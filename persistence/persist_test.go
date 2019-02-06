@@ -10,32 +10,33 @@ import (
 	"testing"
 )
 
-func TestPersistPostLabels(t *testing.T) {
+func TestPostLabelsReaderAndWriter(t *testing.T) {
 	req := require.New(t)
 	id, labels := generateIdAndLabels()
 
-	PersistPostLabels(id, labels)
-
-	f, err := os.Open(filepath.Join("data", "deadbeef", "all.labels"))
+	writer, err := NewPostLabelsWriter(id)
 	req.NoError(err)
-	defer f.Close()
 
-	req.Equal(datatypes.NewLabel(0), datatypes.Label(readEightBytes(req, f)))
-	req.Equal(datatypes.NewLabel(1), datatypes.Label(readEightBytes(req, f)))
-	req.Equal(datatypes.NewLabel(2), datatypes.Label(readEightBytes(req, f)))
-	req.Equal(datatypes.NewLabel(3), datatypes.Label(readEightBytes(req, f)))
-	ensureNoMoreContent(req, f)
-}
-
-func TestReadPostLabels(t *testing.T) {
-	req := require.New(t)
-	id, labels := generateIdAndLabels()
-
-	PersistPostLabels(id, labels)
-	actualLabels, err := ReadPostLabels(id)
-
+	for _, l := range labels {
+		err := writer.Write(l)
+		req.NoError(err)
+	}
+	err = writer.Close()
 	req.NoError(err)
-	req.EqualValues(labels, actualLabels)
+
+	reader, err := NewPostLabelsReader(id)
+	req.NoError(err)
+
+	labelsFromReader := make([]datatypes.Label, 4)
+	for i := range labelsFromReader {
+		labelsFromReader[i], err = reader.Read()
+		req.NoError(err)
+	}
+	shouldBeNil, err := reader.Read()
+	req.Nil(shouldBeNil)
+	req.Equal(err, io.EOF)
+
+	req.EqualValues(labels, labelsFromReader)
 }
 
 func generateIdAndLabels() ([]byte, []datatypes.Label) {
@@ -49,20 +50,6 @@ func generateIdAndLabels() ([]byte, []datatypes.Label) {
 	return id, labels
 }
 
-func ensureNoMoreContent(req *require.Assertions, f *os.File) {
-	b := make([]byte, 1)
-	_, err := f.Read(b)
-	req.Equal(io.EOF, err)
-}
-
-func readEightBytes(req *require.Assertions, f *os.File) []byte {
-	b := make([]byte, datatypes.LabelSize)
-	n, err := f.Read(b)
-	req.NoError(err)
-	req.Equal(datatypes.LabelSize, n)
-	return b
-}
-
 func TestMain(m *testing.M) {
 	// call flag.Parse() here if TestMain uses flags
 	res := m.Run()
@@ -71,5 +58,5 @@ func TestMain(m *testing.M) {
 }
 
 func cleanup() {
-	_ = os.RemoveAll(filepath.Join("data", "deadbeef"))
+	_ = os.RemoveAll(filepath.Join(GetPostDataPath(), "deadbeef"))
 }

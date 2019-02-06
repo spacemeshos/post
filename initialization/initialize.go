@@ -15,30 +15,43 @@ func Initialize(id []byte, width uint64, difficulty []byte) <-chan []byte {
 	// TODO @noam: tune performance (parallel PoW, but don't overuse the machine)
 	ch := make(chan []byte)
 	go func() {
-		res := initializeSync(id, width, difficulty)
+		res, _ := initializeSync(id, width, difficulty) // TODO @noam: handle error
 		ch <- res
 	}()
 	return ch
 }
 
-func initializeSync(id []byte, width uint64, difficulty []byte) []byte {
-	labels := make([]datatypes.Label, 0, width)
-	var cnt uint64 = 0
-	for len(labels) < int(width) { // TODO @noam: handle larger than int
+func initializeSync(id []byte, width uint64, difficulty []byte) ([]byte, error) {
+	labelsWriter, err := persistence.NewPostLabelsWriter(id)
+	if err != nil {
+		return nil, err
+	}
+	merkleTree := merkle.NewTree(width)
+	var cnt, labelsFound uint64 = 0, 0
+	for labelsFound < width {
 		l := datatypes.NewLabel(cnt)
 		if datatypes.CalcHash(id, l).IsLessThan(difficulty) {
-			labels = append(labels, l)
+			err := labelsWriter.Write(l)
+			if err != nil {
+				return nil, err
+			}
+			merkleTree.AddLeaf(l)
+			labelsFound++
 		}
-		if cnt == math.MaxUint64 && len(labels) < int(width) {
+		if cnt == math.MaxUint64 && labelsFound < width {
 			panic("Out of counter space!") // TODO @noam: handle gracefully?
 		}
 		cnt++
 	}
-	persistence.PersistPostLabels(id, labels)
-	root := merkle.CalcMerkleRoot(labels)
-	fmt.Printf("\n===\nConstructed list of %v PoST labels.\n"+
-		"Number of random oracle calls: %v\n"+
-		"Merkel root: %v\n"+
-		"Actual labels: %v\n===\n\n", len(labels), cnt, hex.EncodeToString(root), labels)
-	return root
+	err = labelsWriter.Close()
+	if err != nil {
+		return nil, err
+	}
+	root := merkleTree.Root()
+	fmt.Printf("\n" +
+		"🔹  Constructed list of %v PoST labels.\n"+
+		"🔹  Number of random oracle calls: %v\n"+
+		"🔹  Merkle root: %v\n" +
+		"\n", labelsFound, cnt, hex.EncodeToString(root))
+	return root, nil
 }
