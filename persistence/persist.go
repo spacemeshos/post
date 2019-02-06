@@ -3,19 +3,23 @@ package persistence
 import (
 	"bufio"
 	"encoding/hex"
+	"io"
 	"os"
 	"path/filepath"
 	"post-private/datatypes"
 )
 
+const (
+	dataPath = "data" // TODO @noam: put in config
+	filename = "all.labels"
+)
+
 func PersistPostLabels(id []byte, labels []datatypes.Label) {
-	dataPath := "data" // TODO @noam: put in config
 	labelsPath := filepath.Join(dataPath, hex.EncodeToString(id))
 	err := os.MkdirAll(labelsPath, os.ModePerm)
 	if err != nil {
 		panic(err) // TODO @noam: handle
 	}
-	filename := "all.labels"
 	fullFilename := filepath.Join(labelsPath, filename)
 	f, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
@@ -37,4 +41,30 @@ func PersistPostLabels(id []byte, labels []datatypes.Label) {
 	if err != nil {
 		panic(err) // TODO @noam: handle
 	}
+}
+
+func ReadPostLabels(id []byte) ([]datatypes.Label, error) {
+	fullFilename := filepath.Join(dataPath, hex.EncodeToString(id), filename)
+	f, err := os.OpenFile(fullFilename, os.O_RDONLY, os.ModePerm)
+	if os.IsNotExist(err) {
+		return nil, err
+	}
+	if err != nil {
+		panic(err)
+	}
+	r := bufio.NewReader(f)
+
+	labels := make([]datatypes.Label, 0)
+	for {
+		var l datatypes.Label = make([]byte, datatypes.LabelSize)
+		n, err := r.Read(l)
+		if err == io.EOF {
+			if n != 0 {
+				return nil, io.ErrUnexpectedEOF
+			}
+			break
+		}
+		labels = append(labels, l)
+	}
+	return labels, nil
 }

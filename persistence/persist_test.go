@@ -3,6 +3,7 @@ package persistence
 import (
 	"encoding/hex"
 	"github.com/stretchr/testify/require"
+	"io"
 	"os"
 	"path/filepath"
 	"post-private/datatypes"
@@ -11,14 +12,8 @@ import (
 
 func TestPersistPostLabels(t *testing.T) {
 	req := require.New(t)
+	id, labels := generateIdAndLabels()
 
-	id, _ := hex.DecodeString("deadbeef")
-	labels := []datatypes.Label{
-		datatypes.NewLabel(0),
-		datatypes.NewLabel(1),
-		datatypes.NewLabel(2),
-		datatypes.NewLabel(3),
-	}
 	PersistPostLabels(id, labels)
 
 	f, err := os.Open(filepath.Join("data", "deadbeef", "all.labels"))
@@ -29,6 +24,35 @@ func TestPersistPostLabels(t *testing.T) {
 	req.Equal(datatypes.NewLabel(1), datatypes.Label(readEightBytes(req, f)))
 	req.Equal(datatypes.NewLabel(2), datatypes.Label(readEightBytes(req, f)))
 	req.Equal(datatypes.NewLabel(3), datatypes.Label(readEightBytes(req, f)))
+	ensureNoMoreContent(req, f)
+}
+
+func TestReadPostLabels(t *testing.T) {
+	req := require.New(t)
+	id, labels := generateIdAndLabels()
+
+	PersistPostLabels(id, labels)
+	actualLabels, err := ReadPostLabels(id)
+
+	req.NoError(err)
+	req.EqualValues(labels, actualLabels)
+}
+
+func generateIdAndLabels() ([]byte, []datatypes.Label) {
+	id, _ := hex.DecodeString("deadbeef")
+	labels := []datatypes.Label{
+		datatypes.NewLabel(0),
+		datatypes.NewLabel(1),
+		datatypes.NewLabel(2),
+		datatypes.NewLabel(3),
+	}
+	return id, labels
+}
+
+func ensureNoMoreContent(req *require.Assertions, f *os.File) {
+	b := make([]byte, 1)
+	_, err := f.Read(b)
+	req.Equal(io.EOF, err)
 }
 
 func readEightBytes(req *require.Assertions, f *os.File) []byte {
