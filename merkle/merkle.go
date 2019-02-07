@@ -15,11 +15,10 @@ type node []byte
 
 type incrementalTree struct {
 	path []node
-	hash func(left node, right node) node
 }
 
 func NewTree(width uint64) Tree {
-	return &incrementalTree{path: make([]node, int(math.Log2(float64(width)))+1), hash: sha256Hash}
+	return &incrementalTree{path: make([]node, int(math.Log2(float64(width)))+1)}
 }
 
 func (t incrementalTree) AddLeaf(label datatypes.Label) {
@@ -29,12 +28,12 @@ func (t incrementalTree) AddLeaf(label datatypes.Label) {
 			t.path[i] = activeNode
 			break
 		}
-		activeNode = t.hash(n, activeNode)
+		activeNode = sum(n, activeNode)
 		t.path[i] = nil
 	}
 }
 
-func sha256Hash(left node, right node) node {
+func sum(left node, right node) node {
 	res := sha256.Sum256(append(left, right...))
 	return res[:]
 }
