@@ -1,7 +1,6 @@
 package merkle
 
 import (
-	"github.com/cbergoon/merkletree"
 	"github.com/spacemeshos/sha256-simd"
 	"math"
 	"post-private/datatypes"
@@ -42,28 +41,4 @@ func sha256Hash(left node, right node) node {
 
 func (t incrementalTree) Root() []byte {
 	return t.path[len(t.path)-1]
-}
-
-type batchTree struct {
-	labels []merkletree.Content
-}
-
-func NewBatchTree(width uint64) Tree {
-	return &batchTree{labels: make([]merkletree.Content, 0, width)}
-}
-
-func (t *batchTree) AddLeaf(label datatypes.Label) {
-	t.labels = append(t.labels, label)
-}
-
-func (t *batchTree) Root() []byte {
-	return calcMerkleRoot(t.labels)
-}
-
-func calcMerkleRoot(labels []merkletree.Content) []byte {
-	merkleTree, err := merkletree.NewTree(labels)
-	if err != nil {
-		panic(err)
-	}
-	return merkleTree.Root.Hash
 }
