@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"github.com/cbergoon/merkletree"
-	"github.com/spacemeshos/sha256-simd"
 )
 
 const LabelSize = 8
@@ -15,8 +14,7 @@ type Label []byte
 // START merkletree.Content methods
 
 func (l Label) CalculateHash() ([]byte, error) {
-	hash := sha256.Sum256(l)
-	return hash[:], nil
+	return l, nil
 }
 
 func (l Label) Equals(other merkletree.Content) (bool, error) {

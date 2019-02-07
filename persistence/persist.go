@@ -56,6 +56,9 @@ func (w *postLabelsWriter) Close() error {
 		return err
 	}
 	w.w = nil
+	if info, err := w.f.Stat(); err == nil {
+		fmt.Printf("closing file: '%v' (%v bytes)\n", info.Name(), info.Size())
+	}
 	err = w.f.Close()
 	if err != nil {
 		return err

@@ -15,7 +15,7 @@ import (
 func TestInitialize(t *testing.T) {
 	id, _ := hex.DecodeString("deadbeef")
 	difficulty, _ := hex.DecodeString("01000000000000000000000000000000")
-	expectedMerkleRoot, _ := hex.DecodeString("3bcf70f0d75aeb2d10eef08c9df63bb618bbdda6f97418884939d6a69538d7ec")
+	expectedMerkleRoot, _ := hex.DecodeString("d39a77684b387f90792706ce49945c73849c6e5cdca31f220d5045e9fa21086b")
 
 	resChan := Initialize(id, 16, difficulty)
 
@@ -39,7 +39,7 @@ func _TestInitializeLong(t *testing.T) {
 	}
 	id, _ := hex.DecodeString("deadbeef")
 	difficulty, _ := hex.DecodeString("10000000000000000000000000000000")
-	expectedMerkleRoot, _ := hex.DecodeString("f7f5cb643a23c5bcd79bc3950dca9c0535381f549876a72f3f6628a3251d27fe")
+	expectedMerkleRoot, _ := hex.DecodeString("c0f742adce5c9fed7289c0a1664d71f08280f7084dcff24df916a6da56f8a88c")
 
 	resChan := Initialize(id, uint64(math.Pow(2,25)), difficulty)
 
@@ -57,12 +57,14 @@ func _TestInitializeLong(t *testing.T) {
 	}
 	/*
 	=== RUN   TestInitializeLong
+	creating directory: /Users/noamnelke/.spacemesh/post-data/deadbeef
+	closing file: 'all.labels' (268435456 bytes)
 
 	🔹  Constructed list of 33554432 PoST labels.
 	🔹  Number of random oracle calls: 536922911
-	🔹  Merkle root: f7f5cb643a23c5bcd79bc3950dca9c0535381f549876a72f3f6628a3251d27fe
+	🔹  Merkle root: c0f742adce5c9fed7289c0a1664d71f08280f7084dcff24df916a6da56f8a88c
 
-	--- PASS: TestInitializeLong (247.98s)
+	--- PASS: TestInitializeLong (177.68s)
 	PASS
 	 */
 }
