@@ -86,25 +86,22 @@ func (t *incrementalTree) isNodeInProof(layer uint) bool {
 		return false
 	}
 
-	var bottomMask uint64 = 1<<(layer+1) - 1 // layer 2 (third layer) becomes ...000111
-	var currMask uint64 = 1 << layer // layer 2 (third layer) becomes ...000100
-
-	samePathAboveCurrentLayer := (t.currentLeaf^*t.leafToProve)|bottomMask == bottomMask
-	differentAtCurrentLayer := (t.currentLeaf^*t.leafToProve)&currMask == currMask
+	pathDiff := t.currentLeaf ^ *t.leafToProve
+	samePathAboveCurrentLayer := pathDiff/(1<<(layer+1)) == 0
+	differentAtCurrentLayer := pathDiff/(1<<layer)%2 == 1
 
 	return samePathAboveCurrentLayer && differentAtCurrentLayer
 
 	/* Explanation:
 
 	The index in binary form (most- to least-significant) represents the path from the top (root) of the tree to the
-	bottom.
-	When we mask the bottom of the tree (`layer` least significant binary digits) we require the currently added leaf's
-	index and the proved leaf index to be identical, in other words - they share the path from the root (top) of the
-	tree to the current layer.
+	bottom (0=left, 1=right).
+	We require that the path from the root to the current leaf and the path to the proved leaf are identical up to the
+	current layer.
 	We also require that the current layer is different - so the currently handled node is a sibling of one of the nodes
 	in the path to the proved node -- so we want it in the proof.
 
-	 */
+	*/
 }
 
 // TODO @noam: Remove!
