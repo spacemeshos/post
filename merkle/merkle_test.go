@@ -26,9 +26,9 @@ func _TestNewTreeBig(t *testing.T) {
 	expectedRoot, _ := hex.DecodeString("d359afe256ea0864223601b064d334ee3667923479a24a2df2daea31936d3779")
 	require.Equal(t, expectedRoot, tree.Root())
 	/*
-	=== RUN   TestNewTreeBig
-	--- PASS: TestNewTreeBig (11.90s)
-	 */
+		=== RUN   TestNewTreeBig
+		--- PASS: TestNewTreeBig (11.90s)
+	*/
 }
 
 func TestNewTreeWithProof(t *testing.T) {

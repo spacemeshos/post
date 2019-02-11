@@ -23,7 +23,7 @@ func TestInitialize(t *testing.T) {
 	go func() {
 		merkleRoot := <-resChan
 		assert.Equal(t, expectedMerkleRoot, merkleRoot)
-		done<-true
+		done <- true
 	}()
 
 	select {
@@ -41,13 +41,13 @@ func _TestInitializeLong(t *testing.T) {
 	difficulty, _ := hex.DecodeString("10000000000000000000000000000000")
 	expectedMerkleRoot, _ := hex.DecodeString("c0f742adce5c9fed7289c0a1664d71f08280f7084dcff24df916a6da56f8a88c")
 
-	resChan := Initialize(id, uint64(math.Pow(2,25)), difficulty)
+	resChan := Initialize(id, uint64(math.Pow(2, 25)), difficulty)
 
 	done := make(chan bool)
 	go func() {
 		merkleRoot := <-resChan
 		assert.Equal(t, expectedMerkleRoot, merkleRoot)
-		done<-true
+		done <- true
 	}()
 
 	select {
@@ -56,17 +56,17 @@ func _TestInitializeLong(t *testing.T) {
 		panic("timeout")
 	}
 	/*
-	=== RUN   TestInitializeLong
-	creating directory: /Users/noamnelke/.spacemesh/post-data/deadbeef
-	closing file: 'all.labels' (268435456 bytes)
+		=== RUN   TestInitializeLong
+		creating directory: /Users/noamnelke/.spacemesh/post-data/deadbeef
+		closing file: 'all.labels' (268435456 bytes)
 
-	🔹  Constructed list of 33554432 PoST labels.
-	🔹  Number of random oracle calls: 536922911
-	🔹  Merkle root: c0f742adce5c9fed7289c0a1664d71f08280f7084dcff24df916a6da56f8a88c
+		🔹  Constructed list of 33554432 PoST labels.
+		🔹  Number of random oracle calls: 536922911
+		🔹  Merkle root: c0f742adce5c9fed7289c0a1664d71f08280f7084dcff24df916a6da56f8a88c
 
-	--- PASS: TestInitializeLong (177.68s)
-	PASS
-	 */
+		--- PASS: TestInitializeLong (177.68s)
+		PASS
+	*/
 }
 
 func TestMain(m *testing.M) {

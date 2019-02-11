@@ -48,10 +48,10 @@ func initializeSync(id []byte, width uint64, difficulty []byte) ([]byte, error) 
 		return nil, err
 	}
 	root := merkleTree.Root()
-	fmt.Printf("\n" +
+	fmt.Printf("\n"+
 		"🔹  Constructed list of %v PoST labels.\n"+
 		"🔹  Number of random oracle calls: %v\n"+
-		"🔹  Merkle root: %v\n" +
+		"🔹  Merkle root: %v\n"+
 		"\n", labelsFound, cnt, hex.EncodeToString(root))
 	return root, nil
 }

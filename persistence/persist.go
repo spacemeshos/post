@@ -96,7 +96,7 @@ func (r *postLabelsReader) Read() (datatypes.Label, error) {
 	var l datatypes.Label = make([]byte, datatypes.LabelSize)
 	n, err := r.r.Read(l)
 	if err != nil {
-		if err == io.EOF && n != 0{
+		if err == io.EOF && n != 0 {
 			return nil, io.ErrUnexpectedEOF
 		}
 		return nil, err
