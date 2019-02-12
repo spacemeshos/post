@@ -21,11 +21,11 @@ func (n node) String() string {
 }
 
 type incrementalTree struct {
-	path        []node
-	currentLeaf uint64
-	leafToProve *uint64
-	proof       []node
-	nodes       [][]node // TODO @noam: Remove!
+	path          []node
+	currentLeaf   uint64
+	leavesToProve []uint64
+	proof         []node
+	nodes         [][]node // TODO @noam: Remove!
 }
 
 func NewTree(width uint64) Tree {
@@ -33,42 +33,60 @@ func NewTree(width uint64) Tree {
 	return &incrementalTree{
 		path:        make([]node, depth),
 		currentLeaf: 0,
-		leafToProve: nil,
-		proof:       nil,
-		nodes:       make([][]node, depth, width), // TODO @noam: Remove!
+		nodes:       make([][]node, depth), // TODO @noam: Remove!
 	}
 }
 
-func NewTreeWithProof(width, leafToProve uint64) Tree {
+func NewProvingTree(width uint64, leavesToProve []uint64) Tree {
 	depth := int(math.Log2(float64(width))) + 1
 	return &incrementalTree{
-		path:        make([]node, depth),
-		currentLeaf: 0,
-		leafToProve: &leafToProve,
-		proof:       make([]node, depth-1),
-		nodes:       make([][]node, depth, width), // TODO @noam: Remove!
+		path:          make([]node, depth),
+		currentLeaf:   0,
+		leavesToProve: leavesToProve,
+		proof:         make([]node, 0, (depth-1)*len(leavesToProve)), // upper bound can be made much tighter
+		nodes:         make([][]node, depth),                         // TODO @noam: Remove!
 	}
 }
 
 func (t *incrementalTree) AddLeaf(label datatypes.Label) {
 	activeNode := node(label)
 	for i := range t.path {
-		t.nodes[i] = append(t.nodes[i], activeNode) // TODO @noam: Remove!
-		if t.isNodeInProof(uint(i)) {
-			t.proof[i] = activeNode
+		if len(t.path) < 5 {
+			t.nodes[i] = append(t.nodes[i], activeNode) // TODO @noam: Remove!
 		}
 		if t.path[i] == nil {
 			t.path[i] = activeNode
 			break
 		}
-		activeNode = sum(t.path[i], activeNode)
+		t.addToProofIfNeeded(uint(i), t.path[i], activeNode)
+		activeNode = getParent(t.path[i], activeNode)
 		t.path[i] = nil
 	}
 	t.currentLeaf++
 }
 
-func sum(left node, right node) node {
-	res := sha256.Sum256(append(left, right...))
+func (t *incrementalTree) addToProofIfNeeded(currentLayer uint, leftChild, rightChild node) {
+	if len(t.leavesToProve) == 0 {
+		return
+	}
+	parentPath, leftChildPath, rightChildPath := getPaths(t.currentLeaf, currentLayer)
+	if t.isNodeInProvedPath(parentPath, currentLayer+1) {
+		if !t.isNodeInProvedPath(leftChildPath, currentLayer) {
+			t.proof = append(t.proof, leftChild)
+		}
+		if !t.isNodeInProvedPath(rightChildPath, currentLayer) {
+			t.proof = append(t.proof, rightChild)
+		}
+	}
+}
+
+func getPaths(currentLeaf uint64, layer uint) (parentPath, leftChildPath, rightChildPath uint64) {
+	parentPath = currentLeaf / (1 << (layer + 1))
+	return parentPath, parentPath << 1, parentPath<<1 + 1
+}
+
+func getParent(leftChild node, rightChild node) node {
+	res := sha256.Sum256(append(leftChild, rightChild...))
 	return res[:]
 }
 
@@ -77,31 +95,20 @@ func (t *incrementalTree) Root() []byte {
 }
 
 func (t *incrementalTree) Proof() []node {
-	printTree(t.nodes) // TODO @noam: Remove!
+	if len(t.path) < 5 {
+		printTree(t.nodes) // TODO @noam: Remove!
+	}
 	return t.proof
 }
 
-func (t *incrementalTree) isNodeInProof(layer uint) bool {
-	if t.leafToProve == nil {
-		return false
+func (t *incrementalTree) isNodeInProvedPath(path uint64, layer uint) bool {
+	var divisor uint64 = 1 << layer
+	for _, leafToProve := range t.leavesToProve {
+		if leafToProve/divisor == path {
+			return true
+		}
 	}
-
-	pathDiff := t.currentLeaf ^ *t.leafToProve
-	samePathAboveCurrentLayer := pathDiff/(1<<(layer+1)) == 0
-	differentAtCurrentLayer := pathDiff/(1<<layer)%2 == 1
-
-	return samePathAboveCurrentLayer && differentAtCurrentLayer
-
-	/* Explanation:
-
-	The index in binary form (most- to least-significant) represents the path from the top (root) of the tree to the
-	bottom (0=left, 1=right).
-	We require that the path from the root to the current leaf and the path to the proved leaf are identical up to the
-	current layer.
-	We also require that the current layer is different - so the currently handled node is a sibling of one of the nodes
-	in the path to the proved node -- so we want it in the proof.
-
-	*/
+	return false
 }
 
 // TODO @noam: Remove!
