@@ -29,7 +29,7 @@ func TestNewTree(t *testing.T) {
 	require.Equal(t, expectedRoot, tree.Root())
 }
 
-func TestNewTreeBig(t *testing.T) {
+func _TestNewTreeBig(t *testing.T) {
 	var size uint64 = 1 << 25
 	tree := NewTree(size)
 	for i := uint64(0); i < size; i++ {
