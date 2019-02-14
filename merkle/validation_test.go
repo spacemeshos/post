@@ -28,11 +28,11 @@ func TestValidatePartialTreeForRealz(t *testing.T) {
 
 	leafIndices := []uint64{4}
 	leaves := []node{datatypes.NewLabel(4)}
-	tree := NewProvingTree(8, leafIndices)
+	tree := NewProvingTree(leafIndices)
 	for i := 0; i < 8; i++ {
 		tree.AddLeaf(datatypes.NewLabel(uint64(i)))
 	}
-	root := tree.Root() // 4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0
+	root := tree.Root()   // 4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0
 	proof := tree.Proof() // 05 6b 13
 
 	valid, err := ValidatePartialTree(leafIndices, leaves, proof, root)
@@ -55,11 +55,11 @@ func TestValidatePartialTreeMulti(t *testing.T) {
 		datatypes.NewLabel(1),
 		datatypes.NewLabel(4),
 	}
-	tree := NewProvingTree(8, leafIndices)
+	tree := NewProvingTree(leafIndices)
 	for i := 0; i < 8; i++ {
 		tree.AddLeaf(datatypes.NewLabel(uint64(i)))
 	}
-	root := tree.Root() // 4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0
+	root := tree.Root()   // 4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0
 	proof := tree.Proof() // 05 6b 13
 
 	valid, err := ValidatePartialTree(leafIndices, leaves, proof, root)
@@ -83,11 +83,11 @@ func TestValidatePartialTreeMulti2(t *testing.T) {
 		datatypes.NewLabel(1),
 		datatypes.NewLabel(4),
 	}
-	tree := NewProvingTree(8, leafIndices)
+	tree := NewProvingTree(leafIndices)
 	for i := 0; i < 8; i++ {
 		tree.AddLeaf(datatypes.NewLabel(uint64(i)))
 	}
-	root := tree.Root() // 4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0
+	root := tree.Root()   // 4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0
 	proof := tree.Proof() // 05 6b 13
 
 	valid, err := ValidatePartialTree(leafIndices, leaves, proof, root)

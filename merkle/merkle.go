@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/spacemeshos/sha256-simd"
-	"math"
 	"post-private/datatypes"
 )
 
@@ -28,30 +27,34 @@ type incrementalTree struct {
 	nodes         [][]node // TODO @noam: Remove!
 }
 
-func NewTree(width uint64) Tree {
-	depth := int(math.Log2(float64(width))) + 1
+func NewTree() Tree {
 	return &incrementalTree{
-		path:        make([]node, depth),
+		path:        make([]node, 0),
 		currentLeaf: 0,
-		nodes:       make([][]node, depth), // TODO @noam: Remove!
+		nodes:       make([][]node, 0), // TODO @noam: Remove!
 	}
 }
 
-func NewProvingTree(width uint64, leavesToProve []uint64) Tree {
-	depth := int(math.Log2(float64(width))) + 1
+func NewProvingTree(leavesToProve []uint64) Tree {
 	return &incrementalTree{
-		path:          make([]node, depth),
+		path:          make([]node, 0),
 		currentLeaf:   0,
 		leavesToProve: leavesToProve,
-		proof:         make([]node, 0, (depth-1)*len(leavesToProve)), // upper bound can be made much tighter
-		nodes:         make([][]node, depth),                         // TODO @noam: Remove!
+		proof:         make([]node, 0),
+		nodes:         make([][]node, 0), // TODO @noam: Remove!
 	}
 }
 
 func (t *incrementalTree) AddLeaf(label datatypes.Label) {
 	activeNode := node(label)
-	for i := range t.path {
+	for i := 0; true; i++ {
+		if len(t.path) == i {
+			t.path = append(t.path, nil)
+		}
 		if len(t.path) < 5 {
+			if len(t.nodes) == i {
+				t.nodes = append(t.nodes, nil)
+			}
 			t.nodes[i] = append(t.nodes[i], activeNode) // TODO @noam: Remove!
 		}
 		if t.path[i] == nil {

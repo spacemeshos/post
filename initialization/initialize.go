@@ -26,7 +26,7 @@ func initializeSync(id []byte, width uint64, difficulty []byte) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	merkleTree := merkle.NewTree(width)
+	merkleTree := merkle.NewTree()
 	var cnt, labelsFound uint64 = 0, 0
 	for labelsFound < width {
 		l := datatypes.NewLabel(cnt)

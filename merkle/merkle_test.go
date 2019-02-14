@@ -21,7 +21,7 @@ import (
 */
 
 func TestNewTree(t *testing.T) {
-	tree := NewTree(8)
+	tree := NewTree()
 	for i := 0; i < 8; i++ {
 		tree.AddLeaf(datatypes.NewLabel(uint64(i)))
 	}
@@ -29,22 +29,27 @@ func TestNewTree(t *testing.T) {
 	require.Equal(t, expectedRoot, tree.Root())
 }
 
-func _TestNewTreeBig(t *testing.T) {
-	var size uint64 = 1 << 25
-	tree := NewTree(size)
+func BenchmarkNewTree(b *testing.B) {
+	var size uint64 = 1 << 28
+	tree := NewTree()
 	for i := uint64(0); i < size; i++ {
 		tree.AddLeaf(datatypes.NewLabel(i))
 	}
-	expectedRoot, _ := hex.DecodeString("d359afe256ea0864223601b064d334ee3667923479a24a2df2daea31936d3779")
-	require.Equal(t, expectedRoot, tree.Root())
 	/*
-		=== RUN   TestNewTreeBig
-		--- PASS: TestNewTreeBig (11.59s)
+		goos: darwin
+		goarch: amd64
+		pkg: post-private/merkle
+		BenchmarkNewTree-8   	       1	94453361478 ns/op
+		PASS
 	*/
+	// Overhead (no hashing) is 8056887277 ns/op (8 seconds)
+	// 94 seconds to construct a 28 layer tree, 86 seconds without overhead (8.5GB @ 32b leaves).
+	// Extrapolated to 256GB -> ~43 minutes + ~4 minutes overhead.
+	// Reading 256GB from a magnetic disk should take ~30 minutes.
 }
 
 func TestNewProvingTree(t *testing.T) {
-	tree := NewProvingTree(8, []uint64{4})
+	tree := NewProvingTree([]uint64{4})
 	for i := 0; i < 8; i++ {
 		tree.AddLeaf(datatypes.NewLabel(uint64(i)))
 	}
@@ -67,7 +72,7 @@ func TestNewProvingTree(t *testing.T) {
 }
 
 func TestNewProvingTreeMultiProof(t *testing.T) {
-	tree := NewProvingTree(8, []uint64{1, 4})
+	tree := NewProvingTree([]uint64{1, 4})
 	for i := 0; i < 8; i++ {
 		tree.AddLeaf(datatypes.NewLabel(uint64(i)))
 	}
@@ -91,7 +96,7 @@ func TestNewProvingTreeMultiProof(t *testing.T) {
 }
 
 func TestNewProvingTreeMultiProof2(t *testing.T) {
-	tree := NewProvingTree(8, []uint64{0, 1, 4})
+	tree := NewProvingTree([]uint64{0, 1, 4})
 	for i := 0; i < 8; i++ {
 		tree.AddLeaf(datatypes.NewLabel(uint64(i)))
 	}

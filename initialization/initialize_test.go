@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"flag"
 	"github.com/stretchr/testify/assert"
-	"math"
 	"os"
 	"path/filepath"
 	"post-private/persistence"
@@ -33,20 +32,17 @@ func TestInitialize(t *testing.T) {
 	}
 }
 
-func _TestInitializeLong(t *testing.T) {
-	if testing.Short() {
-		t.Skip("This is a long test (4+ minutes)")
-	}
+func BenchmarkInitialize(b *testing.B) {
 	id, _ := hex.DecodeString("deadbeef")
 	difficulty, _ := hex.DecodeString("10000000000000000000000000000000")
 	expectedMerkleRoot, _ := hex.DecodeString("c0f742adce5c9fed7289c0a1664d71f08280f7084dcff24df916a6da56f8a88c")
 
-	resChan := Initialize(id, uint64(math.Pow(2, 25)), difficulty)
+	resChan := Initialize(id, 1<<25, difficulty)
 
 	done := make(chan bool)
 	go func() {
 		merkleRoot := <-resChan
-		assert.Equal(t, expectedMerkleRoot, merkleRoot)
+		assert.Equal(b, expectedMerkleRoot, merkleRoot)
 		done <- true
 	}()
 
@@ -56,7 +52,6 @@ func _TestInitializeLong(t *testing.T) {
 		panic("timeout")
 	}
 	/*
-		=== RUN   TestInitializeLong
 		creating directory: /Users/noamnelke/.spacemesh/post-data/deadbeef
 		closing file: 'all.labels' (268435456 bytes)
 
@@ -64,7 +59,10 @@ func _TestInitializeLong(t *testing.T) {
 		🔹  Number of random oracle calls: 536922911
 		🔹  Merkle root: c0f742adce5c9fed7289c0a1664d71f08280f7084dcff24df916a6da56f8a88c
 
-		--- PASS: TestInitializeLong (177.68s)
+		goos: darwin
+		goarch: amd64
+		pkg: post-private/initialization
+		BenchmarkInitialize-8   	       1	170890054153 ns/op
 		PASS
 	*/
 }
