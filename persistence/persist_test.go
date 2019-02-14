@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"post-private/datatypes"
+	"post-private/util"
 	"testing"
 )
 
@@ -27,12 +27,15 @@ func TestPostLabelsReaderAndWriter(t *testing.T) {
 	reader, err := NewPostLabelsReader(id)
 	req.NoError(err)
 
-	labelsFromReader := make([]datatypes.Label, 4)
+	labelsFromReader := make([]util.Label, 4)
+	var idx uint64
 	for i := range labelsFromReader {
-		labelsFromReader[i], err = reader.Read()
+		idx, labelsFromReader[i], err = reader.Read()
+		req.Equal(idx, uint64(i))
 		req.NoError(err)
 	}
-	shouldBeNil, err := reader.Read()
+	idx, shouldBeNil, err := reader.Read()
+	req.Zero(idx)
 	req.Nil(shouldBeNil)
 	req.Equal(err, io.EOF)
 
@@ -42,13 +45,13 @@ func TestPostLabelsReaderAndWriter(t *testing.T) {
 	req.EqualValues(labels, labelsFromReader)
 }
 
-func generateIdAndLabels() ([]byte, []datatypes.Label) {
+func generateIdAndLabels() ([]byte, []util.Label) {
 	id, _ := hex.DecodeString("deadbeef")
-	labels := []datatypes.Label{
-		datatypes.NewLabel(0),
-		datatypes.NewLabel(1),
-		datatypes.NewLabel(2),
-		datatypes.NewLabel(3),
+	labels := []util.Label{
+		util.NewLabel(0),
+		util.NewLabel(1),
+		util.NewLabel(2),
+		util.NewLabel(3),
 	}
 	return id, labels
 }

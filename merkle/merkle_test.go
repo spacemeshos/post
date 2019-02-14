@@ -3,7 +3,7 @@ package merkle
 import (
 	"encoding/hex"
 	"github.com/stretchr/testify/require"
-	"post-private/datatypes"
+	"post-private/util"
 	"testing"
 )
 
@@ -23,7 +23,7 @@ import (
 func TestNewTree(t *testing.T) {
 	tree := NewTree()
 	for i := 0; i < 8; i++ {
-		tree.AddLeaf(datatypes.NewLabel(uint64(i)))
+		tree.AddLeaf(util.NewLabel(uint64(i)))
 	}
 	expectedRoot, _ := hex.DecodeString("4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0")
 	require.Equal(t, expectedRoot, tree.Root())
@@ -33,7 +33,7 @@ func BenchmarkNewTree(b *testing.B) {
 	var size uint64 = 1 << 28
 	tree := NewTree()
 	for i := uint64(0); i < size; i++ {
-		tree.AddLeaf(datatypes.NewLabel(i))
+		tree.AddLeaf(util.NewLabel(i))
 	}
 	/*
 		goos: darwin
@@ -51,7 +51,7 @@ func BenchmarkNewTree(b *testing.B) {
 func TestNewProvingTree(t *testing.T) {
 	tree := NewProvingTree([]uint64{4})
 	for i := 0; i < 8; i++ {
-		tree.AddLeaf(datatypes.NewLabel(uint64(i)))
+		tree.AddLeaf(util.NewLabel(uint64(i)))
 	}
 	expectedRoot, _ := hex.DecodeString("4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0")
 	require.Equal(t, expectedRoot, tree.Root())
@@ -74,7 +74,7 @@ func TestNewProvingTree(t *testing.T) {
 func TestNewProvingTreeMultiProof(t *testing.T) {
 	tree := NewProvingTree([]uint64{1, 4})
 	for i := 0; i < 8; i++ {
-		tree.AddLeaf(datatypes.NewLabel(uint64(i)))
+		tree.AddLeaf(util.NewLabel(uint64(i)))
 	}
 	expectedRoot, _ := hex.DecodeString("4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0")
 	require.Equal(t, expectedRoot, tree.Root())
@@ -98,7 +98,7 @@ func TestNewProvingTreeMultiProof(t *testing.T) {
 func TestNewProvingTreeMultiProof2(t *testing.T) {
 	tree := NewProvingTree([]uint64{0, 1, 4})
 	for i := 0; i < 8; i++ {
-		tree.AddLeaf(datatypes.NewLabel(uint64(i)))
+		tree.AddLeaf(util.NewLabel(uint64(i)))
 	}
 	expectedRoot, _ := hex.DecodeString("4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0")
 	require.Equal(t, expectedRoot, tree.Root())

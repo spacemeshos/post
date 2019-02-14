@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
-	"post-private/datatypes"
+	"post-private/util"
 	"post-private/merkle"
 	"post-private/persistence"
 )
@@ -29,8 +29,8 @@ func initializeSync(id []byte, width uint64, difficulty []byte) ([]byte, error) 
 	merkleTree := merkle.NewTree()
 	var cnt, labelsFound uint64 = 0, 0
 	for labelsFound < width {
-		l := datatypes.NewLabel(cnt)
-		if datatypes.CalcHash(id, l).IsLessThan(difficulty) {
+		l := util.NewLabel(cnt)
+		if util.CalcHash(id, l).IsLessThan(difficulty) {
 			err := labelsWriter.Write(l)
 			if err != nil {
 				return nil, err

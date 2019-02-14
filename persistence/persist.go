@@ -7,11 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"post-private/datatypes"
+	"post-private/util"
 )
 
 type PostLabelsWriter interface {
-	Write(label datatypes.Label) error
+	Write(label util.Label) error
 	Close() error
 }
 
@@ -39,13 +39,13 @@ func NewPostLabelsWriter(id []byte) (PostLabelsWriter, error) {
 	}, nil
 }
 
-func (w *postLabelsWriter) Write(label datatypes.Label) error {
+func (w *postLabelsWriter) Write(label util.Label) error {
 	nn, err := w.w.Write(label)
 	if err != nil {
 		return err
 	}
-	if nn != datatypes.LabelSize {
-		return fmt.Errorf("expected label size of %v bytes, but wrote %v bytes (len(label)=%v)", datatypes.LabelSize, nn, len(label))
+	if nn != util.LabelSize {
+		return fmt.Errorf("expected label size of %v bytes, but wrote %v bytes (len(label)=%v)", util.LabelSize, nn, len(label))
 	}
 	return nil
 }
@@ -68,13 +68,14 @@ func (w *postLabelsWriter) Close() error {
 }
 
 type PostLabelsReader interface {
-	Read() (datatypes.Label, error)
+	Read() (uint64, util.Label, error)
 	Close() error
 }
 
 type postLabelsReader struct {
 	f *os.File
 	r *bufio.Reader
+	i uint64
 }
 
 func NewPostLabelsReader(id []byte) (PostLabelsReader, error) {
@@ -89,19 +90,22 @@ func NewPostLabelsReader(id []byte) (PostLabelsReader, error) {
 	return &postLabelsReader{
 		f: f,
 		r: bufio.NewReader(f),
+		i: 0,
 	}, nil
 }
 
-func (r *postLabelsReader) Read() (datatypes.Label, error) {
-	var l datatypes.Label = make([]byte, datatypes.LabelSize)
+func (r *postLabelsReader) Read() (uint64, util.Label, error) {
+	var l util.Label = make([]byte, util.LabelSize)
 	n, err := r.r.Read(l)
 	if err != nil {
 		if err == io.EOF && n != 0 {
-			return nil, io.ErrUnexpectedEOF
+			return 0, nil, io.ErrUnexpectedEOF
 		}
-		return nil, err
+		return 0, nil, err
 	}
-	return l, nil
+	i := r.i
+	r.i++
+	return i, l, nil
 }
 
 func (r *postLabelsReader) Close() error {

@@ -4,11 +4,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/spacemeshos/sha256-simd"
-	"post-private/datatypes"
+	"post-private/util"
 )
 
 type Tree interface {
-	AddLeaf(label datatypes.Label)
+	AddLeaf(label util.Label)
 	Root() []byte
 	Proof() []node
 }
@@ -45,7 +45,7 @@ func NewProvingTree(leavesToProve []uint64) Tree {
 	}
 }
 
-func (t *incrementalTree) AddLeaf(label datatypes.Label) {
+func (t *incrementalTree) AddLeaf(label util.Label) {
 	activeNode := node(label)
 	for i := 0; true; i++ {
 		if len(t.path) == i {

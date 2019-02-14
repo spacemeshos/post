@@ -1,4 +1,4 @@
-package datatypes
+package util
 
 import (
 	"bytes"
@@ -11,9 +11,10 @@ func (h Hash) IsLessThan(other Hash) bool {
 	return bytes.Compare(h, other) <= 0
 }
 
-func CalcHash(id []byte, l Label) Hash {
+func CalcHash(byteArrays... []byte) Hash {
 	h := sha256.New()
-	h.Write(id)
-	h.Write(l)
+	for _, ba := range byteArrays {
+		h.Write(ba)
+	}
 	return h.Sum(nil)[:]
 }

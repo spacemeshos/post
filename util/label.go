@@ -1,4 +1,4 @@
-package datatypes
+package util
 
 import (
 	"encoding/binary"
