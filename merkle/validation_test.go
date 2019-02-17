@@ -3,7 +3,6 @@ package merkle
 import (
 	"encoding/hex"
 	"github.com/stretchr/testify/require"
-	"post-private/util"
 	"testing"
 )
 
@@ -11,11 +10,11 @@ func TestValidatePartialTree(t *testing.T) {
 	req := require.New(t)
 
 	leafIndices := []uint64{3}
-	leaves := []node{util.NewLabel(3)}
+	leaves := []node{newNodeFromUint64(3)}
 	proof := []node{
-		util.NewLabel(0),
-		util.NewLabel(0),
-		util.NewLabel(0),
+		newNodeFromUint64(0),
+		newNodeFromUint64(0),
+		newNodeFromUint64(0),
 	}
 	root, _ := hex.DecodeString("62b525ec807e21a1fd12d06905d85c4b7bc1feacfa57789d95702f6b69ce129f")
 	valid, err := ValidatePartialTree(leafIndices, leaves, proof, root)
@@ -27,10 +26,10 @@ func TestValidatePartialTreeForRealz(t *testing.T) {
 	req := require.New(t)
 
 	leafIndices := []uint64{4}
-	leaves := []node{util.NewLabel(4)}
+	leaves := []node{newNodeFromUint64(4)}
 	tree := NewProvingTree(leafIndices)
-	for i := 0; i < 8; i++ {
-		tree.AddLeaf(util.NewLabel(uint64(i)))
+	for i := uint64(0); i < 8; i++ {
+		tree.AddLeaf(newNodeFromUint64(i))
 	}
 	root := tree.Root()   // 4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0
 	proof := tree.Proof() // 05 6b 13
@@ -52,12 +51,12 @@ func TestValidatePartialTreeMulti(t *testing.T) {
 
 	leafIndices := []uint64{1, 4}
 	leaves := []node{
-		util.NewLabel(1),
-		util.NewLabel(4),
+		newNodeFromUint64(1),
+		newNodeFromUint64(4),
 	}
 	tree := NewProvingTree(leafIndices)
-	for i := 0; i < 8; i++ {
-		tree.AddLeaf(util.NewLabel(uint64(i)))
+	for i := uint64(0); i < 8; i++ {
+		tree.AddLeaf(newNodeFromUint64(i))
 	}
 	root := tree.Root()   // 4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0
 	proof := tree.Proof() // 05 6b 13
@@ -79,13 +78,13 @@ func TestValidatePartialTreeMulti2(t *testing.T) {
 
 	leafIndices := []uint64{0, 1, 4}
 	leaves := []node{
-		util.NewLabel(0),
-		util.NewLabel(1),
-		util.NewLabel(4),
+		newNodeFromUint64(0),
+		newNodeFromUint64(1),
+		newNodeFromUint64(4),
 	}
 	tree := NewProvingTree(leafIndices)
-	for i := 0; i < 8; i++ {
-		tree.AddLeaf(util.NewLabel(uint64(i)))
+	for i := uint64(0); i < 8; i++ {
+		tree.AddLeaf(newNodeFromUint64(i))
 	}
 	root := tree.Root()   // 4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0
 	proof := tree.Proof() // 05 6b 13

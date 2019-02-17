@@ -1,22 +1,14 @@
 package merkle
 
 import (
-	"encoding/hex"
 	"fmt"
 	"github.com/spacemeshos/sha256-simd"
-	"post-private/util"
 )
 
 type Tree interface {
-	AddLeaf(label util.Label)
-	Root() []byte
+	AddLeaf(leaf node)
+	Root() node
 	Proof() []node
-}
-
-type node []byte
-
-func (n node) String() string {
-	return hex.EncodeToString(n)[:4]
 }
 
 type incrementalTree struct {
@@ -45,8 +37,8 @@ func NewProvingTree(leavesToProve []uint64) Tree {
 	}
 }
 
-func (t *incrementalTree) AddLeaf(label util.Label) {
-	activeNode := node(label)
+func (t *incrementalTree) AddLeaf(leaf node) {
+	activeNode := leaf
 	for i := 0; true; i++ {
 		if len(t.path) == i {
 			t.path = append(t.path, nil)
@@ -88,12 +80,12 @@ func getPaths(currentLeaf uint64, layer uint) (parentPath, leftChildPath, rightC
 	return parentPath, parentPath << 1, parentPath<<1 + 1
 }
 
-func getParent(leftChild node, rightChild node) node {
+func getParent(leftChild, rightChild node) node {
 	res := sha256.Sum256(append(leftChild, rightChild...))
 	return res[:]
 }
 
-func (t *incrementalTree) Root() []byte {
+func (t *incrementalTree) Root() node {
 	return t.path[len(t.path)-1]
 }
 

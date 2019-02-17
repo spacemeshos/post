@@ -4,9 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
-	"post-private/util"
 	"post-private/merkle"
 	"post-private/persistence"
+	"post-private/util"
 )
 
 // Initialize takes an id (public key), width (number of labels) and difficulty (hash to use as upper bound for labels).

@@ -1,9 +1,7 @@
 package merkle
 
 import (
-	"encoding/hex"
 	"github.com/stretchr/testify/require"
-	"post-private/util"
 	"testing"
 )
 
@@ -22,10 +20,10 @@ import (
 
 func TestNewTree(t *testing.T) {
 	tree := NewTree()
-	for i := 0; i < 8; i++ {
-		tree.AddLeaf(util.NewLabel(uint64(i)))
+	for i := uint64(0); i < 8; i++ {
+		tree.AddLeaf(newNodeFromUint64(i))
 	}
-	expectedRoot, _ := hex.DecodeString("4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0")
+	expectedRoot, _ := newNodeFromHex("4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0")
 	require.Equal(t, expectedRoot, tree.Root())
 }
 
@@ -33,7 +31,7 @@ func BenchmarkNewTree(b *testing.B) {
 	var size uint64 = 1 << 28
 	tree := NewTree()
 	for i := uint64(0); i < size; i++ {
-		tree.AddLeaf(util.NewLabel(i))
+		tree.AddLeaf(newNodeFromUint64(i))
 	}
 	/*
 		goos: darwin
@@ -50,16 +48,16 @@ func BenchmarkNewTree(b *testing.B) {
 
 func TestNewProvingTree(t *testing.T) {
 	tree := NewProvingTree([]uint64{4})
-	for i := 0; i < 8; i++ {
-		tree.AddLeaf(util.NewLabel(uint64(i)))
+	for i := uint64(0); i < 8; i++ {
+		tree.AddLeaf(newNodeFromUint64(i))
 	}
-	expectedRoot, _ := hex.DecodeString("4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0")
+	expectedRoot, _ := newNodeFromHex("4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0")
 	require.Equal(t, expectedRoot, tree.Root())
 
 	expectedProof := make([]node, 3)
-	expectedProof[0], _ = hex.DecodeString("0500000000000000")
-	expectedProof[1], _ = hex.DecodeString("6b2e10cb2111114ce942174c38e7ea38864cc364a8fe95c66869c85888d812da")
-	expectedProof[2], _ = hex.DecodeString("13c04a6157aa640f711d230a4f04bc2b19e75df1127dfc899f025f3aa282912d")
+	expectedProof[0], _ = newNodeFromHex("0500000000000000")
+	expectedProof[1], _ = newNodeFromHex("6b2e10cb2111114ce942174c38e7ea38864cc364a8fe95c66869c85888d812da")
+	expectedProof[2], _ = newNodeFromHex("13c04a6157aa640f711d230a4f04bc2b19e75df1127dfc899f025f3aa282912d")
 
 	require.EqualValues(t, expectedProof, tree.Proof())
 
@@ -73,17 +71,17 @@ func TestNewProvingTree(t *testing.T) {
 
 func TestNewProvingTreeMultiProof(t *testing.T) {
 	tree := NewProvingTree([]uint64{1, 4})
-	for i := 0; i < 8; i++ {
-		tree.AddLeaf(util.NewLabel(uint64(i)))
+	for i := uint64(0); i < 8; i++ {
+		tree.AddLeaf(newNodeFromUint64(i))
 	}
-	expectedRoot, _ := hex.DecodeString("4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0")
+	expectedRoot, _ := newNodeFromHex("4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0")
 	require.Equal(t, expectedRoot, tree.Root())
 
 	expectedProof := make([]node, 4)
-	expectedProof[0], _ = hex.DecodeString("0000000000000000")
-	expectedProof[1], _ = hex.DecodeString("fe6d3d3bb5dd778af1128cc7b2b33668d51b9a52dfc8f2342be37ddc06a0072d")
-	expectedProof[2], _ = hex.DecodeString("0500000000000000")
-	expectedProof[3], _ = hex.DecodeString("6b2e10cb2111114ce942174c38e7ea38864cc364a8fe95c66869c85888d812da")
+	expectedProof[0], _ = newNodeFromHex("0000000000000000")
+	expectedProof[1], _ = newNodeFromHex("fe6d3d3bb5dd778af1128cc7b2b33668d51b9a52dfc8f2342be37ddc06a0072d")
+	expectedProof[2], _ = newNodeFromHex("0500000000000000")
+	expectedProof[3], _ = newNodeFromHex("6b2e10cb2111114ce942174c38e7ea38864cc364a8fe95c66869c85888d812da")
 
 	require.EqualValues(t, expectedProof, tree.Proof())
 
@@ -97,16 +95,16 @@ func TestNewProvingTreeMultiProof(t *testing.T) {
 
 func TestNewProvingTreeMultiProof2(t *testing.T) {
 	tree := NewProvingTree([]uint64{0, 1, 4})
-	for i := 0; i < 8; i++ {
-		tree.AddLeaf(util.NewLabel(uint64(i)))
+	for i := uint64(0); i < 8; i++ {
+		tree.AddLeaf(newNodeFromUint64(i))
 	}
-	expectedRoot, _ := hex.DecodeString("4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0")
+	expectedRoot, _ := newNodeFromHex("4a2ca61d1fd537170785a8575d424634713c82e7392e67795a807653e498cfd0")
 	require.Equal(t, expectedRoot, tree.Root())
 
 	expectedProof := make([]node, 3)
-	expectedProof[0], _ = hex.DecodeString("fe6d3d3bb5dd778af1128cc7b2b33668d51b9a52dfc8f2342be37ddc06a0072d")
-	expectedProof[1], _ = hex.DecodeString("0500000000000000")
-	expectedProof[2], _ = hex.DecodeString("6b2e10cb2111114ce942174c38e7ea38864cc364a8fe95c66869c85888d812da")
+	expectedProof[0], _ = newNodeFromHex("fe6d3d3bb5dd778af1128cc7b2b33668d51b9a52dfc8f2342be37ddc06a0072d")
+	expectedProof[1], _ = newNodeFromHex("0500000000000000")
+	expectedProof[2], _ = newNodeFromHex("6b2e10cb2111114ce942174c38e7ea38864cc364a8fe95c66869c85888d812da")
 
 	require.EqualValues(t, expectedProof, tree.Proof())
 
