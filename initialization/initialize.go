@@ -3,8 +3,8 @@ package initialization
 import (
 	"encoding/hex"
 	"fmt"
-	"math"
 	"github.com/spacemeshos/merkle-tree"
+	"math"
 	"post-private/persistence"
 	"post-private/util"
 )
