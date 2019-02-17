@@ -1,4 +1,4 @@
-module post-private
+module github.com/spacemeshos/post-private
 
 require (
 	github.com/spacemeshos/go-spacemesh v0.0.0-20190206110759-2defc23a3392
