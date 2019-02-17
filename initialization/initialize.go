@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
-	"post-private/merkle"
+	"github.com/spacemeshos/merkle-tree"
 	"post-private/persistence"
 	"post-private/util"
 )

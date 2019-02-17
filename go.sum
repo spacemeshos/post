@@ -59,6 +59,8 @@ github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZN
 github.com/seehuhn/mt19937 v0.0.0-20180715112136-cc7708819361/go.mod h1:w+IAy13Luqfsp+plFpT1RiqauADylJKmpkrWFwpjbsc=
 github.com/spacemeshos/go-spacemesh v0.0.0-20190206110759-2defc23a3392 h1:C5O4PF45IfOcKeUCqKkriPohZDo3yPdwGJBEWDlhhHk=
 github.com/spacemeshos/go-spacemesh v0.0.0-20190206110759-2defc23a3392/go.mod h1:IIqoUyqvcQNJagzdDSAy0CYry5cBAlPTmd5UC4tsEL8=
+github.com/spacemeshos/merkle-tree v0.0.0-20190217153407-b89a4544aa32 h1:mrXqpKhKMDcruHEuG9JTpGSkm1Su3YnyFVKU7QLj08o=
+github.com/spacemeshos/merkle-tree v0.0.0-20190217153407-b89a4544aa32/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
 github.com/spacemeshos/sha256-simd v0.0.0-20190111104731-8575aafc88c9 h1:Cc+np6ORem5wrvO+YHQ1sdu71ItiQVRiYB4ugazpgxM=
 github.com/spacemeshos/sha256-simd v0.0.0-20190111104731-8575aafc88c9/go.mod h1:Pz5LyRghtiEuSixOVGO0da5AxKBZa6+Yq8ZJfjTAPI0=
 github.com/spf13/afero v1.1.2/go.mod h1:j4pytiNVoe2o6bmDsKpLACNPDBIoEAkihy7loJ1B0CQ=
