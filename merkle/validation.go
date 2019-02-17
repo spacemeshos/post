@@ -9,7 +9,7 @@ import (
 
 const MaxUint = ^uint(0)
 
-func ValidatePartialTree(leafIndices []uint64, leaves, proof []node, expectedRoot node) (bool, error) {
+func ValidatePartialTree(leafIndices []uint64, leaves, proof []Node, expectedRoot Node) (bool, error) {
 	v, err := newValidator(leafIndices, leaves, proof)
 	if err != nil {
 		return false, err
@@ -18,7 +18,7 @@ func ValidatePartialTree(leafIndices []uint64, leaves, proof []node, expectedRoo
 	return bytes.Equal(root, expectedRoot), nil
 }
 
-func newValidator(leafIndices []uint64, leaves, proof []node) (validator, error) {
+func newValidator(leafIndices []uint64, leaves, proof []Node) (validator, error) {
 	if len(leafIndices) != len(leaves) {
 		return validator{}, fmt.Errorf("number of leaves (%d) must equal number of indices (%d)", len(leaves), len(leafIndices))
 	}
@@ -39,13 +39,13 @@ type validator struct {
 	proofNodes *proofIterator
 }
 
-func (v *validator) calcRoot(stopAtLayer uint) node {
+func (v *validator) calcRoot(stopAtLayer uint) Node {
 	layer := uint(0)
 	idx, activeNode, err := v.leaves.next()
 	if err != nil {
 		panic(err) // this should never happen since we verify there are more leaves before calling calcRoot
 	}
-	var leftChild, rightChild, sibling node
+	var leftChild, rightChild, sibling Node
 	println()
 	for {
 		if layer == stopAtLayer {
@@ -89,10 +89,10 @@ func (v *validator) shouldCalcSubtree(idx uint64, layer uint) bool {
 var noMoreItems = errors.New("no more items")
 
 type proofIterator struct {
-	nodes []node
+	nodes []Node
 }
 
-func (it *proofIterator) next() (node, error) {
+func (it *proofIterator) next() (Node, error) {
 	if len(it.nodes) == 0 {
 		return nil, noMoreItems
 	}
@@ -103,10 +103,10 @@ func (it *proofIterator) next() (node, error) {
 
 type leafIterator struct {
 	indices []uint64
-	leaves  []node
+	leaves  []Node
 }
 
-func (it *leafIterator) next() (uint64, node, error) {
+func (it *leafIterator) next() (uint64, Node, error) {
 	if len(it.indices) == 0 {
 		return 0, nil, noMoreItems
 	}

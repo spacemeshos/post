@@ -6,38 +6,38 @@ import (
 )
 
 type Tree interface {
-	AddLeaf(leaf node)
-	Root() node
-	Proof() []node
+	AddLeaf(leaf Node)
+	Root() Node
+	Proof() []Node
 }
 
 type incrementalTree struct {
-	path          []node
+	path          []Node
 	currentLeaf   uint64
 	leavesToProve []uint64
-	proof         []node
-	nodes         [][]node // TODO @noam: Remove!
+	proof         []Node
+	nodes         [][]Node // TODO @noam: Remove!
 }
 
 func NewTree() Tree {
 	return &incrementalTree{
-		path:        make([]node, 0),
+		path:        make([]Node, 0),
 		currentLeaf: 0,
-		nodes:       make([][]node, 0), // TODO @noam: Remove!
+		nodes:       make([][]Node, 0), // TODO @noam: Remove!
 	}
 }
 
 func NewProvingTree(leavesToProve []uint64) Tree {
 	return &incrementalTree{
-		path:          make([]node, 0),
+		path:          make([]Node, 0),
 		currentLeaf:   0,
 		leavesToProve: leavesToProve,
-		proof:         make([]node, 0),
-		nodes:         make([][]node, 0), // TODO @noam: Remove!
+		proof:         make([]Node, 0),
+		nodes:         make([][]Node, 0), // TODO @noam: Remove!
 	}
 }
 
-func (t *incrementalTree) AddLeaf(leaf node) {
+func (t *incrementalTree) AddLeaf(leaf Node) {
 	activeNode := leaf
 	for i := 0; true; i++ {
 		if len(t.path) == i {
@@ -60,7 +60,7 @@ func (t *incrementalTree) AddLeaf(leaf node) {
 	t.currentLeaf++
 }
 
-func (t *incrementalTree) addToProofIfNeeded(currentLayer uint, leftChild, rightChild node) {
+func (t *incrementalTree) addToProofIfNeeded(currentLayer uint, leftChild, rightChild Node) {
 	if len(t.leavesToProve) == 0 {
 		return
 	}
@@ -80,16 +80,16 @@ func getPaths(currentLeaf uint64, layer uint) (parentPath, leftChildPath, rightC
 	return parentPath, parentPath << 1, parentPath<<1 + 1
 }
 
-func getParent(leftChild, rightChild node) node {
+func getParent(leftChild, rightChild Node) Node {
 	res := sha256.Sum256(append(leftChild, rightChild...))
 	return res[:]
 }
 
-func (t *incrementalTree) Root() node {
+func (t *incrementalTree) Root() Node {
 	return t.path[len(t.path)-1]
 }
 
-func (t *incrementalTree) Proof() []node {
+func (t *incrementalTree) Proof() []Node {
 	if len(t.path) < 5 {
 		printTree(t.nodes) // TODO @noam: Remove!
 	}
@@ -107,7 +107,7 @@ func (t *incrementalTree) isNodeInProvedPath(path uint64, layer uint) bool {
 }
 
 // TODO @noam: Remove!
-func printTree(nodes [][]node) {
+func printTree(nodes [][]Node) {
 	for _, n := range nodes {
 		defer fmt.Println(n)
 	}

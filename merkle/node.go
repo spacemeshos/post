@@ -5,19 +5,19 @@ import (
 	"encoding/hex"
 )
 
-type node []byte
+type Node []byte
 
-func (l node) String() string {
+func (l Node) String() string {
 	return hex.EncodeToString(l)[:4]
 }
 
-func newNodeFromUint64(i uint64) node {
+func NewNodeFromUint64(i uint64) Node {
 	const bytesInUint64 = 8
 	b := make([]byte, bytesInUint64)
 	binary.LittleEndian.PutUint64(b, i)
 	return b
 }
 
-func newNodeFromHex(s string) (node, error) {
+func NewNodeFromHex(s string) (Node, error) {
 	return hex.DecodeString(s)
 }
