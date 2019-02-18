@@ -2,11 +2,11 @@ package persistence
 
 import (
 	"encoding/hex"
+	"github.com/spacemeshos/post-private/util"
 	"github.com/stretchr/testify/require"
 	"io"
 	"os"
 	"path/filepath"
-	"post-private/util"
 	"testing"
 )
 

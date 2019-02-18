@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"encoding/hex"
 	"fmt"
+	"github.com/spacemeshos/post-private/util"
 	"io"
 	"os"
 	"path/filepath"
-	"post-private/util"
 )
 
 type PostLabelsWriter interface {

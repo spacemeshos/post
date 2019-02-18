@@ -4,9 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/spacemeshos/merkle-tree"
+	"github.com/spacemeshos/post-private/persistence"
+	"github.com/spacemeshos/post-private/util"
 	"math"
-	"post-private/persistence"
-	"post-private/util"
 )
 
 // Initialize takes an id (public key), width (number of labels) and difficulty (hash to use as upper bound for labels).

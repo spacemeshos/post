@@ -3,10 +3,10 @@ package initialization
 import (
 	"encoding/hex"
 	"flag"
+	"github.com/spacemeshos/post-private/persistence"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
-	"post-private/persistence"
 	"testing"
 	"time"
 )
