@@ -94,7 +94,7 @@ func (r *PostLabelsFileReader) Read() (uint64, util.Label, error) {
 	var l util.Label = make([]byte, util.LabelSize)
 	n, err := r.r.Read(l)
 	if err != nil {
-		if err == io.EOF && n != 0 {
+		if err == io.EOF && n != 0 { // n < util.LabelSize or we wouldn't get EOF
 			return 0, nil, io.ErrUnexpectedEOF
 		}
 		return 0, nil, err
