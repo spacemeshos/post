@@ -69,9 +69,9 @@ func (w *PostLabelsFileWriter) Close() error {
 }
 
 type PostLabelsFileReader struct {
-	f *os.File
-	r *bufio.Reader
-	i uint64
+	f        *os.File
+	r        *bufio.Reader
+	position uint64
 }
 
 func NewPostLabelsFileReader(id []byte) (PostLabelsFileReader, error) {
@@ -84,9 +84,9 @@ func NewPostLabelsFileReader(id []byte) (PostLabelsFileReader, error) {
 		panic(err)
 	}
 	return PostLabelsFileReader{
-		f: f,
-		r: bufio.NewReader(f),
-		i: 0,
+		f:        f,
+		r:        bufio.NewReader(f),
+		position: 0,
 	}, nil
 }
 
@@ -99,9 +99,9 @@ func (r *PostLabelsFileReader) Read() (uint64, util.Label, error) {
 		}
 		return 0, nil, err
 	}
-	i := r.i
-	r.i++
-	return i, l, nil
+	position := r.position
+	r.position++
+	return position, l, nil
 }
 
 func (r *PostLabelsFileReader) Close() error {
