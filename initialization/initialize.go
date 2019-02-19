@@ -11,21 +11,7 @@ import (
 
 // Initialize takes an id (public key), width (number of labels) and difficulty (hash to use as upper bound for labels).
 // The merkle root is passed on the results channel.
-func Initialize(id []byte, width uint64, difficulty []byte) <-chan []byte {
-	// TODO @noam: tune performance (parallel PoW, but don't overuse the machine)
-	ch := make(chan []byte)
-	go func() {
-		res, err := initializeSync(id, width, difficulty)
-		if err != nil {
-			log.Error(err.Error())
-			close(ch)
-		}
-		ch <- res
-	}()
-	return ch
-}
-
-func initializeSync(id []byte, width uint64, difficulty []byte) ([]byte, error) {
+func Initialize(id []byte, width uint64, difficulty []byte) ([]byte, error) {
 	labelsWriter, err := persistence.NewPostLabelsFileWriter(id)
 	if err != nil {
 		return nil, err
