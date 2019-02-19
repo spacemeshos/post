@@ -52,17 +52,13 @@ func BenchmarkInitialize(b *testing.B) {
 		panic("timeout")
 	}
 	/*
-		creating directory: /Users/noamnelke/.spacemesh/post-data/deadbeef
-		closing file: 'all.labels' (268435456 bytes)
-
-		🔹  Constructed list of 33554432 PoST labels.
-		🔹  Number of random oracle calls: 536922911
-		🔹  Merkle root: c0f742adce5c9fed7289c0a1664d71f08280f7084dcff24df916a6da56f8a88c
-
+		2019-02-19T13:53:02.749+0200	INFO	Spacemesh	creating directory: "/Users/noamnelke/.spacemesh/post-data/deadbeef"
+		2019-02-19T13:55:56.848+0200	INFO	Spacemesh	closing file	{"filename": "all.labels", "size_in_bytes": 268435456}
+		2019-02-19T13:55:56.849+0200	INFO	Spacemesh	completed PoST label list construction	{"number_of_labels": 33554432, "number_of_oracle_calls": 536922911}
 		goos: darwin
 		goarch: amd64
-		pkg: post-private/initialization
-		BenchmarkInitialize-8   	       1	170890054153 ns/op
+		pkg: github.com/spacemeshos/post-private/initialization
+		BenchmarkInitialize-8   	       1	174098803159 ns/op
 		PASS
 	*/
 }

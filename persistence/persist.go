@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/hex"
 	"fmt"
+	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/post-private/util"
 	"io"
 	"os"
@@ -23,8 +24,7 @@ type PostLabelsFileWriter struct {
 
 func NewPostLabelsFileWriter(id []byte) (PostLabelsFileWriter, error) {
 	labelsPath := filepath.Join(GetPostDataPath(), hex.EncodeToString(id))
-	s, _ := filepath.Abs(labelsPath)
-	fmt.Println("creating directory:", s)
+	log.Info("creating directory: \"%v\"", labelsPath)
 	err := os.MkdirAll(labelsPath, OwnerReadWriteExec)
 	if err != nil {
 		return PostLabelsFileWriter{}, err
@@ -58,7 +58,10 @@ func (w *PostLabelsFileWriter) Close() error {
 	}
 	w.w = nil
 	if info, err := w.f.Stat(); err == nil {
-		fmt.Printf("closing file: '%v' (%v bytes)\n", info.Name(), info.Size())
+		log.With().Info("closing file",
+			log.String("filename", info.Name()),
+			log.Uint64("size_in_bytes", uint64(info.Size())),
+		)
 	}
 	err = w.f.Close()
 	if err != nil {

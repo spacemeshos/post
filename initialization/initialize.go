@@ -1,8 +1,7 @@
 package initialization
 
 import (
-	"encoding/hex"
-	"fmt"
+	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/post-private/persistence"
 	"github.com/spacemeshos/post-private/util"
@@ -15,7 +14,11 @@ func Initialize(id []byte, width uint64, difficulty []byte) <-chan []byte {
 	// TODO @noam: tune performance (parallel PoW, but don't overuse the machine)
 	ch := make(chan []byte)
 	go func() {
-		res, _ := initializeSync(id, width, difficulty) // TODO @noam: handle error
+		res, err := initializeSync(id, width, difficulty)
+		if err != nil {
+			log.Error(err.Error())
+			close(ch)
+		}
 		ch <- res
 	}()
 	return ch
@@ -47,11 +50,9 @@ func initializeSync(id []byte, width uint64, difficulty []byte) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	root := merkleTree.Root()
-	fmt.Printf("\n"+
-		"🔹  Constructed list of %v PoST labels.\n"+
-		"🔹  Number of random oracle calls: %v\n"+
-		"🔹  Merkle root: %v\n"+
-		"\n", labelsFound, cnt, hex.EncodeToString(root))
-	return root, nil
+	log.With().Info("completed PoST label list construction",
+		log.Uint64("number_of_labels", labelsFound),
+		log.Uint64("number_of_oracle_calls", cnt),
+	)
+	return merkleTree.Root(), nil
 }
