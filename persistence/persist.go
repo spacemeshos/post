@@ -23,6 +23,9 @@ type PostLabelsFileWriter struct {
 }
 
 func NewPostLabelsFileWriter(id []byte) (PostLabelsFileWriter, error) {
+	if len(id) > 64 {
+		return PostLabelsFileWriter{}, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
+	}
 	labelsPath := filepath.Join(GetPostDataPath(), hex.EncodeToString(id))
 	log.Info("creating directory: \"%v\"", labelsPath)
 	err := os.MkdirAll(labelsPath, OwnerReadWriteExec)
@@ -78,6 +81,9 @@ type PostLabelsFileReader struct {
 }
 
 func NewPostLabelsFileReader(id []byte) (PostLabelsFileReader, error) {
+	if len(id) > 64 {
+		return PostLabelsFileReader{}, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
+	}
 	fullFilename := filepath.Join(GetPostDataPath(), hex.EncodeToString(id), filename)
 	f, err := os.OpenFile(fullFilename, os.O_RDONLY, OwnerReadWrite)
 	if os.IsNotExist(err) {
