@@ -1,6 +1,7 @@
 package initialization
 
 import (
+	"errors"
 	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/post-private/persistence"
@@ -31,7 +32,7 @@ func initializeSync(id []byte, width uint64, difficulty []byte) ([]byte, error) 
 	}
 	merkleTree := merkle.NewTree()
 	var cnt, labelsFound uint64 = 0, 0
-	for labelsFound < width {
+	for {
 		l := util.NewLabel(cnt)
 		if util.CalcHash(id, l).IsLessThan(difficulty) {
 			err := labelsWriter.Write(l)
@@ -40,9 +41,15 @@ func initializeSync(id []byte, width uint64, difficulty []byte) ([]byte, error) 
 			}
 			merkleTree.AddLeaf(l)
 			labelsFound++
+			if labelsFound == width {
+				break
+			}
+			if labelsFound%5000000 == 0 {
+				log.Info("found %v labels", labelsFound)
+			}
 		}
-		if cnt == math.MaxUint64 && labelsFound < width {
-			panic("Out of counter space!") // TODO @noam: handle gracefully?
+		if cnt == math.MaxUint64 {
+			return nil, errors.New("out of counter space")
 		}
 		cnt++
 	}

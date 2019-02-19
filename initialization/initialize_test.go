@@ -52,13 +52,19 @@ func BenchmarkInitialize(b *testing.B) {
 		panic("timeout")
 	}
 	/*
-		2019-02-19T13:53:02.749+0200	INFO	Spacemesh	creating directory: "/Users/noamnelke/.spacemesh/post-data/deadbeef"
-		2019-02-19T13:55:56.848+0200	INFO	Spacemesh	closing file	{"filename": "all.labels", "size_in_bytes": 268435456}
-		2019-02-19T13:55:56.849+0200	INFO	Spacemesh	completed PoST label list construction	{"number_of_labels": 33554432, "number_of_oracle_calls": 536922911}
+		2019-02-19T15:21:48.505+0200	INFO	Spacemesh	creating directory: "/Users/noamnelke/.spacemesh/post-data/deadbeef"
+		2019-02-19T15:22:13.913+0200	INFO	Spacemesh	found 5000000 labels
+		2019-02-19T15:22:39.265+0200	INFO	Spacemesh	found 10000000 labels
+		2019-02-19T15:23:05.030+0200	INFO	Spacemesh	found 15000000 labels
+		2019-02-19T15:23:30.480+0200	INFO	Spacemesh	found 20000000 labels
+		2019-02-19T15:23:55.900+0200	INFO	Spacemesh	found 25000000 labels
+		2019-02-19T15:24:21.338+0200	INFO	Spacemesh	found 30000000 labels
+		2019-02-19T15:24:39.349+0200	INFO	Spacemesh	closing file	{"filename": "all.labels", "size_in_bytes": 268435456}
+		2019-02-19T15:24:39.349+0200	INFO	Spacemesh	completed PoST label list construction	{"number_of_labels": 33554432, "number_of_oracle_calls": 536922910}
 		goos: darwin
 		goarch: amd64
 		pkg: github.com/spacemeshos/post-private/initialization
-		BenchmarkInitialize-8   	       1	174098803159 ns/op
+		BenchmarkInitialize-8   	       1	170844397489 ns/op
 		PASS
 	*/
 }
