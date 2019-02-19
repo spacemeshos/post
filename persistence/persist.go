@@ -10,6 +10,12 @@ import (
 	"path/filepath"
 )
 
+// OwnerReadWriteExec is a standard owner read / write / exec file permission.
+const OwnerReadWriteExec = 0700
+
+// OwnerReadWrite is a standard owner read / write file permission.
+const OwnerReadWrite = 0600
+
 type PostLabelsWriter interface {
 	Write(label util.Label) error
 	Close() error
@@ -24,12 +30,12 @@ func NewPostLabelsWriter(id []byte) (PostLabelsWriter, error) {
 	labelsPath := filepath.Join(GetPostDataPath(), hex.EncodeToString(id))
 	s, _ := filepath.Abs(labelsPath)
 	fmt.Println("creating directory:", s)
-	err := os.MkdirAll(labelsPath, os.ModePerm)
+	err := os.MkdirAll(labelsPath, OwnerReadWriteExec)
 	if err != nil {
 		return nil, err
 	}
 	fullFilename := filepath.Join(labelsPath, filename)
-	f, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_WRONLY, os.ModePerm)
+	f, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_WRONLY, OwnerReadWrite)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +86,7 @@ type postLabelsReader struct {
 
 func NewPostLabelsReader(id []byte) (PostLabelsReader, error) {
 	fullFilename := filepath.Join(GetPostDataPath(), hex.EncodeToString(id), filename)
-	f, err := os.OpenFile(fullFilename, os.O_RDONLY, os.ModePerm)
+	f, err := os.OpenFile(fullFilename, os.O_RDONLY, OwnerReadWrite)
 	if os.IsNotExist(err) {
 		return nil, err
 	}
