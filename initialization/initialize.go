@@ -2,6 +2,7 @@ package initialization
 
 import (
 	"errors"
+	"fmt"
 	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/post-private/persistence"
@@ -9,9 +10,14 @@ import (
 	"math"
 )
 
+const maxWidth = 1 << 50 // at 1 byte per label, this would be 1 peta-byte of storage
+
 // Initialize takes an id (public key), width (number of labels) and difficulty (hash to use as upper bound for labels).
 // The merkle root is passed on the results channel.
 func Initialize(id []byte, width uint64, difficulty []byte) ([]byte, error) {
+	if width > maxWidth {
+		return nil, fmt.Errorf("requested width (%d) is larger than supported width (%d)", width, maxWidth)
+	}
 	labelsWriter, err := persistence.NewPostLabelsFileWriter(id)
 	if err != nil {
 		return nil, err

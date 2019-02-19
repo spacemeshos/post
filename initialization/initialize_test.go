@@ -21,6 +21,15 @@ func TestInitialize(t *testing.T) {
 	assert.Equal(t, expectedMerkleRoot, merkleRoot)
 }
 
+func TestInitialize2(t *testing.T) {
+	id, _ := hex.DecodeString("deadbeef")
+	difficulty, _ := hex.DecodeString("01000000000000000000000000000000")
+
+	merkleRoot, err := Initialize(id, (1<<50)+1, difficulty)
+	require.Error(t, err)
+	require.Nil(t, merkleRoot)
+}
+
 func BenchmarkInitialize(b *testing.B) {
 	id, _ := hex.DecodeString("deadbeef")
 	difficulty, _ := hex.DecodeString("10000000000000000000000000000000")
