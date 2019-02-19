@@ -1,0 +1,3 @@
+# Main Config
+[post]
+data-folder = "~/.spacemesh-data/post-data"
