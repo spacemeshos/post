@@ -14,7 +14,7 @@ func TestPostLabelsReaderAndWriter(t *testing.T) {
 	req := require.New(t)
 	id, labels := generateIdAndLabels()
 
-	writer, err := NewPostLabelsWriter(id)
+	writer, err := NewPostLabelsFileWriter(id)
 	req.NoError(err)
 
 	for _, l := range labels {
@@ -24,7 +24,7 @@ func TestPostLabelsReaderAndWriter(t *testing.T) {
 	err = writer.Close()
 	req.NoError(err)
 
-	reader, err := NewPostLabelsReader(id)
+	reader, err := NewPostLabelsFileReader(id)
 	req.NoError(err)
 
 	labelsFromReader := make([]util.Label, 4)

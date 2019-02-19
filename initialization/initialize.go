@@ -22,7 +22,7 @@ func Initialize(id []byte, width uint64, difficulty []byte) <-chan []byte {
 }
 
 func initializeSync(id []byte, width uint64, difficulty []byte) ([]byte, error) {
-	labelsWriter, err := persistence.NewPostLabelsWriter(id)
+	labelsWriter, err := persistence.NewPostLabelsFileWriter(id)
 	if err != nil {
 		return nil, err
 	}

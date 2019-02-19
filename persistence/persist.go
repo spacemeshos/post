@@ -16,36 +16,31 @@ const OwnerReadWriteExec = 0700
 // OwnerReadWrite is a standard owner read / write file permission.
 const OwnerReadWrite = 0600
 
-type PostLabelsWriter interface {
-	Write(label util.Label) error
-	Close() error
-}
-
-type postLabelsWriter struct {
+type PostLabelsFileWriter struct {
 	f *os.File
 	w *bufio.Writer
 }
 
-func NewPostLabelsWriter(id []byte) (PostLabelsWriter, error) {
+func NewPostLabelsFileWriter(id []byte) (PostLabelsFileWriter, error) {
 	labelsPath := filepath.Join(GetPostDataPath(), hex.EncodeToString(id))
 	s, _ := filepath.Abs(labelsPath)
 	fmt.Println("creating directory:", s)
 	err := os.MkdirAll(labelsPath, OwnerReadWriteExec)
 	if err != nil {
-		return nil, err
+		return PostLabelsFileWriter{}, err
 	}
 	fullFilename := filepath.Join(labelsPath, filename)
 	f, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_WRONLY, OwnerReadWrite)
 	if err != nil {
-		return nil, err
+		return PostLabelsFileWriter{}, err
 	}
-	return &postLabelsWriter{
+	return PostLabelsFileWriter{
 		f: f,
 		w: bufio.NewWriter(f),
 	}, nil
 }
 
-func (w *postLabelsWriter) Write(label util.Label) error {
+func (w *PostLabelsFileWriter) Write(label util.Label) error {
 	nn, err := w.w.Write(label)
 	if err != nil {
 		return err
@@ -56,7 +51,7 @@ func (w *postLabelsWriter) Write(label util.Label) error {
 	return nil
 }
 
-func (w *postLabelsWriter) Close() error {
+func (w *PostLabelsFileWriter) Close() error {
 	err := w.w.Flush()
 	if err != nil {
 		return err
@@ -73,34 +68,29 @@ func (w *postLabelsWriter) Close() error {
 	return nil
 }
 
-type PostLabelsReader interface {
-	Read() (uint64, util.Label, error)
-	Close() error
-}
-
-type postLabelsReader struct {
+type PostLabelsFileReader struct {
 	f *os.File
 	r *bufio.Reader
 	i uint64
 }
 
-func NewPostLabelsReader(id []byte) (PostLabelsReader, error) {
+func NewPostLabelsFileReader(id []byte) (PostLabelsFileReader, error) {
 	fullFilename := filepath.Join(GetPostDataPath(), hex.EncodeToString(id), filename)
 	f, err := os.OpenFile(fullFilename, os.O_RDONLY, OwnerReadWrite)
 	if os.IsNotExist(err) {
-		return nil, err
+		return PostLabelsFileReader{}, err
 	}
 	if err != nil {
 		panic(err)
 	}
-	return &postLabelsReader{
+	return PostLabelsFileReader{
 		f: f,
 		r: bufio.NewReader(f),
 		i: 0,
 	}, nil
 }
 
-func (r *postLabelsReader) Read() (uint64, util.Label, error) {
+func (r *PostLabelsFileReader) Read() (uint64, util.Label, error) {
 	var l util.Label = make([]byte, util.LabelSize)
 	n, err := r.r.Read(l)
 	if err != nil {
@@ -114,7 +104,7 @@ func (r *postLabelsReader) Read() (uint64, util.Label, error) {
 	return i, l, nil
 }
 
-func (r *postLabelsReader) Close() error {
+func (r *PostLabelsFileReader) Close() error {
 	r.r = nil
 	err := r.f.Close()
 	if err != nil {
