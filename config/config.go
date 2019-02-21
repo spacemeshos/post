@@ -13,12 +13,14 @@ const (
 )
 
 type postConfig struct {
-	DataFolder string `mapstructure:"data-folder"`
+	DataFolder      string `mapstructure:"data-folder"`
+	LogEveryXLabels uint64 `mapstructure:"log-every-x-labels"`
 }
 
 var Post = postConfig{
 	// Default config values (overwritten in init() if config file detected):
-	DataFolder: "~/.spacemesh-data/post-data",
+	DataFolder:      "~/.spacemesh-data/post-data",
+	LogEveryXLabels: 5000000,
 }
 
 func init() {

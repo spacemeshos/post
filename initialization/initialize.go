@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
+	"github.com/spacemeshos/post-private/config"
 	"github.com/spacemeshos/post-private/persistence"
 	"github.com/spacemeshos/post-private/util"
 	"math"
@@ -44,7 +45,7 @@ func initialize(id []byte, width uint64, difficulty []byte) ([]byte, error) {
 			if labelsFound == width {
 				break
 			}
-			if labelsFound%5000000 == 0 {
+			if labelsFound%config.Post.LogEveryXLabels == 0 {
 				log.Info("found %v labels", labelsFound)
 			}
 		}
