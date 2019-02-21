@@ -46,10 +46,10 @@ func NewPostLabelsFileWriter(id []byte) (PostLabelsFileWriter, error) {
 func (w *PostLabelsFileWriter) Write(label util.Label) error {
 	nn, err := w.w.Write(label)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write label: %v", err)
 	}
 	if nn != util.LabelSize {
-		return fmt.Errorf("expected label size of %v bytes, but wrote %v bytes (len(label)=%v)", util.LabelSize, nn, len(label))
+		return fmt.Errorf("failed to write label: expected label size of %v bytes, but wrote %v bytes (len(label)=%v)", util.LabelSize, nn, len(label))
 	}
 	return nil
 }

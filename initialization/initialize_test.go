@@ -39,19 +39,19 @@ func BenchmarkInitialize(b *testing.B) {
 	require.NoError(b, err)
 	assert.Equal(b, expectedMerkleRoot, merkleRoot)
 	/*
-		2019-02-19T15:21:48.505+0200	INFO	Spacemesh	creating directory: "/Users/noamnelke/.spacemesh/post-data/deadbeef"
-		2019-02-19T15:22:13.913+0200	INFO	Spacemesh	found 5000000 labels
-		2019-02-19T15:22:39.265+0200	INFO	Spacemesh	found 10000000 labels
-		2019-02-19T15:23:05.030+0200	INFO	Spacemesh	found 15000000 labels
-		2019-02-19T15:23:30.480+0200	INFO	Spacemesh	found 20000000 labels
-		2019-02-19T15:23:55.900+0200	INFO	Spacemesh	found 25000000 labels
-		2019-02-19T15:24:21.338+0200	INFO	Spacemesh	found 30000000 labels
-		2019-02-19T15:24:39.349+0200	INFO	Spacemesh	closing file	{"filename": "all.labels", "size_in_bytes": 268435456}
-		2019-02-19T15:24:39.349+0200	INFO	Spacemesh	completed PoST label list construction	{"number_of_labels": 33554432, "number_of_oracle_calls": 536922910}
+		2019-02-21T11:54:22.649+0200	INFO	Spacemesh	creating directory: "/Users/noamnelke/.spacemesh-data/post-data/deadbeef"
+		2019-02-21T11:54:47.512+0200	INFO	Spacemesh	found 5000000 labels
+		2019-02-21T11:55:12.373+0200	INFO	Spacemesh	found 10000000 labels
+		2019-02-21T11:55:37.346+0200	INFO	Spacemesh	found 15000000 labels
+		2019-02-21T11:56:02.292+0200	INFO	Spacemesh	found 20000000 labels
+		2019-02-21T11:56:27.203+0200	INFO	Spacemesh	found 25000000 labels
+		2019-02-21T11:56:52.184+0200	INFO	Spacemesh	found 30000000 labels
+		2019-02-21T11:57:10.325+0200	INFO	Spacemesh	completed PoST label list construction	{"number_of_labels": 33554432, "number_of_oracle_calls": 536922910}
+		2019-02-21T11:57:10.325+0200	INFO	Spacemesh	closing file	{"filename": "all.labels", "size_in_bytes": 268435456}
 		goos: darwin
 		goarch: amd64
 		pkg: github.com/spacemeshos/post-private/initialization
-		BenchmarkInitialize-8   	       1	170844397489 ns/op
+		BenchmarkInitialize-8   	       1	167676495711 ns/op
 		PASS
 	*/
 }
