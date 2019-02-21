@@ -1,6 +1,7 @@
 package initialization
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/spacemeshos/go-spacemesh/log"
@@ -67,6 +68,7 @@ func initialize(id []byte, width uint64, difficulty []byte, labelsWriter postLab
 		cnt++
 	}
 	log.With().Info("completed PoST label list construction",
+		log.String("id", hex.EncodeToString(id)),
 		log.Uint64("number_of_labels", labelsFound),
 		log.Uint64("number_of_oracle_calls", cnt),
 	)
