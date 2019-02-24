@@ -1,0 +1,4 @@
+# Main Config
+[post]
+data-folder = "~/.spacemesh-data/post-data"
+log-every-x-labels = 5000000
