@@ -94,6 +94,8 @@ github.com/spacemeshos/go-spacemesh v0.0.0-20190218131258-f9290a04382c h1:F2uZn5
 github.com/spacemeshos/go-spacemesh v0.0.0-20190218131258-f9290a04382c/go.mod h1:tY7flNGGFec6jgu03jBYCbFmntvpxOS8dG3dt0Eznl8=
 github.com/spacemeshos/merkle-tree v0.0.0-20190217153407-b89a4544aa32 h1:mrXqpKhKMDcruHEuG9JTpGSkm1Su3YnyFVKU7QLj08o=
 github.com/spacemeshos/merkle-tree v0.0.0-20190217153407-b89a4544aa32/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
+github.com/spacemeshos/merkle-tree v0.0.0-20190313093531-931747b24840 h1:WV6zaOmaBsbdKqn0BMHMJto38h+ZOEeOPQR+EVhYJbA=
+github.com/spacemeshos/merkle-tree v0.0.0-20190313093531-931747b24840/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
 github.com/spacemeshos/sha256-simd v0.0.0-20190111104731-8575aafc88c9 h1:Cc+np6ORem5wrvO+YHQ1sdu71ItiQVRiYB4ugazpgxM=
 github.com/spacemeshos/sha256-simd v0.0.0-20190111104731-8575aafc88c9/go.mod h1:Pz5LyRghtiEuSixOVGO0da5AxKBZa6+Yq8ZJfjTAPI0=
 github.com/spf13/afero v1.1.2/go.mod h1:j4pytiNVoe2o6bmDsKpLACNPDBIoEAkihy7loJ1B0CQ=

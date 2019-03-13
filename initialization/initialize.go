@@ -44,7 +44,7 @@ func initialize(id []byte, width uint64, difficulty []byte, labelsWriter postLab
 	if width > maxWidth {
 		return nil, fmt.Errorf("requested width (%d) is larger than supported width (%d)", width, maxWidth)
 	}
-	merkleTree := merkle.NewTree()
+	merkleTree := merkle.NewTree(merkle.GetSha256Parent)
 	var cnt, labelsFound uint64 = 0, 0
 	for {
 		l := util.NewLabel(cnt)
@@ -53,7 +53,10 @@ func initialize(id []byte, width uint64, difficulty []byte, labelsWriter postLab
 			if err != nil {
 				return nil, err
 			}
-			merkleTree.AddLeaf(l)
+			err = merkleTree.AddLeaf(l)
+			if err != nil {
+				return nil, err
+			}
 			labelsFound++
 			if labelsFound == width {
 				break
