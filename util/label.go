@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 )
 
-const LabelSize = 8
+const LabelSize = 32
 
 type Label []byte
 

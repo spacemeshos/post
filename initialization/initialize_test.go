@@ -13,45 +13,46 @@ import (
 
 func TestInitialize(t *testing.T) {
 	id, _ := hex.DecodeString("deadbeef")
-	difficulty, _ := hex.DecodeString("01000000000000000000000000000000")
-	expectedMerkleRoot, _ := hex.DecodeString("d39a77684b387f90792706ce49945c73849c6e5cdca31f220d5045e9fa21086b")
+	expectedMerkleRoot, _ := hex.DecodeString("fb00ac6f6b50a1433a7691d2e079b0dc5b221b4f3fd5ace3dc00c0db792518bb")
 
-	merkleRoot, err := Initialize(id, 16, difficulty)
+	merkleRoot, err := Initialize(id, 16)
 	require.NoError(t, err)
+	println(hex.EncodeToString(merkleRoot))
 	assert.Equal(t, expectedMerkleRoot, merkleRoot)
 }
 
 func TestInitialize2(t *testing.T) {
 	id, _ := hex.DecodeString("deadbeef")
-	difficulty, _ := hex.DecodeString("01000000000000000000000000000000")
 
-	merkleRoot, err := Initialize(id, (1<<50)+1, difficulty)
+	merkleRoot, err := Initialize(id, (1<<50)+1)
 	require.Error(t, err)
 	require.Nil(t, merkleRoot)
 }
 
 func BenchmarkInitialize(b *testing.B) {
 	id, _ := hex.DecodeString("deadbeef")
-	difficulty, _ := hex.DecodeString("10000000000000000000000000000000")
-	expectedMerkleRoot, _ := hex.DecodeString("c0f742adce5c9fed7289c0a1664d71f08280f7084dcff24df916a6da56f8a88c")
+	expectedMerkleRoot, _ := hex.DecodeString("af052351d359ce4a3041ce1992d659f68d30f6c1e5c5d229c389c2912a373c70")
 
-	merkleRoot, err := Initialize(id, 1<<25, difficulty)
+	merkleRoot, err := Initialize(id, 1<<25)
 	require.NoError(b, err)
+	println(hex.EncodeToString(merkleRoot))
 	assert.Equal(b, expectedMerkleRoot, merkleRoot)
 	/*
-		2019-02-21T11:54:22.649+0200	INFO	Spacemesh	creating directory: "/Users/noamnelke/.spacemesh-data/post-data/deadbeef"
-		2019-02-21T11:54:47.512+0200	INFO	Spacemesh	found 5000000 labels
-		2019-02-21T11:55:12.373+0200	INFO	Spacemesh	found 10000000 labels
-		2019-02-21T11:55:37.346+0200	INFO	Spacemesh	found 15000000 labels
-		2019-02-21T11:56:02.292+0200	INFO	Spacemesh	found 20000000 labels
-		2019-02-21T11:56:27.203+0200	INFO	Spacemesh	found 25000000 labels
-		2019-02-21T11:56:52.184+0200	INFO	Spacemesh	found 30000000 labels
-		2019-02-21T11:57:10.325+0200	INFO	Spacemesh	completed PoST label list construction	{"number_of_labels": 33554432, "number_of_oracle_calls": 536922910}
-		2019-02-21T11:57:10.325+0200	INFO	Spacemesh	closing file	{"filename": "all.labels", "size_in_bytes": 268435456}
+		2019-03-18T17:38:42.336+0200	INFO	Spacemesh	creating directory: "/Users/noamnelke/.spacemesh-data/post-data/deadbeef"
+		2019-03-18T17:39:23.608+0200	INFO	Spacemesh	found 5000000 labels
+		2019-03-18T17:40:04.247+0200	INFO	Spacemesh	found 10000000 labels
+		2019-03-18T17:40:44.546+0200	INFO	Spacemesh	found 15000000 labels
+		2019-03-18T17:41:25.565+0200	INFO	Spacemesh	found 20000000 labels
+		2019-03-18T17:42:05.958+0200	INFO	Spacemesh	found 25000000 labels
+		2019-03-18T17:42:46.402+0200	INFO	Spacemesh	found 30000000 labels
+		2019-03-18T17:43:14.990+0200	INFO	Spacemesh	completed PoST label list construction
+		2019-03-18T17:43:14.990+0200	INFO	Spacemesh	closing file	{"filename": "all.labels", "size_in_bytes": 1073741824}
 		goos: darwin
+
+		af052351d359ce4a3041ce1992d659f68d30f6c1e5c5d229c389c2912a373c70
 		goarch: amd64
 		pkg: github.com/spacemeshos/post-private/initialization
-		BenchmarkInitialize-8   	       1	167676495711 ns/op
+		BenchmarkInitialize-8   	       1	272653006697 ns/op
 		PASS
 	*/
 }
