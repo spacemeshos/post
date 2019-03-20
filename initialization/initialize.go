@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
+	"github.com/spacemeshos/post-private/challenge"
 	"github.com/spacemeshos/post-private/config"
 	"github.com/spacemeshos/post-private/labels"
 	"github.com/spacemeshos/post-private/persistence"
@@ -43,7 +44,7 @@ func initialize(id []byte, width uint64, labelsWriter postLabelsWriter) ([]byte,
 		return nil, fmt.Errorf("requested width (%d) is larger than supported width (%d)", width, maxWidth)
 	}
 	// TODO @noam: save cache
-	merkleTree := merkle.NewTree(merkle.GetSha256Parent)
+	merkleTree := merkle.NewTree(challenge.ZeroChallenge.GetSha256Parent)
 	for position := uint64(0); position < width; position++ {
 		lg := labels.CalcLabelGroup(id, position)
 		err := labelsWriter.Write(lg)
