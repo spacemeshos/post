@@ -35,7 +35,7 @@ func TestPostLabelsReaderAndWriter(t *testing.T) {
 		req.NoError(err)
 	}
 	idx, shouldBeNil, err := reader.Read()
-	req.Equal(err, io.EOF)
+	req.Equal(io.EOF, err)
 	req.Nil(shouldBeNil)
 	req.Zero(idx)
 

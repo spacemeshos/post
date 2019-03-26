@@ -22,22 +22,22 @@ type PostLabelsFileWriter struct {
 	w *bufio.Writer
 }
 
-func NewPostLabelsFileWriter(id []byte) (PostLabelsFileWriter, error) {
+func NewPostLabelsFileWriter(id []byte) (*PostLabelsFileWriter, error) {
 	if len(id) > 64 {
-		return PostLabelsFileWriter{}, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
+		return nil, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
 	}
 	labelsPath := filepath.Join(GetPostDataPath(), hex.EncodeToString(id))
 	log.Info("creating directory: \"%v\"", labelsPath)
 	err := os.MkdirAll(labelsPath, OwnerReadWriteExec)
 	if err != nil {
-		return PostLabelsFileWriter{}, err
+		return nil, err
 	}
 	fullFilename := filepath.Join(labelsPath, filename)
 	f, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_WRONLY, OwnerReadWrite)
 	if err != nil {
-		return PostLabelsFileWriter{}, err
+		return nil, err
 	}
-	return PostLabelsFileWriter{
+	return &PostLabelsFileWriter{
 		f: f,
 		w: bufio.NewWriter(f),
 	}, nil
@@ -72,6 +72,15 @@ func (w *PostLabelsFileWriter) Close() error {
 	}
 	w.f = nil
 	return nil
+}
+
+func (w *PostLabelsFileWriter) GetLeafReader() (*LeafReader, error) {
+	err := w.w.Flush()
+	if err != nil {
+		return nil, err
+	}
+	name := w.f.Name()
+	return newLeafReader(name)
 }
 
 type PostLabelsFileReader struct {
