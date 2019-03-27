@@ -17,35 +17,33 @@ const difficulty = 5
 func TestInitialize(t *testing.T) {
 	r := require.New(t)
 	id := hexDecode("deadbeef")
-	expectedMerkleRoot := hexDecode("fb00ac6f6b50a1433a7691d2e079b0dc5b221b4f3fd5ace3dc00c0db792518bb")
+	expectedMerkleRoot := hexDecode("2292f95c87626f5a281fa811ba825ffce79442f8999e1ddc8e8c9bbac15e3fcb")
 
 	proof, err := Initialize(id, 16, 4, difficulty)
 	r.NoError(err)
 	r.Equal(expectedMerkleRoot, proof.MerkleRoot)
 
 	expectedProvenLeaves := nodes{
-		hexDecode("d46655d5d089024be1e0cdaf9a581e6841adec80490d4fd83350a1960069a4cc"),
-		hexDecode("1efdf0ac1d019422061d4751ae3b21eff98285a38186890944b86c06711f38eb"),
-		hexDecode("cb0ff939e3b3a1dd0d36bc14f7f05f8dce599a158ab39e125c175d23a958d79b"),
-		hexDecode("a7f925a9734acaea7a87ce76b1314274c82068605e9ca882c545b6de45769c7a"),
+		hexDecode("1507851a83f1b8644dbbc09c4cb66d28397ed7f5cecce3d5dbce4b6f0b7cd5b3"),
+		hexDecode("04e98f15e487573d38609f0cb50e4d66107d2aef126dd52f4833f24200e099ff"),
+		hexDecode("f0e25e059be7c13a2af257568f7ea386ccbf9f175b7af3c978e3376c48ba20ff"),
+		hexDecode("d876529601cf04b6acc7ee1ac2b33f052e58d0dce58859e3a4a6a029ded70ee0"),
 	}
 
 	r.EqualValues(expectedProvenLeaves, nodes(proof.ProvenLeaves))
 
 	expectedProofNodes := nodes{
-		hexDecode("9c75020dd3efc92f8181e17283063982f4d36a657949bcf094312310847fc6fc"),
-		hexDecode("5b3393e2c969ed646d261cdecc5506a177f5d0afa586531c53489be77265030b"),
-		hexDecode("a8b27534bec9db1512b8bcb5ea30bd9bda9f5588d8a7b5cbe62580d7fa5d61d5"),
-		hexDecode("13f955ccbc82c0c67d473a0e83826f90144e5d43c0410a8002f7d81d25a9da69"),
-		hexDecode("39e6a1117dfcea18367ea949b49c46f65c31d1c0fac9afae0fcab83f3c944114"),
-		hexDecode("a68af3373456a8c6cbc1de201c7bed0d47ded851e15ddde4dde64aa697c8c0d3"),
-		hexDecode("48577ac18b61dbac03650ec87b733e82e37c8eb44c26ba72cf8640f9dd26bf2a"),
-		hexDecode("af6e5d56fdc7c77b29b4d42d62ce96eca35823b3e14fe3b64a1272fb3f95c9fa"),
+		hexDecode("94686b27f3ef2ab9415f95aeafba42da6f4036872dffcc5475e9749980e8e4b3"),
+		hexDecode("750ba998411ef4d1357fead36c2b080c53bef7fa8a9bd3ff02cae1aef08fce7d"),
+		hexDecode("9847d3adad39f5c2a8c2f9e7d8d3001caf6b65c9a544e537c55f630949d6c440"),
+		hexDecode("6695ccdf6ff22dc17c7cdd3217b7d49405824266d35bda1eeae610335a2247bd"),
+		hexDecode("8bed2cae59accd2c817c4d82a11c610d5590d96e98607cbc1bc4c7040d9ade8b"),
+		hexDecode("09db8e0d03b3786a4cd05dd1dce42d7d6dfbfabd63575734b531ab80c05ff41d"),
 	}
 
 	r.EqualValues(expectedProofNodes, nodes(proof.ProofNodes))
 
-	r.EqualValues([]uint64{1, 6, 9, 12}, proof.ProvenIndices)
+	r.EqualValues([]uint64{2, 9, 12, 13}, proof.ProvenIndices)
 }
 
 func TestInitializeErrors(t *testing.T) {
@@ -77,7 +75,7 @@ type nodes [][]byte
 func (n nodes) String() string {
 	s := ""
 	for _, v := range n {
-		s += hex.EncodeToString(v[:2]) + " "
+		s += "\n" + hex.EncodeToString(v[:]) + " "
 	}
 	return s
 }
