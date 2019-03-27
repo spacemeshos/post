@@ -1,4 +1,4 @@
-package indices
+package proving
 
 import (
 	"encoding/hex"

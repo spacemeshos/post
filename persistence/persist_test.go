@@ -1,8 +1,8 @@
 package persistence
 
 import (
+	"encoding/binary"
 	"encoding/hex"
-	"github.com/spacemeshos/post-private/util"
 	"github.com/stretchr/testify/require"
 	"io"
 	"os"
@@ -27,7 +27,7 @@ func TestPostLabelsReaderAndWriter(t *testing.T) {
 	reader, err := NewPostLabelsFileReader(id)
 	req.NoError(err)
 
-	labelsFromReader := make([]util.Label, 4)
+	labelsFromReader := make([]Label, 4)
 	var idx uint64
 	for i := range labelsFromReader {
 		idx, labelsFromReader[i], err = reader.Read()
@@ -45,13 +45,13 @@ func TestPostLabelsReaderAndWriter(t *testing.T) {
 	req.EqualValues(labels, labelsFromReader)
 }
 
-func generateIdAndLabels() ([]byte, []util.Label) {
+func generateIdAndLabels() ([]byte, []Label) {
 	id, _ := hex.DecodeString("deadbeef")
-	labels := []util.Label{
-		util.NewLabel(0),
-		util.NewLabel(1),
-		util.NewLabel(2),
-		util.NewLabel(3),
+	labels := []Label{
+		NewLabel(0),
+		NewLabel(1),
+		NewLabel(2),
+		NewLabel(3),
 	}
 	return id, labels
 }
@@ -65,4 +65,10 @@ func TestMain(m *testing.M) {
 
 func cleanup() {
 	_ = os.RemoveAll(filepath.Join(GetPostDataPath(), "deadbeef"))
+}
+
+func NewLabel(cnt uint64) []byte {
+	b := make([]byte, LabelSize)
+	binary.LittleEndian.PutUint64(b, cnt)
+	return b
 }

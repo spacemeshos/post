@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"github.com/spacemeshos/post-private/persistence"
+	"github.com/spacemeshos/post-private/proving"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"os"
@@ -53,16 +54,16 @@ func TestInitializeErrors(t *testing.T) {
 
 	proof, err := Initialize(id, 16, 4, 4)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 4)")
-	r.EqualValues(Proof{}, proof)
+	r.EqualValues(proving.Proof{}, proof)
 
 	proof, err = Initialize(id, 16, 4, 9)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 9)")
-	r.EqualValues(Proof{}, proof)
+	r.EqualValues(proving.Proof{}, proof)
 
 	proof, err = Initialize(id, (1<<50)+1, 100, difficulty)
 	r.EqualError(err, "failed to initialize post: requested width (1125899906842625) is greater than "+
 		"supported width (1125899906842624)")
-	r.EqualValues(Proof{}, proof)
+	r.EqualValues(proving.Proof{}, proof)
 
 }
 

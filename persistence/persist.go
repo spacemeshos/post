@@ -5,11 +5,12 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/spacemeshos/go-spacemesh/log"
-	"github.com/spacemeshos/post-private/util"
 	"io"
 	"os"
 	"path/filepath"
 )
+
+const LabelSize = 32
 
 // OwnerReadWriteExec is a standard owner read / write / exec file permission.
 const OwnerReadWriteExec = 0700
@@ -43,13 +44,13 @@ func NewPostLabelsFileWriter(id []byte) (*PostLabelsFileWriter, error) {
 	}, nil
 }
 
-func (w *PostLabelsFileWriter) Write(label util.Label) error {
+func (w *PostLabelsFileWriter) Write(label Label) error {
 	nn, err := w.w.Write(label)
 	if err != nil {
 		return fmt.Errorf("failed to write label: %v", err)
 	}
-	if nn != util.LabelSize {
-		return fmt.Errorf("failed to write label: expected label size of %v bytes, but wrote %v bytes (len(label)=%v)", util.LabelSize, nn, len(label))
+	if nn != LabelSize {
+		return fmt.Errorf("failed to write label: expected label size of %v bytes, but wrote %v bytes (len(label)=%v)", LabelSize, nn, len(label))
 	}
 	return nil
 }
@@ -108,8 +109,8 @@ func NewPostLabelsFileReader(id []byte) (PostLabelsFileReader, error) {
 	}, nil
 }
 
-func (r *PostLabelsFileReader) Read() (uint64, util.Label, error) {
-	var l util.Label = make([]byte, util.LabelSize)
+func (r *PostLabelsFileReader) Read() (uint64, Label, error) {
+	var l Label = make([]byte, LabelSize)
 	n, err := r.r.Read(l)
 	if err != nil {
 		if err == io.EOF && n != 0 { // n < util.LabelSize or we wouldn't get EOF
