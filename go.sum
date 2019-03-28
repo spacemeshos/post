@@ -114,6 +114,10 @@ github.com/spacemeshos/merkle-tree v0.0.0-20190326114226-610da37c4b22 h1:qDyZYIY
 github.com/spacemeshos/merkle-tree v0.0.0-20190326114226-610da37c4b22/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
 github.com/spacemeshos/merkle-tree v0.0.0-20190326201001-de1caa2f3357 h1:g5TtsqopmIhmfGFTpw7CsMq5iHhmceTH3icX7eAGNPU=
 github.com/spacemeshos/merkle-tree v0.0.0-20190326201001-de1caa2f3357/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
+github.com/spacemeshos/merkle-tree v0.0.0-20190327105249-64fda4a93234 h1:38va4YdBbM+m99rVUdSZxud7LrSJA+NEpnw3V9tkisk=
+github.com/spacemeshos/merkle-tree v0.0.0-20190327105249-64fda4a93234/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
+github.com/spacemeshos/merkle-tree v0.0.0-20190327145446-3651a544f849 h1:RJw90V/KgsE3dKbcec+aFsgTdYzIwRlYwKRwu9DADPY=
+github.com/spacemeshos/merkle-tree v0.0.0-20190327145446-3651a544f849/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
 github.com/spacemeshos/sha256-simd v0.0.0-20190111104731-8575aafc88c9 h1:Cc+np6ORem5wrvO+YHQ1sdu71ItiQVRiYB4ugazpgxM=
 github.com/spacemeshos/sha256-simd v0.0.0-20190111104731-8575aafc88c9/go.mod h1:Pz5LyRghtiEuSixOVGO0da5AxKBZa6+Yq8ZJfjTAPI0=
 github.com/spf13/afero v1.1.2/go.mod h1:j4pytiNVoe2o6bmDsKpLACNPDBIoEAkihy7loJ1B0CQ=

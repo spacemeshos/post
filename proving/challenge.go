@@ -1,4 +1,4 @@
-package challenge
+package proving
 
 import "github.com/spacemeshos/sha256-simd"
 

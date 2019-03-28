@@ -17,10 +17,11 @@ const difficulty = 5
 func TestInitialize(t *testing.T) {
 	r := require.New(t)
 	id := hexDecode("deadbeef")
-	expectedMerkleRoot := hexDecode("2292f95c87626f5a281fa811ba825ffce79442f8999e1ddc8e8c9bbac15e3fcb")
 
 	proof, err := Initialize(id, 16, 4, difficulty)
 	r.NoError(err)
+
+	expectedMerkleRoot := hexDecode("2292f95c87626f5a281fa811ba825ffce79442f8999e1ddc8e8c9bbac15e3fcb")
 	r.Equal(expectedMerkleRoot, proof.MerkleRoot)
 
 	expectedProvenLeaves := nodes{
@@ -42,8 +43,6 @@ func TestInitialize(t *testing.T) {
 	}
 
 	r.EqualValues(expectedProofNodes, nodes(proof.ProofNodes))
-
-	r.EqualValues([]uint64{2, 9, 12, 13}, proof.ProvenIndices)
 }
 
 func TestInitializeErrors(t *testing.T) {

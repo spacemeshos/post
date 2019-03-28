@@ -1,8 +1,9 @@
 package proving
 
 type Proof struct {
-	MerkleRoot    []byte
-	ProofNodes    [][]byte
-	ProvenLeaves  [][]byte
-	ProvenIndices []uint64
+	Identity     []byte
+	Challenge    Challenge
+	MerkleRoot   []byte
+	ProofNodes   [][]byte
+	ProvenLeaves [][]byte
 }

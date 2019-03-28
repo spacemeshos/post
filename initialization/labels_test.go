@@ -11,7 +11,7 @@ func TestCalcLabelGroupWholeByte(t *testing.T) {
 
 	labels := make([]byte, 32)
 	for i := 0; i < 32; i++ {
-		labels[i] = calcLabel(id, uint64(i))
+		labels[i] = CalcLabel(id, uint64(i), difficulty)
 	}
 
 	labelGroup := CalcLabelGroup(id, 0, difficulty)
@@ -25,7 +25,7 @@ func TestCalcLabelGroupWholeByteWithOffset(t *testing.T) {
 
 	labels := make([]byte, 32)
 	for i := 32; i < 64; i++ {
-		labels[i-32] = calcLabel(id, uint64(i))
+		labels[i-32] = CalcLabel(id, uint64(i), difficulty)
 	}
 
 	labelGroup := CalcLabelGroup(id, 1, difficulty)
@@ -43,7 +43,7 @@ func TestCalcLabelGroupHalfByte(t *testing.T) {
 
 	labels := make([]byte, 64)
 	for i := 0; i < 64; i++ {
-		labels[i] = calcLabel(id, uint64(i))
+		labels[i] = CalcLabel(id, uint64(i), difficulty)
 	}
 
 	//internalShift := uint8(1) << (8 - difficulty)
