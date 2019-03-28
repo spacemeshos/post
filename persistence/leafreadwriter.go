@@ -2,11 +2,22 @@ package persistence
 
 import (
 	"bufio"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"github.com/spacemeshos/merkle-tree"
 	"io"
 	"os"
+	"path/filepath"
 )
+
+func NewLeafReader(id []byte) (*LeafReader, error) {
+	if len(id) > 64 {
+		return nil, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
+	}
+	fullFilename := filepath.Join(GetPostDataPath(), hex.EncodeToString(id), filename)
+	return newLeafReader(fullFilename)
+}
 
 type LeafReader struct {
 	f *os.File
@@ -52,4 +63,9 @@ func (l *LeafReader) Width() uint64 {
 
 func (l *LeafReader) Append(p []byte) (n int, err error) {
 	return 0, errors.New("writing not permitted")
+}
+
+func (l *LeafReader) Close() error {
+	l.b = nil
+	return l.f.Close()
 }

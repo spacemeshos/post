@@ -3,6 +3,7 @@ package validation
 import (
 	"encoding/hex"
 	"github.com/spacemeshos/post-private/initialization"
+	"github.com/spacemeshos/post-private/proving"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -18,6 +19,8 @@ func TestValidate(t *testing.T) {
 
 	err = Validate(proof, 16, 4, difficulty)
 	r.Nil(err)
+
+	testGenerateProof(r, id, difficulty)
 }
 
 func TestValidate2(t *testing.T) {
@@ -31,6 +34,8 @@ func TestValidate2(t *testing.T) {
 
 	err = Validate(proof, 16, 4, difficulty)
 	r.Nil(err)
+
+	testGenerateProof(r, id, difficulty)
 }
 
 func TestValidate3(t *testing.T) {
@@ -44,6 +49,8 @@ func TestValidate3(t *testing.T) {
 
 	err = Validate(proof, 16, 4, difficulty)
 	r.Nil(err)
+
+	testGenerateProof(r, id, difficulty)
 }
 
 func TestValidate4(t *testing.T) {
@@ -56,6 +63,17 @@ func TestValidate4(t *testing.T) {
 	r.NoError(err)
 
 	err = Validate(proof, 16, 4, difficulty)
+	r.Nil(err)
+
+	testGenerateProof(r, id, difficulty)
+}
+
+func testGenerateProof(r *require.Assertions, id []byte, difficulty proving.Difficulty) {
+	challenge := proving.Challenge{1, 2, 3}
+	proof2, err := proving.GenerateProof(id, challenge, 4, difficulty)
+	r.NoError(err)
+
+	err = Validate(proof2, 16, 4, difficulty)
 	r.Nil(err)
 }
 

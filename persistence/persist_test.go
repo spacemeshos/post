@@ -24,20 +24,17 @@ func TestPostLabelsReaderAndWriter(t *testing.T) {
 	err = writer.Close()
 	req.NoError(err)
 
-	reader, err := NewPostLabelsFileReader(id)
+	reader, err := NewLeafReader(id)
 	req.NoError(err)
 
 	labelsFromReader := make([]Label, 4)
-	var idx uint64
 	for i := range labelsFromReader {
-		idx, labelsFromReader[i], err = reader.Read()
-		req.Equal(idx, uint64(i))
+		labelsFromReader[i], err = reader.ReadNext()
 		req.NoError(err)
 	}
-	idx, shouldBeNil, err := reader.Read()
+	shouldBeNil, err := reader.ReadNext()
 	req.Equal(io.EOF, err)
 	req.Nil(shouldBeNil)
-	req.Zero(idx)
 
 	err = reader.Close()
 	req.NoError(err)

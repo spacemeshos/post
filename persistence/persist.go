@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/spacemeshos/go-spacemesh/log"
-	"io"
 	"os"
 	"path/filepath"
 )
@@ -82,53 +81,4 @@ func (w *PostLabelsFileWriter) GetLeafReader() (*LeafReader, error) {
 	}
 	name := w.f.Name()
 	return newLeafReader(name)
-}
-
-type PostLabelsFileReader struct {
-	f        *os.File
-	r        *bufio.Reader
-	position uint64
-}
-
-func NewPostLabelsFileReader(id []byte) (PostLabelsFileReader, error) {
-	if len(id) > 64 {
-		return PostLabelsFileReader{}, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
-	}
-	fullFilename := filepath.Join(GetPostDataPath(), hex.EncodeToString(id), filename)
-	f, err := os.OpenFile(fullFilename, os.O_RDONLY, OwnerReadWrite)
-	if os.IsNotExist(err) {
-		return PostLabelsFileReader{}, err
-	}
-	if err != nil {
-		panic(err)
-	}
-	return PostLabelsFileReader{
-		f:        f,
-		r:        bufio.NewReader(f),
-		position: 0,
-	}, nil
-}
-
-func (r *PostLabelsFileReader) Read() (uint64, Label, error) {
-	var l Label = make([]byte, LabelSize)
-	n, err := r.r.Read(l)
-	if err != nil {
-		if err == io.EOF && n != 0 { // n < util.LabelSize or we wouldn't get EOF
-			return 0, nil, io.ErrUnexpectedEOF
-		}
-		return 0, nil, err
-	}
-	position := r.position
-	r.position++
-	return position, l, nil
-}
-
-func (r *PostLabelsFileReader) Close() error {
-	r.r = nil
-	err := r.f.Close()
-	if err != nil {
-		return err
-	}
-	r.f = nil
-	return nil
 }
