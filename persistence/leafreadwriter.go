@@ -58,7 +58,7 @@ func (l *LeafReader) Width() uint64 {
 	if err != nil {
 		return 0
 	}
-	return uint64(info.Size()) >> 5
+	return uint64(info.Size()) / merkle.NodeSize
 }
 
 func (l *LeafReader) Append(p []byte) (n int, err error) {
