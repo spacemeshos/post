@@ -51,7 +51,7 @@ func validatePow(identity []byte, provenLeaves [][]byte, labelIndices proving.Se
 			provenLeaves = provenLeaves[1:]
 			currentLeafIndex = leafIndex
 		}
-		intraLeafIndex := difficulty.IndexInLeaf(labelIndexList[0])
+		intraLeafIndex := difficulty.IndexInGroup(labelIndexList[0])
 		b := labelsByte(currentLeaf[difficulty.ByteIndex(intraLeafIndex)])
 		label := b.GetLabelAtIndex(difficulty.IndexInByte(intraLeafIndex), difficulty)
 		expectedLabel := initialization.CalcLabel(identity, labelIndexList[0], difficulty)

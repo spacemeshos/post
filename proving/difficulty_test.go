@@ -68,10 +68,10 @@ func TestDifficulty_LeafIndex(t *testing.T) {
 
 func TestDifficulty_IndexInLeaf(t *testing.T) {
 	r := require.New(t)
-	r.Equal(uint64(1), Difficulty(5).IndexInLeaf(32+1))
-	r.Equal(uint64(3), Difficulty(6).IndexInLeaf(64+2+1))
-	r.Equal(uint64(5), Difficulty(7).IndexInLeaf(128+4+1))
-	r.Equal(uint64(9), Difficulty(8).IndexInLeaf(256+8+1))
+	r.Equal(uint64(1), Difficulty(5).IndexInGroup(32+1))
+	r.Equal(uint64(3), Difficulty(6).IndexInGroup(64+2+1))
+	r.Equal(uint64(5), Difficulty(7).IndexInGroup(128+4+1))
+	r.Equal(uint64(9), Difficulty(8).IndexInGroup(256+8+1))
 }
 
 func TestDifficulty_IndexInByte(t *testing.T) {
