@@ -11,7 +11,8 @@ import (
 )
 
 func Validate(proof proving.Proof, leafCount uint64, numberOfProvenLabels uint8, difficulty proving.Difficulty) error {
-	labelIndices := proving.DrawProvenLabelIndices(proof.MerkleRoot, leafCount<<difficulty, numberOfProvenLabels)
+	labelIndices := proving.DrawProvenLabelIndices(proof.MerkleRoot, leafCount*difficulty.LabelsPerGroup(),
+		numberOfProvenLabels)
 	leafIndices := proving.ConvertLabelIndicesToLeafIndices(labelIndices, difficulty)
 	if len(leafIndices) != len(proof.ProvenLeaves) {
 		return fmt.Errorf("number of derived leaf indices (%d) doesn't match number of included proven "+

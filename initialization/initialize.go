@@ -13,9 +13,10 @@ import (
 // at 8 bits per label, this would be 1 peta-byte of storage
 const maxWidth = 1 << 50
 
-// Initialize takes an id (public key), width (number of labels) and difficulty. Difficulty sets the number of bits per
-// label that are stored. Each leaf in the tree is 32 bytes = 256 bits -- the number of bits per label is
-// 256/(1<<difficulty). Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
+// Initialize takes an id (public key), width (number of labels) and difficulty.
+// Difficulty determines the number of bits per label that are stored. Each leaf in the tree is 32 bytes = 256 bits.
+// The number of bits per label is 256 / LabelsPerGroup. LabelsPerGroup = 1 << difficulty.
+// Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
 func Initialize(id []byte, width uint64, numberOfProvenLabels uint8, difficulty proving.Difficulty) (
 	proof proving.Proof, err error) {
 

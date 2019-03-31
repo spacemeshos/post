@@ -1,12 +1,13 @@
 package initialization
 
 import (
+	"github.com/spacemeshos/post-private/proving"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 func TestCalcLabelGroupWholeByte(t *testing.T) {
-	const difficulty = 5
+	const difficulty = proving.Difficulty(5)
 	id := []byte{0, 0, 0, 0}
 
 	labels := make([]byte, 32)
@@ -20,7 +21,7 @@ func TestCalcLabelGroupWholeByte(t *testing.T) {
 }
 
 func TestCalcLabelGroupWholeByteWithOffset(t *testing.T) {
-	const difficulty = 5
+	const difficulty = proving.Difficulty(5)
 	id := []byte{0, 0, 0, 0}
 
 	labels := make([]byte, 32)
@@ -34,23 +35,21 @@ func TestCalcLabelGroupWholeByteWithOffset(t *testing.T) {
 }
 
 func TestCalcLabelGroupHalfByte(t *testing.T) {
-	const difficulty = 6
+	const difficulty = proving.Difficulty(6)
 	id := []byte{0, 0, 0, 0}
 
 	labelGroup := CalcLabelGroup(id, 0, difficulty)
 
 	require.Equal(t, hexDecode("51255c4d9310ef2d5846a0701a31104b53b43cdd19a6c6fcd33e92363af6c742"), labelGroup)
 
-	labels := make([]byte, 64)
-	for i := 0; i < 64; i++ {
-		labels[i] = CalcLabel(id, uint64(i), difficulty)
-	}
-
-	//internalShift := uint8(1) << (8 - difficulty)
-	//labelMask := (uint8(1) << internalShift) - 1
+	//labels := make([]byte, 64)
+	//for i := 0; i < 64; i++ {
+	//	labels[i] = CalcLabel(id, uint64(i), difficulty)
+	//}
 	//
 	//for _, label := range labels {
-	//	fmt.Printf("%08b | %0" + strconv.Itoa(int(internalShift)) + "b\n", label, label & labelMask)
+	//	fmt.Printf("%08b | %0"+strconv.Itoa(int(difficulty.LabelBits()))+"b\n", label,
+	//		label&difficulty.LabelMask())
 	//}
 	//fmt.Println("-----------")
 	//for _, label := range labelGroup {
@@ -61,7 +60,7 @@ func TestCalcLabelGroupHalfByte(t *testing.T) {
 }
 
 func TestCalcLabelGroupHalfByteWithOffset(t *testing.T) {
-	const difficulty = 6
+	const difficulty = proving.Difficulty(6)
 	id := []byte{0, 0, 0, 0}
 
 	labelGroup := CalcLabelGroup(id, 1, difficulty)
@@ -70,14 +69,12 @@ func TestCalcLabelGroupHalfByteWithOffset(t *testing.T) {
 
 	//labels := make([]byte, 64)
 	//for i := 64; i < 128; i++ {
-	//	labels[i-64] = calcLabel(id, uint64(i))
+	//	labels[i-64] = CalcLabel(id, uint64(i), difficulty)
 	//}
 	//
-	//internalShift := uint8(1) << (8 - difficulty)
-	//labelMask := (uint8(1) << internalShift) - 1
-	//
 	//for _, label := range labels {
-	//	fmt.Printf("%08b | %0" + strconv.Itoa(int(internalShift)) + "b\n", label, label & labelMask)
+	//	fmt.Printf("%08b | %0"+strconv.Itoa(int(difficulty.LabelBits()))+"b\n", label,
+	//		label&difficulty.LabelMask())
 	//}
 	//fmt.Println("-----------")
 	//for _, label := range labelGroup {
@@ -88,7 +85,7 @@ func TestCalcLabelGroupHalfByteWithOffset(t *testing.T) {
 }
 
 func TestCalcLabelGroupQuarterByte(t *testing.T) {
-	const difficulty = 7
+	const difficulty = proving.Difficulty(7)
 	id := []byte{0, 0, 0, 0}
 
 	labelGroup := CalcLabelGroup(id, 0, difficulty)
@@ -97,14 +94,12 @@ func TestCalcLabelGroupQuarterByte(t *testing.T) {
 
 	//labels := make([]byte, 128)
 	//for i := 0; i < 128; i++ {
-	//	labels[i] = calcLabel(id, uint64(i))
+	//	labels[i] = CalcLabel(id, uint64(i), difficulty)
 	//}
 	//
-	//internalShift := uint8(1) << (8 - difficulty)
-	//labelMask := (uint8(1) << internalShift) - 1
-	//
 	//for _, label := range labels {
-	//	fmt.Printf("%08b | %0" + strconv.Itoa(int(internalShift)) + "b\n", label, label & labelMask)
+	//	fmt.Printf("%08b | %0"+strconv.Itoa(int(difficulty.LabelBits()))+"b\n", label,
+	//		label&difficulty.LabelMask())
 	//}
 	//fmt.Println("-----------")
 	//for _, label := range labelGroup {

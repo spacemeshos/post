@@ -39,7 +39,7 @@ func GenerateProof(id []byte, challenge Challenge, numberOfProvenLabels uint8, d
 	cacheReader, err := cacheWriter.GetReader()
 
 	provenLeafIndices := CalcProvenLeafIndices(
-		proof.MerkleRoot, leafReader.Width()<<difficulty, numberOfProvenLabels, difficulty)
+		proof.MerkleRoot, leafReader.Width()*difficulty.LabelsPerGroup(), numberOfProvenLabels, difficulty)
 
 	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, cacheReader)
 	if err != nil {
