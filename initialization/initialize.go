@@ -46,8 +46,7 @@ func Initialize(id []byte, width uint64, numberOfProvenLabels uint8, difficulty 
 
 	leafReader := cacheReader.GetLayerReader(0)
 	provenLeafIndices := proving.CalcProvenLeafIndices(
-		merkleRoot, leafReader.Width()<<difficulty, numberOfProvenLabels, difficulty,
-	)
+		merkleRoot, leafReader.Width()<<difficulty, numberOfProvenLabels, difficulty)
 
 	proof.MerkleRoot = merkleRoot
 	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, cacheReader)
@@ -58,8 +57,8 @@ func Initialize(id []byte, width uint64, numberOfProvenLabels uint8, difficulty 
 	return proof, err
 }
 
-func initialize(id []byte, width uint64, difficulty proving.Difficulty, labelsWriter *persistence.PostLabelsFileWriter) (merkleRoot []byte,
-	cacheReader *cache.Reader, err error) {
+func initialize(id []byte, width uint64, difficulty proving.Difficulty,
+	labelsWriter *persistence.PostLabelsFileWriter) (merkleRoot []byte, cacheReader *cache.Reader, err error) {
 
 	if width > maxWidth {
 		return nil, nil,
