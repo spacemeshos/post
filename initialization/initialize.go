@@ -19,8 +19,8 @@ const maxWidth = 1 << 50
 func Initialize(id []byte, width uint64, numberOfProvenLabels uint8, difficulty proving.Difficulty) (
 	proof proving.Proof, err error) {
 
-	if difficulty < 5 || difficulty > 8 {
-		return proving.Proof{}, fmt.Errorf("difficulty must be between 5 and 8 (received %d)", difficulty)
+	if err = difficulty.Validate(); err != nil {
+		return proving.Proof{}, err
 	}
 
 	proof.Challenge = proving.ZeroChallenge

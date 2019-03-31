@@ -73,3 +73,11 @@ func TestDifficulty_LabelsPerByte(t *testing.T) {
 	r.Equal(uint64(4), Difficulty(7).LabelsPerByte())
 	r.Equal(uint64(8), Difficulty(8).LabelsPerByte())
 }
+
+func TestDifficulty_Validate(t *testing.T) {
+	r := require.New(t)
+	r.EqualError(Difficulty(4).Validate(), "difficulty must be between 5 and 8 (received 4)")
+	r.NoError(Difficulty(5).Validate())
+	r.NoError(Difficulty(8).Validate())
+	r.EqualError(Difficulty(9).Validate(), "difficulty must be between 5 and 8 (received 9)")
+}
