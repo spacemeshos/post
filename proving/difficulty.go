@@ -7,6 +7,16 @@ const MaxDifficulty = 8 // 1 bit per label
 
 type Difficulty uint8
 
+// LabelsPerGroup returns the number of labels in a label group. A value between 32 and 256.
+func (d Difficulty) LabelsPerGroup() uint64 {
+	return 1 << d
+}
+
+// LabelsPerByte returns the number of labels in a single byte. A value between 1 and 8.
+func (d Difficulty) LabelsPerByte() uint64 {
+	return 1 << (d - MinDifficulty)
+}
+
 // LabelBits returns the number of bits per label.
 func (d Difficulty) LabelBits() uint64 {
 	return 1 << (MaxDifficulty - d)
@@ -36,10 +46,6 @@ func (d Difficulty) IndexInLeaf(labelIndex uint64) uint64 {
 // IndexInByte returns the relative label index within the byte that contains it.
 func (d Difficulty) IndexInByte(labelIndex uint64) uint64 {
 	return labelIndex &^ (^uint64(0) << (d - MinDifficulty))
-}
-
-func (d Difficulty) LabelsPerByte() uint64 {
-	return 1 << (d - MinDifficulty)
 }
 
 func (d Difficulty) Validate() error {

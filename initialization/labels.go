@@ -9,8 +9,9 @@ import (
 
 func CalcLabelGroup(identity []byte, groupPosition uint64, difficulty proving.Difficulty) []byte {
 	labelGroup := make([]byte, merkle.NodeSize)
-	offset := groupPosition << difficulty
-	for labelIndex := uint64(0); labelIndex < 1<<difficulty; labelIndex++ {
+	labelsPerGroup := difficulty.LabelsPerGroup()
+	offset := groupPosition * labelsPerGroup
+	for labelIndex := uint64(0); labelIndex < labelsPerGroup; labelIndex++ {
 		label := CalcLabel(identity, labelIndex+offset, difficulty)
 		byteIndex := difficulty.ByteIndex(labelIndex)
 		labelGroup[byteIndex] <<= difficulty.LabelBits()

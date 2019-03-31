@@ -5,6 +5,22 @@ import (
 	"testing"
 )
 
+func TestDifficulty_LabelsPerByte(t *testing.T) {
+	r := require.New(t)
+	r.Equal(uint64(1), Difficulty(5).LabelsPerByte())
+	r.Equal(uint64(2), Difficulty(6).LabelsPerByte())
+	r.Equal(uint64(4), Difficulty(7).LabelsPerByte())
+	r.Equal(uint64(8), Difficulty(8).LabelsPerByte())
+}
+
+func TestDifficulty_LabelsPerGroup(t *testing.T) {
+	r := require.New(t)
+	r.Equal(uint64(32), Difficulty(5).LabelsPerGroup())
+	r.Equal(uint64(64), Difficulty(6).LabelsPerGroup())
+	r.Equal(uint64(128), Difficulty(7).LabelsPerGroup())
+	r.Equal(uint64(256), Difficulty(8).LabelsPerGroup())
+}
+
 func TestDifficulty_LabelBits(t *testing.T) {
 	r := require.New(t)
 	r.Equal(uint64(8), Difficulty(5).LabelBits())
@@ -64,14 +80,6 @@ func TestDifficulty_IndexInByte(t *testing.T) {
 	r.Equal(uint64(1), Difficulty(6).IndexInByte(64+2+1))
 	r.Equal(uint64(1), Difficulty(7).IndexInByte(128+4+1))
 	r.Equal(uint64(1), Difficulty(8).IndexInByte(256+8+1))
-}
-
-func TestDifficulty_LabelsPerByte(t *testing.T) {
-	r := require.New(t)
-	r.Equal(uint64(1), Difficulty(5).LabelsPerByte())
-	r.Equal(uint64(2), Difficulty(6).LabelsPerByte())
-	r.Equal(uint64(4), Difficulty(7).LabelsPerByte())
-	r.Equal(uint64(8), Difficulty(8).LabelsPerByte())
 }
 
 func TestDifficulty_Validate(t *testing.T) {
