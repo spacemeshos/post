@@ -10,6 +10,8 @@ import (
 	"math"
 )
 
+const LowestLayerToCacheDuringProofGeneration = 11
+
 func GenerateProof(id []byte, challenge Challenge, numberOfProvenLabels uint8, difficulty Difficulty) (proof Proof,
 	err error) {
 
@@ -40,7 +42,8 @@ func generateProof(id []byte, challenge Challenge, numberOfProvenLabels uint8, d
 		return Proof{}, fmt.Errorf("leaf reader too big, number of label groups (%d) * labels per group (%d) " +
 			"overflows uint64", leafReader.Width(), difficulty.LabelsPerGroup())
 	}
-	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(7), cache.MakeSliceReadWriterFactory())
+	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(LowestLayerToCacheDuringProofGeneration),
+		cache.MakeSliceReadWriterFactory())
 
 	tree := merkle.NewTreeBuilder().WithHashFunc(challenge.GetSha256Parent).WithCacheWriter(cacheWriter).Build()
 	for {
