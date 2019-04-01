@@ -3,6 +3,7 @@ package validation
 import (
 	"errors"
 	"fmt"
+	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/post-private/initialization"
 	"github.com/spacemeshos/post-private/proving"
@@ -11,6 +12,15 @@ import (
 )
 
 func Validate(proof proving.Proof, leafCount uint64, numberOfProvenLabels uint8, difficulty proving.Difficulty) error {
+	err := validate(proof, leafCount, numberOfProvenLabels, difficulty)
+	if err != nil {
+		err = fmt.Errorf("validation failed: %v", err)
+		log.Info(err.Error())
+	}
+	return err
+}
+
+func validate(proof proving.Proof, leafCount uint64, numberOfProvenLabels uint8, difficulty proving.Difficulty) error {
 	labelIndices := proving.DrawProvenLabelIndices(proof.MerkleRoot, leafCount*difficulty.LabelsPerGroup(),
 		numberOfProvenLabels)
 	leafIndices := proving.ConvertLabelIndicesToLeafIndices(labelIndices, difficulty)
@@ -26,10 +36,10 @@ func Validate(proof proving.Proof, leafCount uint64, numberOfProvenLabels uint8,
 		proof.Challenge.GetSha256Parent,
 	)
 	if err != nil {
-		return fmt.Errorf("validation failed: %v", err)
+		return err
 	}
 	if !valid {
-		return errors.New("validation failed: merkle root mismatch")
+		return errors.New("merkle root mismatch")
 	}
 	return validatePow(proof.Identity, proof.ProvenLeaves, labelIndices, difficulty)
 }

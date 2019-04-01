@@ -89,7 +89,7 @@ func TestValidateFail(t *testing.T) {
 	proof.Identity[0] = 0
 
 	err = Validate(proof, 16, 4, difficulty)
-	r.EqualError(err, "label at index 91 should be 01101111, but found 00011101")
+	r.EqualError(err, "validation failed: label at index 91 should be 01101111, but found 00011101")
 }
 
 func TestValidateFail2(t *testing.T) {
@@ -134,7 +134,7 @@ func TestValidateFail4(t *testing.T) {
 	proof.ProvenLeaves = proof.ProvenLeaves[1:]
 
 	err = Validate(proof, 16, 4, difficulty)
-	r.EqualError(err, "number of derived leaf indices (4) doesn't match number of included proven leaves (3)")
+	r.EqualError(err, "validation failed: number of derived leaf indices (4) doesn't match number of included proven leaves (3)")
 }
 
 func TestValidateFail5(t *testing.T) {
