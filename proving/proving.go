@@ -10,6 +10,8 @@ import (
 	"math"
 )
 
+// NumberOfProvenLabels is the recommended setting for this argument to ensure proof safety
+const NumberOfProvenLabels = 100
 const LowestLayerToCacheDuringProofGeneration = 11
 
 func GenerateProof(id []byte, challenge Challenge, numberOfProvenLabels uint8, difficulty Difficulty) (proof Proof,
