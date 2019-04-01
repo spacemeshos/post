@@ -15,8 +15,8 @@ func CalcProvenLeafIndices(merkleRoot []byte, numberOfLabels uint64, numberOfPro
 
 func ConvertLabelIndicesToLeafIndices(labelIndices Set, difficulty Difficulty) (leafIndices Set) {
 	leafIndices = make(Set)
-	for key, value := range labelIndices {
-		leafIndices[key>>difficulty] = value
+	for labelIndex, value := range labelIndices {
+		leafIndices[difficulty.LeafIndex(labelIndex)] = value
 	}
 	return leafIndices
 }
