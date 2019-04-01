@@ -68,6 +68,13 @@ func TestValidate4(t *testing.T) {
 	testGenerateProof(r, id, difficulty)
 }
 
+func TestValidateBadDifficulty(t *testing.T) {
+	r := require.New(t)
+
+	err := Validate(proving.Proof{}, 16, 4, 4)
+	r.EqualError(err, "difficulty must be between 5 and 8 (received 4)")
+}
+
 func testGenerateProof(r *require.Assertions, id []byte, difficulty proving.Difficulty) {
 	challenge := proving.Challenge{1, 2, 3}
 	proof2, err := proving.GenerateProof(id, challenge, 4, difficulty)

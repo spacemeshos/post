@@ -11,8 +11,16 @@ import (
 	"strconv"
 )
 
+// Validate ensures the validity of the given proof. It returns nil if the proof is valid or an error describing the
+// failure, otherwise.
 func Validate(proof proving.Proof, leafCount uint64, numberOfProvenLabels uint8, difficulty proving.Difficulty) error {
-	err := validate(proof, leafCount, numberOfProvenLabels, difficulty)
+	err := difficulty.Validate()
+	if err != nil {
+		log.Error(err.Error())
+		return err
+	}
+
+	err = validate(proof, leafCount, numberOfProvenLabels, difficulty)
 	if err != nil {
 		err = fmt.Errorf("validation failed: %v", err)
 		log.Info(err.Error())
@@ -24,6 +32,9 @@ func validate(proof proving.Proof, leafCount uint64, numberOfProvenLabels uint8,
 	labelIndices := proving.DrawProvenLabelIndices(proof.MerkleRoot, leafCount*difficulty.LabelsPerGroup(),
 		numberOfProvenLabels)
 	leafIndices := proving.ConvertLabelIndicesToLeafIndices(labelIndices, difficulty)
+	// The number of proven leaves could be less than the number of proven labels since more than one label could be in
+	// the same leaf. That's why we can only validate the number of proven leaves after drawing the proven labels and
+	// determining which leaf each one falls in.
 	if len(leafIndices) != len(proof.ProvenLeaves) {
 		return fmt.Errorf("number of derived leaf indices (%d) doesn't match number of included proven "+
 			"leaves (%d)", len(leafIndices), len(proof.ProvenLeaves))
