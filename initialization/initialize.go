@@ -1,27 +1,37 @@
 package initialization
 
 import (
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
+	"github.com/spacemeshos/merkle-tree/cache"
 	"github.com/spacemeshos/post-private/config"
 	"github.com/spacemeshos/post-private/persistence"
-	"github.com/spacemeshos/post-private/util"
-	"math"
+	"github.com/spacemeshos/post-private/proving"
 )
 
-const maxWidth = 1 << 50 // at 1 byte per label, this would be 1 peta-byte of storage
+// at 8 bits per label, this would be 1 peta-byte of storage
+const maxWidth = 1 << 50
 
-// Initialize takes an id (public key), width (number of labels) and difficulty (hash to use as upper bound for labels).
-// The merkle root is passed on the results channel.
-func Initialize(id []byte, width uint64, difficulty []byte) ([]byte, error) {
+// Initialize takes an id (public key), width (number of labels) and difficulty.
+// Difficulty determines the number of bits per label that are stored. Each leaf in the tree is 32 bytes = 256 bits.
+// The number of bits per label is 256 / LabelsPerGroup. LabelsPerGroup = 1 << difficulty.
+// Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
+func Initialize(id []byte, width uint64, numberOfProvenLabels uint8, difficulty proving.Difficulty) (
+	proof proving.Proof, err error) {
+
+	if err = difficulty.Validate(); err != nil {
+		return proving.Proof{}, err
+	}
+
+	proof.Challenge = proving.ZeroChallenge
+	proof.Identity = id
+
 	labelsWriter, err := persistence.NewPostLabelsFileWriter(id)
 	if err != nil {
-		return nil, err
+		return proving.Proof{}, err
 	}
-	merkleRoot, err := initialize(id, width, difficulty, &labelsWriter)
+	merkleRoot, cacheReader, err := initialize(id, width, difficulty, labelsWriter)
 	if err2 := labelsWriter.Close(); err2 != nil {
 		if err != nil {
 			err = fmt.Errorf("%v, %v", err, err2)
@@ -32,45 +42,59 @@ func Initialize(id []byte, width uint64, difficulty []byte) ([]byte, error) {
 	if err != nil {
 		err = fmt.Errorf("failed to initialize post: %v", err)
 		log.Error(err.Error())
+		return proving.Proof{}, err
 	}
-	return merkleRoot, err
+
+	leafReader := cacheReader.GetLayerReader(0)
+	provenLeafIndices := proving.CalcProvenLeafIndices(
+		merkleRoot, leafReader.Width()<<difficulty, numberOfProvenLabels, difficulty)
+
+	proof.MerkleRoot = merkleRoot
+	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, cacheReader)
+	if err != nil {
+		return proving.Proof{}, err
+	}
+
+	return proof, err
 }
 
-type postLabelsWriter interface {
-	Write(label util.Label) error
-}
+func initialize(id []byte, width uint64, difficulty proving.Difficulty,
+	labelsWriter *persistence.PostLabelsFileWriter) (merkleRoot []byte, cacheReader *cache.Reader, err error) {
 
-func initialize(id []byte, width uint64, difficulty []byte, labelsWriter postLabelsWriter) ([]byte, error) {
 	if width > maxWidth {
-		return nil, fmt.Errorf("requested width (%d) is larger than supported width (%d)", width, maxWidth)
+		return nil, nil,
+			fmt.Errorf("requested width (%d) is greater than supported width (%d)", width, maxWidth)
 	}
-	merkleTree := merkle.NewTree()
-	var cnt, labelsFound uint64 = 0, 0
-	for {
-		l := util.NewLabel(cnt)
-		if util.CalcHash(id, l).IsLessThan(difficulty) {
-			err := labelsWriter.Write(l)
-			if err != nil {
-				return nil, err
-			}
-			merkleTree.AddLeaf(l)
-			labelsFound++
-			if labelsFound == width {
-				break
-			}
-			if labelsFound%config.Post.LogEveryXLabels == 0 {
-				log.Info("found %v labels", labelsFound)
-			}
+	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(7), cache.MakeSliceReadWriterFactory())
+	merkleTree := merkle.NewTreeBuilder().
+		WithHashFunc(proving.ZeroChallenge.GetSha256Parent).
+		WithCacheWriter(cacheWriter).
+		Build()
+	for position := uint64(0); position < width; position++ {
+		lg := CalcLabelGroup(id, position, difficulty)
+		err := labelsWriter.Write(lg)
+		if err != nil {
+			return nil, nil, err
 		}
-		if cnt == math.MaxUint64 {
-			return nil, errors.New("out of counter space")
+		err = merkleTree.AddLeaf(lg)
+		if err != nil {
+			return nil, nil, err
 		}
-		cnt++
+		if (position+1)%config.Post.LogEveryXLabels == 0 {
+			log.Info("found %v labels", position+1)
+		}
 	}
-	log.With().Info("completed PoST label list construction",
-		log.String("id", hex.EncodeToString(id)),
-		log.Uint64("number_of_labels", labelsFound),
-		log.Uint64("number_of_oracle_calls", cnt),
-	)
-	return merkleTree.Root(), nil
+
+	log.With().Info("completed PoST label list construction")
+
+	leafReader, err := labelsWriter.GetLeafReader()
+	if err != nil {
+		return nil, nil, err
+	}
+	cacheWriter.SetLayer(0, leafReader)
+	cacheReader, err = cacheWriter.GetReader()
+	if err != nil {
+		return nil, nil, err
+	}
+	return merkleTree.Root(), cacheReader, nil
 }

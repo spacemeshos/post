@@ -1,0 +1,219 @@
+package validation
+
+import (
+	"encoding/hex"
+	"flag"
+	"github.com/spacemeshos/post-private/initialization"
+	"github.com/spacemeshos/post-private/persistence"
+	"github.com/spacemeshos/post-private/proving"
+	"github.com/stretchr/testify/require"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestValidate(t *testing.T) {
+	r := require.New(t)
+
+	const difficulty = 5
+	id := hexDecode("deadbeef")
+
+	proof, err := initialization.Initialize(id, 16, 4, difficulty)
+	r.NoError(err)
+
+	err = Validate(proof, 16, 4, difficulty)
+	r.Nil(err)
+
+	testGenerateProof(r, id, difficulty)
+}
+
+func TestValidate2(t *testing.T) {
+	r := require.New(t)
+
+	const difficulty = 6
+	id := hexDecode("deadbeef")
+
+	proof, err := initialization.Initialize(id, 16, 4, difficulty)
+	r.NoError(err)
+
+	err = Validate(proof, 16, 4, difficulty)
+	r.Nil(err)
+
+	testGenerateProof(r, id, difficulty)
+}
+
+func TestValidate3(t *testing.T) {
+	r := require.New(t)
+
+	const difficulty = 7
+	id := hexDecode("deadbeef")
+
+	proof, err := initialization.Initialize(id, 16, 4, difficulty)
+	r.NoError(err)
+
+	err = Validate(proof, 16, 4, difficulty)
+	r.Nil(err)
+
+	testGenerateProof(r, id, difficulty)
+}
+
+func TestValidate4(t *testing.T) {
+	r := require.New(t)
+
+	const difficulty = 8
+	id := hexDecode("deadbeef")
+
+	proof, err := initialization.Initialize(id, 16, 4, difficulty)
+	r.NoError(err)
+
+	err = Validate(proof, 16, 4, difficulty)
+	r.Nil(err)
+
+	testGenerateProof(r, id, difficulty)
+}
+
+func TestValidateBadDifficulty(t *testing.T) {
+	r := require.New(t)
+
+	err := Validate(proving.Proof{}, 16, 4, 4)
+	r.EqualError(err, "difficulty must be between 5 and 8 (received 4)")
+}
+
+func testGenerateProof(r *require.Assertions, id []byte, difficulty proving.Difficulty) {
+	challenge := proving.Challenge{1, 2, 3}
+	proof2, err := proving.GenerateProof(id, challenge, 4, difficulty)
+	r.NoError(err)
+
+	err = Validate(proof2, 16, 4, difficulty)
+	r.Nil(err)
+}
+
+func TestGenerateProofFailure(t *testing.T) {
+	r := require.New(t)
+
+	id := hexDecode("deadbeef")
+	proof, err := proving.GenerateProof(id, id, 4, 4)
+	r.EqualError(err, "proof generation failed: difficulty must be between 5 and 8 (received 4)")
+	r.Empty(proof)
+}
+
+func TestValidateFail(t *testing.T) {
+	r := require.New(t)
+
+	const difficulty = 5
+	id := hexDecode("deadbeef")
+
+	proof, err := initialization.Initialize(id, 16, 4, difficulty)
+	r.NoError(err)
+
+	proof.Identity[0] = 0
+
+	err = Validate(proof, 16, 4, difficulty)
+	r.EqualError(err, "validation failed: label at index 91 should be 01101111, but found 00011101")
+}
+
+func TestValidateFail2(t *testing.T) {
+	r := require.New(t)
+
+	const difficulty = 5
+	id := hexDecode("deadbeef")
+
+	proof, err := initialization.Initialize(id, 16, 4, difficulty)
+	r.NoError(err)
+
+	proof.Challenge = []byte{1}
+
+	err = Validate(proof, 16, 4, difficulty)
+	r.EqualError(err, "validation failed: merkle root mismatch")
+}
+
+func TestValidateFail3(t *testing.T) {
+	r := require.New(t)
+
+	const difficulty = 5
+	id := hexDecode("deadbeef")
+
+	proof, err := initialization.Initialize(id, 16, 4, difficulty)
+	r.NoError(err)
+
+	proof.ProvenLeaves[0][0] += 1
+
+	err = Validate(proof, 16, 4, difficulty)
+	r.EqualError(err, "validation failed: merkle root mismatch")
+}
+
+func TestValidateFail4(t *testing.T) {
+	r := require.New(t)
+
+	const difficulty = 5
+	id := hexDecode("deadbeef")
+
+	proof, err := initialization.Initialize(id, 16, 4, difficulty)
+	r.NoError(err)
+
+	proof.ProvenLeaves = proof.ProvenLeaves[1:]
+
+	err = Validate(proof, 16, 4, difficulty)
+	r.EqualError(err, "validation failed: number of derived leaf indices (4) doesn't match number of included proven leaves (3)")
+}
+
+func TestValidateFail5(t *testing.T) {
+	r := require.New(t)
+
+	const difficulty = 5
+	id := hexDecode("deadbeef")
+
+	proof, err := initialization.Initialize(id, 16, 4, difficulty)
+	r.NoError(err)
+
+	proof.ProofNodes[0][0] += 1
+
+	err = Validate(proof, 16, 4, difficulty)
+	r.EqualError(err, "validation failed: merkle root mismatch")
+}
+
+func TestValidateFail6(t *testing.T) {
+	r := require.New(t)
+
+	const difficulty = 5
+	id := hexDecode("deadbeef")
+
+	proof, err := initialization.Initialize(id, 16, 4, difficulty)
+	r.NoError(err)
+
+	proof.ProofNodes = proof.ProofNodes[1:]
+
+	err = Validate(proof, 16, 4, difficulty)
+	r.EqualError(err, "validation failed: merkle root mismatch")
+}
+
+func TestValidateFail7(t *testing.T) {
+	r := require.New(t)
+
+	const difficulty = 5
+	id := hexDecode("deadbeef")
+
+	proof, err := initialization.Initialize(id, 16, 4, difficulty)
+	r.NoError(err)
+
+	proof.MerkleRoot[0] += 1
+
+	err = Validate(proof, 16, 4, difficulty)
+	r.EqualError(err, "validation failed: merkle root mismatch")
+}
+
+func hexDecode(hexStr string) []byte {
+	node, _ := hex.DecodeString(hexStr)
+	return node
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	res := m.Run()
+	cleanup()
+	os.Exit(res)
+}
+
+func cleanup() {
+	_ = os.RemoveAll(filepath.Join(persistence.GetPostDataPath(), "deadbeef"))
+}
