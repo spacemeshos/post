@@ -66,6 +66,7 @@ func validatePow(identity []byte, provenLeaves [][]byte, labelIndices proving.Se
 	for labelIndexList := labelIndices.AsSortedSlice(); len(labelIndexList) > 0; labelIndexList = labelIndexList[1:] {
 		leafIndex := difficulty.LeafIndex(labelIndexList[0])
 		if leafIndex != currentLeafIndex {
+			// Proven leaves are expected to be sorted (or validation fails)
 			currentLeaf = provenLeaves[0]
 			provenLeaves = provenLeaves[1:]
 			currentLeafIndex = leafIndex
