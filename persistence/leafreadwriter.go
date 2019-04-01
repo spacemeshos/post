@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/prometheus/common/log"
 	"github.com/spacemeshos/merkle-tree"
 	"io"
 	"os"
@@ -13,7 +14,10 @@ import (
 
 func NewLeafReader(id []byte) (*LeafReader, error) {
 	if len(id) > 64 {
-		return nil, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
+		err := fmt.Errorf("failed to create leaf reader: id cannot be longer than 64 bytes (got %d bytes)",
+			len(id))
+		log.Error(err)
+		return nil, err
 	}
 	fullFilename := filepath.Join(GetPostDataPath(), hex.EncodeToString(id), filename)
 	return newLeafReader(fullFilename)
@@ -27,6 +31,7 @@ type LeafReader struct {
 func newLeafReader(name string) (*LeafReader, error) {
 	f, err := os.OpenFile(name, os.O_RDONLY, OwnerReadWrite)
 	if err != nil {
+		log.Error("failed to open file for leaf reader: %v", err)
 		return nil, err
 	}
 	return &LeafReader{
@@ -38,6 +43,7 @@ func newLeafReader(name string) (*LeafReader, error) {
 func (l *LeafReader) Seek(index uint64) error {
 	_, err := l.f.Seek(int64(index*32), io.SeekStart)
 	if err != nil {
+		log.Error("failed to seek in leaf reader: %v", err)
 		return err
 	}
 	l.b.Reset(l.f)
@@ -48,6 +54,7 @@ func (l *LeafReader) ReadNext() ([]byte, error) {
 	ret := make([]byte, merkle.NodeSize)
 	_, err := l.b.Read(ret)
 	if err != nil {
+		log.Error("failed to read in leaf reader: %v", err)
 		return nil, err
 	}
 	return ret, nil
@@ -56,6 +63,7 @@ func (l *LeafReader) ReadNext() ([]byte, error) {
 func (l *LeafReader) Width() uint64 {
 	info, err := l.f.Stat()
 	if err != nil {
+		log.Error("failed to get stats for leaf reader: %v", err)
 		return 0
 	}
 	return uint64(info.Size()) / merkle.NodeSize
