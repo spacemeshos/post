@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/prometheus/common/log"
+	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
 	"io"
 	"os"
@@ -16,7 +16,7 @@ func NewLeafReader(id []byte) (*LeafReader, error) {
 	if len(id) > 64 {
 		err := fmt.Errorf("failed to create leaf reader: id cannot be longer than 64 bytes (got %d bytes)",
 			len(id))
-		log.Error(err)
+		log.Error(err.Error())
 		return nil, err
 	}
 	fullFilename := filepath.Join(GetPostDataPath(), hex.EncodeToString(id), filename)
