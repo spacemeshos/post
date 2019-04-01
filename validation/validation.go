@@ -44,11 +44,9 @@ func validate(proof proving.Proof, leafCount uint64, numberOfProvenLabels uint8,
 	return validatePow(proof.Identity, proof.ProvenLeaves, labelIndices, difficulty)
 }
 
-type labelsByte uint8
-
-func (l labelsByte) GetLabelAtIndex(indexInByte uint64, difficulty proving.Difficulty) byte {
+func getLabelAtIndex(l byte, indexInByte uint64, difficulty proving.Difficulty) byte {
 	labelsToClear := difficulty.LabelsPerByte() - 1 - indexInByte
-	return byte(l) >> (labelsToClear * difficulty.LabelBits()) & difficulty.LabelMask()
+	return l >> (labelsToClear * difficulty.LabelBits()) & difficulty.LabelMask()
 }
 
 func validatePow(identity []byte, provenLeaves [][]byte, labelIndices proving.Set, difficulty proving.Difficulty) error {
@@ -62,8 +60,8 @@ func validatePow(identity []byte, provenLeaves [][]byte, labelIndices proving.Se
 			currentLeafIndex = leafIndex
 		}
 		intraLeafIndex := difficulty.IndexInGroup(labelIndexList[0])
-		b := labelsByte(currentLeaf[difficulty.ByteIndex(intraLeafIndex)])
-		label := b.GetLabelAtIndex(difficulty.IndexInByte(intraLeafIndex), difficulty)
+		label := getLabelAtIndex(currentLeaf[difficulty.ByteIndex(intraLeafIndex)],
+			difficulty.IndexInByte(intraLeafIndex), difficulty)
 		expectedLabel := initialization.CalcLabel(identity, labelIndexList[0], difficulty)
 		if label != expectedLabel {
 			lBits := strconv.Itoa(int(difficulty.LabelBits()))
