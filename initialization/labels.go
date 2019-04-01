@@ -14,6 +14,7 @@ func CalcLabelGroup(identity []byte, groupPosition uint64, difficulty proving.Di
 	for labelIndex := uint64(0); labelIndex < labelsPerGroup; labelIndex++ {
 		label := CalcLabel(identity, labelIndex+offset, difficulty)
 		byteIndex := difficulty.ByteIndex(labelIndex)
+		// This causes labels to be added in LIFO order:
 		labelGroup[byteIndex] <<= difficulty.LabelBits()
 		labelGroup[byteIndex] += label
 	}
