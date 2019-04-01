@@ -2,9 +2,13 @@ package validation
 
 import (
 	"encoding/hex"
+	"flag"
 	"github.com/spacemeshos/post-private/initialization"
+	"github.com/spacemeshos/post-private/persistence"
 	"github.com/spacemeshos/post-private/proving"
 	"github.com/stretchr/testify/require"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -201,4 +205,15 @@ func TestValidateFail7(t *testing.T) {
 func hexDecode(hexStr string) []byte {
 	node, _ := hex.DecodeString(hexStr)
 	return node
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	res := m.Run()
+	cleanup()
+	os.Exit(res)
+}
+
+func cleanup() {
+	_ = os.RemoveAll(filepath.Join(persistence.GetPostDataPath(), "deadbeef"))
 }
