@@ -1,6 +1,8 @@
 package proving
 
 import (
+	"fmt"
+	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/merkle-tree/cache"
 	"github.com/spacemeshos/post-private/persistence"
@@ -9,6 +11,22 @@ import (
 
 func GenerateProof(id []byte, challenge Challenge, numberOfProvenLabels uint8, difficulty Difficulty) (proof Proof,
 	err error) {
+
+	proof, err = generateProof(id, challenge, numberOfProvenLabels, difficulty)
+	if err != nil {
+		err = fmt.Errorf("proof generation failed: %v", err)
+		log.Error(err.Error())
+	}
+	return proof, err
+}
+
+func generateProof(id []byte, challenge Challenge, numberOfProvenLabels uint8, difficulty Difficulty) (proof Proof,
+	err error) {
+
+	err = difficulty.Validate()
+	if err != nil {
+		return Proof{}, err
+	}
 
 	proof.Challenge = challenge
 	proof.Identity = id

@@ -77,6 +77,15 @@ func testGenerateProof(r *require.Assertions, id []byte, difficulty proving.Diff
 	r.Nil(err)
 }
 
+func TestGenerateProofFailure(t *testing.T) {
+	r := require.New(t)
+
+	id := hexDecode("deadbeef")
+	proof, err := proving.GenerateProof(id, id, 4, 4)
+	r.EqualError(err, "proof generation failed: difficulty must be between 5 and 8 (received 4)")
+	r.Empty(proof)
+}
+
 func TestValidateFail(t *testing.T) {
 	r := require.New(t)
 
