@@ -3,9 +3,9 @@ package validation
 import (
 	"encoding/hex"
 	"flag"
-	"github.com/spacemeshos/post-private/initialization"
-	"github.com/spacemeshos/post-private/persistence"
-	"github.com/spacemeshos/post-private/proving"
+	"github.com/spacemeshos/post/initialization"
+	"github.com/spacemeshos/post/persistence"
+	"github.com/spacemeshos/post/proving"
 	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"

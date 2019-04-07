@@ -5,9 +5,9 @@ import (
 	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/merkle-tree/cache"
-	"github.com/spacemeshos/post-private/config"
-	"github.com/spacemeshos/post-private/persistence"
-	"github.com/spacemeshos/post-private/proving"
+	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/persistence"
+	"github.com/spacemeshos/post/proving"
 )
 
 // at 8 bits per label, this would be 1 peta-byte of storage

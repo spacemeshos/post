@@ -2,7 +2,7 @@ package persistence
 
 import (
 	"github.com/spacemeshos/go-spacemesh/filesystem"
-	"github.com/spacemeshos/post-private/config"
+	"github.com/spacemeshos/post/config"
 )
 
 const (

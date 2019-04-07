@@ -1,7 +1,7 @@
 package initialization
 
 import (
-	"github.com/spacemeshos/post-private/proving"
+	"github.com/spacemeshos/post/proving"
 	"github.com/stretchr/testify/require"
 	"testing"
 )

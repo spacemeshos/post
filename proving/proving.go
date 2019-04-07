@@ -5,7 +5,7 @@ import (
 	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/merkle-tree/cache"
-	"github.com/spacemeshos/post-private/persistence"
+	"github.com/spacemeshos/post/persistence"
 	"io"
 	"math"
 )
@@ -40,8 +40,8 @@ func generateProof(id []byte, challenge Challenge, numberOfProvenLabels uint8, d
 	if err != nil {
 		return Proof{}, err
 	}
-	if leafReader.Width() * difficulty.LabelsPerGroup() >= math.MaxUint64 {
-		return Proof{}, fmt.Errorf("leaf reader too big, number of label groups (%d) * labels per group (%d) " +
+	if leafReader.Width()*difficulty.LabelsPerGroup() >= math.MaxUint64 {
+		return Proof{}, fmt.Errorf("leaf reader too big, number of label groups (%d) * labels per group (%d) "+
 			"overflows uint64", leafReader.Width(), difficulty.LabelsPerGroup())
 	}
 	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(LowestLayerToCacheDuringProofGeneration),

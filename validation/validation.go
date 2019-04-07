@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
-	"github.com/spacemeshos/post-private/initialization"
-	"github.com/spacemeshos/post-private/proving"
+	"github.com/spacemeshos/post/initialization"
+	"github.com/spacemeshos/post/proving"
 	"math"
 	"strconv"
 )
