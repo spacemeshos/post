@@ -3,7 +3,7 @@ package initialization
 import (
 	"encoding/binary"
 	"github.com/spacemeshos/merkle-tree"
-	"github.com/spacemeshos/post-private/proving"
+	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/sha256-simd"
 )
 

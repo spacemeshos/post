@@ -3,8 +3,8 @@ package initialization
 import (
 	"encoding/hex"
 	"flag"
-	"github.com/spacemeshos/post-private/persistence"
-	"github.com/spacemeshos/post-private/proving"
+	"github.com/spacemeshos/post/persistence"
+	"github.com/spacemeshos/post/proving"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"os"
@@ -101,7 +101,7 @@ func BenchmarkInitialize(b *testing.B) {
 
 		af052351d359ce4a3041ce1992d659f68d30f6c1e5c5d229c389c2912a373c70
 		goarch: amd64
-		pkg: github.com/spacemeshos/post-private/initialization
+		pkg: github.com/spacemeshos/post/initialization
 		BenchmarkInitialize-8   	       1	272653006697 ns/op
 		PASS
 	*/
