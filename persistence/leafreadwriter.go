@@ -54,7 +54,6 @@ func (l *LeafReader) ReadNext() ([]byte, error) {
 	ret := make([]byte, merkle.NodeSize)
 	_, err := l.b.Read(ret)
 	if err != nil {
-		log.Error("failed to read in leaf reader: %v", err)
 		return nil, err
 	}
 	return ret, nil
