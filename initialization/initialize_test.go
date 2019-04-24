@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	defaultDifficulty           = 5
-	defaultSpace                = proving.Space(16 * LabelGroupSize)
-	defaultNumberOfProvenLabels = 4
+	defaultDifficulty        = 5
+	defaultSpace             = proving.Space(16 * LabelGroupSize)
+	defaultNumOfProvenLabels = 4
 )
 
 var (
@@ -26,7 +26,7 @@ var (
 func TestInitialize(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	proof, err := Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
 	expectedMerkleRoot := hexDecode("2292f95c87626f5a281fa811ba825ffce79442f8999e1ddc8e8c9bbac15e3fcb")
@@ -56,11 +56,11 @@ func TestInitialize(t *testing.T) {
 func TestInitializeErrors(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, 4)
+	proof, err := Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, 4)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 4)")
 	r.EqualValues(proving.Proof{}, proof)
 
-	proof, err = Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, 9)
+	proof, err = Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, 9)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 9)")
 	r.EqualValues(proving.Proof{}, proof)
 

@@ -10,11 +10,11 @@ import (
 	"github.com/spacemeshos/post/proving"
 )
 
-// Initialize takes an id (public key), space (in bytes) and difficulty.
+// Initialize takes an id (public key), space (in bytes), numOfProvenLabels and difficulty.
 // Difficulty determines the number of bits per label that are stored. Each leaf in the tree is 32 bytes = 256 bits.
 // The number of bits per label is 256 / LabelsPerGroup. LabelsPerGroup = 1 << difficulty.
 // Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
-func Initialize(id []byte, space proving.Space, numberOfProvenLabels uint8, difficulty proving.Difficulty) (
+func Initialize(id []byte, space proving.Space, numOfProvenLabels uint8, difficulty proving.Difficulty) (
 	proof proving.Proof, err error) {
 
 	if err = space.Validate(LabelGroupSize); err != nil {
@@ -49,7 +49,7 @@ func Initialize(id []byte, space proving.Space, numberOfProvenLabels uint8, diff
 
 	leafReader := cacheReader.GetLayerReader(0)
 	provenLeafIndices := proving.CalcProvenLeafIndices(
-		merkleRoot, leafReader.Width()<<difficulty, numberOfProvenLabels, difficulty)
+		merkleRoot, leafReader.Width()<<difficulty, numOfProvenLabels, difficulty)
 
 	proof.MerkleRoot = merkleRoot
 	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, cacheReader)

@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	defaultDifficulty           = 5
-	defaultSpace                = proving.Space(16 * initialization.LabelGroupSize)
-	defaultNumberOfProvenLabels = 4
+	defaultDifficulty        = 5
+	defaultSpace             = proving.Space(16 * initialization.LabelGroupSize)
+	defaultNumOfProvenLabels = 4
 )
 
 var (
@@ -27,10 +27,10 @@ var (
 func TestValidate(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
-	err = Validate(proof, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.Nil(err)
 
 	testGenerateProof(r, defaultId, defaultDifficulty)
@@ -41,10 +41,10 @@ func TestValidate2(t *testing.T) {
 
 	const difficulty = 6
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, difficulty)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, difficulty)
 	r.NoError(err)
 
-	err = Validate(proof, defaultSpace, defaultNumberOfProvenLabels, difficulty)
+	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, difficulty)
 	r.Nil(err)
 
 	testGenerateProof(r, defaultId, difficulty)
@@ -55,10 +55,10 @@ func TestValidate3(t *testing.T) {
 
 	const difficulty = 7
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, difficulty)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, difficulty)
 	r.NoError(err)
 
-	err = Validate(proof, defaultSpace, defaultNumberOfProvenLabels, difficulty)
+	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, difficulty)
 	r.Nil(err)
 
 	testGenerateProof(r, defaultId, difficulty)
@@ -69,10 +69,10 @@ func TestValidate4(t *testing.T) {
 
 	const difficulty = 8
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, difficulty)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, difficulty)
 	r.NoError(err)
 
-	err = Validate(proof, defaultSpace, defaultNumberOfProvenLabels, difficulty)
+	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, difficulty)
 	r.Nil(err)
 
 	testGenerateProof(r, defaultId, difficulty)
@@ -83,15 +83,15 @@ func TestValidateBadDifficulty(t *testing.T) {
 
 	const difficulty = 4
 
-	err := Validate(proving.Proof{}, defaultSpace, defaultNumberOfProvenLabels, difficulty)
+	err := Validate(proving.Proof{}, defaultSpace, defaultNumOfProvenLabels, difficulty)
 	r.EqualError(err, fmt.Sprintf("difficulty must be between 5 and 8 (received %d)", difficulty))
 }
 
 func testGenerateProof(r *require.Assertions, id []byte, difficulty proving.Difficulty) {
-	proof2, err := proving.GenerateProof(id, defaultChallenge, defaultNumberOfProvenLabels, difficulty)
+	proof2, err := proving.GenerateProof(id, defaultChallenge, defaultNumOfProvenLabels, difficulty)
 	r.NoError(err)
 
-	err = Validate(proof2, defaultSpace, defaultNumberOfProvenLabels, difficulty)
+	err = Validate(proof2, defaultSpace, defaultNumOfProvenLabels, difficulty)
 	r.Nil(err)
 }
 
@@ -100,7 +100,7 @@ func TestGenerateProofFailure(t *testing.T) {
 
 	const difficulty = 4
 
-	proof, err := proving.GenerateProof(defaultId, defaultChallenge, defaultNumberOfProvenLabels, difficulty)
+	proof, err := proving.GenerateProof(defaultId, defaultChallenge, defaultNumOfProvenLabels, difficulty)
 	r.EqualError(err, fmt.Sprintf("proof generation failed: difficulty must be between 5 and 8 (received %d)", difficulty))
 	r.Empty(proof)
 }
@@ -108,36 +108,36 @@ func TestGenerateProofFailure(t *testing.T) {
 func TestValidateFail(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
 	proof.Identity[0] = 0
 
-	err = Validate(proof, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.EqualError(err, "validation failed: label at index 91 should be 01101111, but found 00011101")
 }
 
 func TestValidateFail2(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
 	proof.Challenge = []byte{1}
 
-	err = Validate(proof, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 }
 
 func TestValidateFail3(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
 	proof.ProvenLeaves[0][0] += 1
 
-	err = Validate(proof, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 }
 
@@ -146,36 +146,36 @@ func TestValidateFail4(t *testing.T) {
 
 	id := hexDecode("deadbeef")
 
-	proof, err := initialization.Initialize(id, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	proof, err := initialization.Initialize(id, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
 	proof.ProvenLeaves = proof.ProvenLeaves[1:]
 
-	err = Validate(proof, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.EqualError(err, "validation failed: number of derived leaf indices (4) doesn't match number of included proven leaves (3)")
 }
 
 func TestValidateFail5(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
 	proof.ProofNodes[0][0] += 1
 
-	err = Validate(proof, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 }
 
 func TestValidateFail6(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
 	proof.ProofNodes = proof.ProofNodes[1:]
 
-	err = Validate(proof, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 }
 
@@ -184,12 +184,12 @@ func TestValidateFail7(t *testing.T) {
 
 	id := hexDecode("deadbeef")
 
-	proof, err := initialization.Initialize(id, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	proof, err := initialization.Initialize(id, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
 	proof.MerkleRoot[0] += 1
 
-	err = Validate(proof, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
+	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 }
 
