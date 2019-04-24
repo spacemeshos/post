@@ -13,14 +13,18 @@ import (
 
 // Validate ensures the validity of the given proof. It returns nil if the proof is valid or an error describing the
 // failure, otherwise.
-func Validate(proof proving.Proof, leafCount uint64, numberOfProvenLabels uint8, difficulty proving.Difficulty) error {
-	err := difficulty.Validate()
-	if err != nil {
+func Validate(proof proving.Proof, space proving.Space, numberOfProvenLabels uint8, difficulty proving.Difficulty) error {
+	if err := space.Validate(initialization.LabelGroupSize); err != nil {
+		log.Error(err.Error())
+		return err
+	}
+	if err := difficulty.Validate(); err != nil {
 		log.Error(err.Error())
 		return err
 	}
 
-	err = validate(proof, leafCount, numberOfProvenLabels, difficulty)
+	width := uint64(space) / initialization.LabelGroupSize
+	err := validate(proof, width, numberOfProvenLabels, difficulty)
 	if err != nil {
 		err = fmt.Errorf("validation failed: %v", err)
 		log.Info(err.Error())
@@ -28,8 +32,8 @@ func Validate(proof proving.Proof, leafCount uint64, numberOfProvenLabels uint8,
 	return err
 }
 
-func validate(proof proving.Proof, leafCount uint64, numberOfProvenLabels uint8, difficulty proving.Difficulty) error {
-	labelIndices := proving.DrawProvenLabelIndices(proof.MerkleRoot, leafCount*difficulty.LabelsPerGroup(),
+func validate(proof proving.Proof, width uint64, numberOfProvenLabels uint8, difficulty proving.Difficulty) error {
+	labelIndices := proving.DrawProvenLabelIndices(proof.MerkleRoot, width*difficulty.LabelsPerGroup(),
 		numberOfProvenLabels)
 	leafIndices := proving.ConvertLabelIndicesToLeafIndices(labelIndices, difficulty)
 	// The number of proven leaves could be less than the number of proven labels since more than one label could be in

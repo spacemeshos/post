@@ -3,6 +3,7 @@ package initialization
 import (
 	"encoding/hex"
 	"flag"
+	"fmt"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/proving"
 	"github.com/stretchr/testify/assert"
@@ -12,13 +13,20 @@ import (
 	"testing"
 )
 
-const difficulty = 5
+const (
+	defaultDifficulty           = 5
+	defaultSpace                = proving.Space(16 * LabelGroupSize)
+	defaultNumberOfProvenLabels = 4
+)
+
+var (
+	defaultId = hexDecode("deadbeef")
+)
 
 func TestInitialize(t *testing.T) {
 	r := require.New(t)
-	id := hexDecode("deadbeef")
 
-	proof, err := Initialize(id, 16, 4, difficulty)
+	proof, err := Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
 	expectedMerkleRoot := hexDecode("2292f95c87626f5a281fa811ba825ffce79442f8999e1ddc8e8c9bbac15e3fcb")
@@ -47,21 +55,18 @@ func TestInitialize(t *testing.T) {
 
 func TestInitializeErrors(t *testing.T) {
 	r := require.New(t)
-	id := hexDecode("deadbeef")
 
-	proof, err := Initialize(id, 16, 4, 4)
+	proof, err := Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, 4)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 4)")
 	r.EqualValues(proving.Proof{}, proof)
 
-	proof, err = Initialize(id, 16, 4, 9)
+	proof, err = Initialize(defaultId, defaultSpace, defaultNumberOfProvenLabels, 9)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 9)")
 	r.EqualValues(proving.Proof{}, proof)
 
-	proof, err = Initialize(id, (1<<50)+1, 100, difficulty)
-	r.EqualError(err, "failed to initialize post: requested width (1125899906842625) is greater than "+
-		"supported width (1125899906842624)")
+	proof, err = Initialize(defaultId, proving.MaxSpace+1, 100, defaultDifficulty)
+	r.EqualError(err, fmt.Sprintf("space (%d) is greater than the supported max (%d)", proving.MaxSpace+1, proving.MaxSpace))
 	r.EqualValues(proving.Proof{}, proof)
-
 }
 
 func hexDecode(hexStr string) []byte {
@@ -83,7 +88,7 @@ func BenchmarkInitialize(b *testing.B) {
 	id, _ := hex.DecodeString("deadbeef")
 	expectedMerkleRoot, _ := hex.DecodeString("af052351d359ce4a3041ce1992d659f68d30f6c1e5c5d229c389c2912a373c70")
 
-	proof, err := Initialize(id, 1<<25, 100, difficulty)
+	proof, err := Initialize(id, 1<<25, 100, defaultDifficulty)
 	require.NoError(b, err)
 	println(hex.EncodeToString(proof.MerkleRoot))
 	assert.Equal(b, expectedMerkleRoot, proof.MerkleRoot)
