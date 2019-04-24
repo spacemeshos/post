@@ -23,8 +23,8 @@ func Validate(proof proving.Proof, space proving.Space, numberOfProvenLabels uin
 		return err
 	}
 
-	width := uint64(space) / initialization.LabelGroupSize
-	err := validate(proof, width, numberOfProvenLabels, difficulty)
+	numOfLabelGroups := space.LabelGroups(initialization.LabelGroupSize)
+	err := validate(proof, numOfLabelGroups, numberOfProvenLabels, difficulty)
 	if err != nil {
 		err = fmt.Errorf("validation failed: %v", err)
 		log.Info(err.Error())
@@ -32,8 +32,8 @@ func Validate(proof proving.Proof, space proving.Space, numberOfProvenLabels uin
 	return err
 }
 
-func validate(proof proving.Proof, width uint64, numberOfProvenLabels uint8, difficulty proving.Difficulty) error {
-	labelIndices := proving.DrawProvenLabelIndices(proof.MerkleRoot, width*difficulty.LabelsPerGroup(),
+func validate(proof proving.Proof, numOfLabelGroups uint64, numberOfProvenLabels uint8, difficulty proving.Difficulty) error {
+	labelIndices := proving.DrawProvenLabelIndices(proof.MerkleRoot, numOfLabelGroups*difficulty.LabelsPerGroup(),
 		numberOfProvenLabels)
 	leafIndices := proving.ConvertLabelIndicesToLeafIndices(labelIndices, difficulty)
 	// The number of proven leaves could be less than the number of proven labels since more than one label could be in

@@ -9,6 +9,7 @@ const MaxSpace = 1 << 40 // 1099511627777
 
 type Space uint64
 
+// Validate validates whether the given space amount is valid.
 func (s Space) Validate(labelGroupSize uint64) error {
 	if s > MaxSpace {
 		return fmt.Errorf("space (%d) is greater than the supported max (%d)", s, MaxSpace)
@@ -18,4 +19,9 @@ func (s Space) Validate(labelGroupSize uint64) error {
 	}
 
 	return nil
+}
+
+// LabelGroups returns the number of label groups of a given space amount.
+func (s Space) LabelGroups(labelGroupSize uint64) uint64 {
+	return uint64(s) / labelGroupSize
 }

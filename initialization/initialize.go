@@ -32,8 +32,8 @@ func Initialize(id []byte, space proving.Space, numberOfProvenLabels uint8, diff
 		return proving.Proof{}, err
 	}
 
-	width := uint64(space) / LabelGroupSize
-	merkleRoot, cacheReader, err := initialize(id, width, difficulty, labelsWriter)
+	numOfLabelGroups := space.LabelGroups(LabelGroupSize)
+	merkleRoot, cacheReader, err := initialize(id, numOfLabelGroups, difficulty, labelsWriter)
 	if err2 := labelsWriter.Close(); err2 != nil {
 		if err != nil {
 			err = fmt.Errorf("%v, %v", err, err2)
@@ -60,7 +60,7 @@ func Initialize(id []byte, space proving.Space, numberOfProvenLabels uint8, diff
 	return proof, err
 }
 
-func initialize(id []byte, width uint64, difficulty proving.Difficulty,
+func initialize(id []byte, numOfLabelGroups uint64, difficulty proving.Difficulty,
 	labelsWriter *persistence.PostLabelsFileWriter) (merkleRoot []byte, cacheReader *cache.Reader, err error) {
 
 	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(proving.LowestLayerToCacheDuringProofGeneration), cache.MakeSliceReadWriterFactory())
@@ -69,7 +69,7 @@ func initialize(id []byte, width uint64, difficulty proving.Difficulty,
 		WithCacheWriter(cacheWriter).
 		Build()
 
-	for position := uint64(0); position < width; position++ {
+	for position := uint64(0); position < numOfLabelGroups; position++ {
 		lg := CalcLabelGroup(id, position, difficulty)
 		err := labelsWriter.Write(lg)
 		if err != nil {
