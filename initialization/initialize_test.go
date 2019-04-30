@@ -64,7 +64,7 @@ func TestInitializeErrors(t *testing.T) {
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 9)")
 	r.EqualValues(proving.Proof{}, proof)
 
-	proof, err = Initialize(defaultId, proving.MaxSpace+1, 100, defaultDifficulty)
+	proof, err = Initialize(defaultId, proving.MaxSpace+1, proving.NumOfProvenLabels, defaultDifficulty)
 	r.EqualError(err, fmt.Sprintf("space (%d) is greater than the supported max (%d)", proving.MaxSpace+1, proving.MaxSpace))
 	r.EqualValues(proving.Proof{}, proof)
 }
@@ -85,29 +85,27 @@ func (n nodes) String() string {
 }
 
 func BenchmarkInitialize(b *testing.B) {
-	id, _ := hex.DecodeString("deadbeef")
-	expectedMerkleRoot, _ := hex.DecodeString("af052351d359ce4a3041ce1992d659f68d30f6c1e5c5d229c389c2912a373c70")
-
-	proof, err := Initialize(id, 1<<25, 100, defaultDifficulty)
+	space := proving.Space(1 << 30) // 1 GB.
+	proof, err := Initialize(defaultId, space, proving.NumOfProvenLabels, defaultDifficulty)
 	require.NoError(b, err)
-	println(hex.EncodeToString(proof.MerkleRoot))
+
+	expectedMerkleRoot, _ := hex.DecodeString("42dd3ed26e6f30f8098ec0b5093147551b32573ef9ed6670076248b4fd0fac30")
 	assert.Equal(b, expectedMerkleRoot, proof.MerkleRoot)
 	/*
-		2019-03-18T17:38:42.336+0200	INFO	Spacemesh	creating directory: "/Users/noamnelke/.spacemesh-data/post-data/deadbeef"
-		2019-03-18T17:39:23.608+0200	INFO	Spacemesh	found 5000000 labels
-		2019-03-18T17:40:04.247+0200	INFO	Spacemesh	found 10000000 labels
-		2019-03-18T17:40:44.546+0200	INFO	Spacemesh	found 15000000 labels
-		2019-03-18T17:41:25.565+0200	INFO	Spacemesh	found 20000000 labels
-		2019-03-18T17:42:05.958+0200	INFO	Spacemesh	found 25000000 labels
-		2019-03-18T17:42:46.402+0200	INFO	Spacemesh	found 30000000 labels
-		2019-03-18T17:43:14.990+0200	INFO	Spacemesh	completed PoST label list construction
-		2019-03-18T17:43:14.990+0200	INFO	Spacemesh	closing file	{"filename": "all.labels", "size_in_bytes": 1073741824}
-		goos: darwin
+		2019-04-30T11:49:10.271+0300    INFO    Spacemesh       creating directory: "/Users/moshababo/.spacemesh-data/post-data/deadbeef"
+		2019-04-30T11:49:45.168+0300    INFO    Spacemesh       found 5000000 labels
+		2019-04-30T11:50:21.192+0300    INFO    Spacemesh       found 10000000 labels
+		2019-04-30T11:50:56.607+0300    INFO    Spacemesh       found 15000000 labels
+		2019-04-30T11:51:32.103+0300    INFO    Spacemesh       found 20000000 labels
+		2019-04-30T11:52:07.283+0300    INFO    Spacemesh       found 25000000 labels
+		2019-04-30T11:52:42.195+0300    INFO    Spacemesh       found 30000000 labels
+		2019-04-30T11:53:07.074+0300    INFO    Spacemesh       completed PoST label list construction
+		2019-04-30T11:53:07.074+0300    INFO    Spacemesh       closing file    {"filename": "all.labels", "size_in_bytes": 1073741824}
 
-		af052351d359ce4a3041ce1992d659f68d30f6c1e5c5d229c389c2912a373c70
+		goos: darwin
 		goarch: amd64
 		pkg: github.com/spacemeshos/post/initialization
-		BenchmarkInitialize-8   	       1	272653006697 ns/op
+		BenchmarkInitialize-12                 1        236916764781 ns/op
 		PASS
 	*/
 }
