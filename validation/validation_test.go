@@ -111,7 +111,7 @@ func TestValidateFail(t *testing.T) {
 	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
-	proof.Identity[0] = 0
+	proof.Identity = append([]byte{0}, proof.Identity[1:]...)
 
 	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.EqualError(err, "validation failed: label at index 91 should be 01101111, but found 00011101")
@@ -135,6 +135,7 @@ func TestValidateFail3(t *testing.T) {
 	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
+	proof.ProvenLeaves[0] = append([]byte{}, proof.ProvenLeaves[0]...)
 	proof.ProvenLeaves[0][0] += 1
 
 	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
@@ -144,9 +145,7 @@ func TestValidateFail3(t *testing.T) {
 func TestValidateFail4(t *testing.T) {
 	r := require.New(t)
 
-	id := hexDecode("deadbeef")
-
-	proof, err := initialization.Initialize(id, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
 	proof.ProvenLeaves = proof.ProvenLeaves[1:]
@@ -161,6 +160,7 @@ func TestValidateFail5(t *testing.T) {
 	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
+	proof.ProofNodes[0] = append([]byte{}, proof.ProofNodes[0]...)
 	proof.ProofNodes[0][0] += 1
 
 	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
@@ -182,11 +182,10 @@ func TestValidateFail6(t *testing.T) {
 func TestValidateFail7(t *testing.T) {
 	r := require.New(t)
 
-	id := hexDecode("deadbeef")
-
-	proof, err := initialization.Initialize(id, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
+	proof.MerkleRoot = append([]byte{}, proof.MerkleRoot...)
 	proof.MerkleRoot[0] += 1
 
 	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
