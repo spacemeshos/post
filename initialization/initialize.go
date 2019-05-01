@@ -10,16 +10,16 @@ import (
 	"github.com/spacemeshos/post/proving"
 )
 
-// at 8 bits per label, this would be 1 peta-byte of storage
-const maxWidth = 1 << 50
-
-// Initialize takes an id (public key), width (number of labels) and difficulty.
+// Initialize takes an id (public key), space (in bytes), numOfProvenLabels and difficulty.
 // Difficulty determines the number of bits per label that are stored. Each leaf in the tree is 32 bytes = 256 bits.
 // The number of bits per label is 256 / LabelsPerGroup. LabelsPerGroup = 1 << difficulty.
 // Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
-func Initialize(id []byte, width uint64, numberOfProvenLabels uint8, difficulty proving.Difficulty) (
+func Initialize(id []byte, space proving.Space, numOfProvenLabels uint8, difficulty proving.Difficulty) (
 	proof proving.Proof, err error) {
 
+	if err = space.Validate(LabelGroupSize); err != nil {
+		return proving.Proof{}, err
+	}
 	if err = difficulty.Validate(); err != nil {
 		return proving.Proof{}, err
 	}
@@ -31,7 +31,9 @@ func Initialize(id []byte, width uint64, numberOfProvenLabels uint8, difficulty 
 	if err != nil {
 		return proving.Proof{}, err
 	}
-	merkleRoot, cacheReader, err := initialize(id, width, difficulty, labelsWriter)
+
+	numOfLabelGroups := space.LabelGroups(LabelGroupSize)
+	merkleRoot, cacheReader, err := initialize(id, numOfLabelGroups, difficulty, labelsWriter)
 	if err2 := labelsWriter.Close(); err2 != nil {
 		if err != nil {
 			err = fmt.Errorf("%v, %v", err, err2)
@@ -47,7 +49,7 @@ func Initialize(id []byte, width uint64, numberOfProvenLabels uint8, difficulty 
 
 	leafReader := cacheReader.GetLayerReader(0)
 	provenLeafIndices := proving.CalcProvenLeafIndices(
-		merkleRoot, leafReader.Width()<<difficulty, numberOfProvenLabels, difficulty)
+		merkleRoot, leafReader.Width()<<difficulty, numOfProvenLabels, difficulty)
 
 	proof.MerkleRoot = merkleRoot
 	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, cacheReader)
@@ -58,19 +60,16 @@ func Initialize(id []byte, width uint64, numberOfProvenLabels uint8, difficulty 
 	return proof, err
 }
 
-func initialize(id []byte, width uint64, difficulty proving.Difficulty,
+func initialize(id []byte, numOfLabelGroups uint64, difficulty proving.Difficulty,
 	labelsWriter *persistence.PostLabelsFileWriter) (merkleRoot []byte, cacheReader *cache.Reader, err error) {
 
-	if width > maxWidth {
-		return nil, nil,
-			fmt.Errorf("requested width (%d) is greater than supported width (%d)", width, maxWidth)
-	}
-	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(7), cache.MakeSliceReadWriterFactory())
+	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(proving.LowestLayerToCacheDuringProofGeneration), cache.MakeSliceReadWriterFactory())
 	merkleTree := merkle.NewTreeBuilder().
 		WithHashFunc(proving.ZeroChallenge.GetSha256Parent).
 		WithCacheWriter(cacheWriter).
 		Build()
-	for position := uint64(0); position < width; position++ {
+
+	for position := uint64(0); position < numOfLabelGroups; position++ {
 		lg := CalcLabelGroup(id, position, difficulty)
 		err := labelsWriter.Write(lg)
 		if err != nil {

@@ -10,14 +10,15 @@ import (
 	"math"
 )
 
-// NumberOfProvenLabels is the recommended setting for this argument to ensure proof safety
-const NumberOfProvenLabels = 100
+// NumOfProvenLabels is the recommended setting for this argument to ensure proof safety.
+const NumOfProvenLabels = 100
+
 const LowestLayerToCacheDuringProofGeneration = 11
 
-func GenerateProof(id []byte, challenge Challenge, numberOfProvenLabels uint8, difficulty Difficulty) (proof Proof,
+func GenerateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, difficulty Difficulty) (proof Proof,
 	err error) {
 
-	proof, err = generateProof(id, challenge, numberOfProvenLabels, difficulty)
+	proof, err = generateProof(id, challenge, numOfProvenLabels, difficulty)
 	if err != nil {
 		err = fmt.Errorf("proof generation failed: %v", err)
 		log.Error(err.Error())
@@ -25,7 +26,7 @@ func GenerateProof(id []byte, challenge Challenge, numberOfProvenLabels uint8, d
 	return proof, err
 }
 
-func generateProof(id []byte, challenge Challenge, numberOfProvenLabels uint8, difficulty Difficulty) (proof Proof,
+func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, difficulty Difficulty) (proof Proof,
 	err error) {
 
 	err = difficulty.Validate()
@@ -66,9 +67,9 @@ func generateProof(id []byte, challenge Challenge, numberOfProvenLabels uint8, d
 	cacheWriter.SetLayer(0, leafReader)
 	cacheReader, err := cacheWriter.GetReader()
 
-	numberOfLabels := leafReader.Width() * difficulty.LabelsPerGroup()
+	numOfLabels := leafReader.Width() * difficulty.LabelsPerGroup()
 	provenLeafIndices := CalcProvenLeafIndices(
-		proof.MerkleRoot, numberOfLabels, numberOfProvenLabels, difficulty)
+		proof.MerkleRoot, numOfLabels, numOfProvenLabels, difficulty)
 
 	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, cacheReader)
 	if err != nil {
