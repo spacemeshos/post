@@ -48,8 +48,14 @@ func Initialize(id []byte, space proving.Space, numOfProvenLabels uint8, difficu
 	}
 
 	leafReader := cacheReader.GetLayerReader(0)
+	width, err := leafReader.Width()
+	if err != nil {
+		err = fmt.Errorf("failed to get leaf reader width: %v", err)
+		log.Error(err.Error())
+		return proving.Proof{}, err
+	}
 	provenLeafIndices := proving.CalcProvenLeafIndices(
-		merkleRoot, leafReader.Width()<<difficulty, numOfProvenLabels, difficulty)
+		merkleRoot, width<<difficulty, numOfProvenLabels, difficulty)
 
 	proof.MerkleRoot = merkleRoot
 	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, cacheReader)
@@ -64,10 +70,13 @@ func initialize(id []byte, numOfLabelGroups uint64, difficulty proving.Difficult
 	labelsWriter *persistence.PostLabelsFileWriter) (merkleRoot []byte, cacheReader *cache.Reader, err error) {
 
 	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(proving.LowestLayerToCacheDuringProofGeneration), cache.MakeSliceReadWriterFactory())
-	merkleTree := merkle.NewTreeBuilder().
+	merkleTree, err := merkle.NewTreeBuilder().
 		WithHashFunc(proving.ZeroChallenge.GetSha256Parent).
 		WithCacheWriter(cacheWriter).
 		Build()
+	if err != nil {
+		return nil, nil, err
+	}
 
 	for position := uint64(0); position < numOfLabelGroups; position++ {
 		lg := CalcLabelGroup(id, position, difficulty)

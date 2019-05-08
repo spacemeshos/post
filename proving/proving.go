@@ -41,14 +41,21 @@ func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, diff
 	if err != nil {
 		return Proof{}, err
 	}
-	if leafReader.Width()*difficulty.LabelsPerGroup() >= math.MaxUint64 {
+	width, err := leafReader.Width()
+	if err != nil {
+		return Proof{}, err
+	}
+	if width*difficulty.LabelsPerGroup() >= math.MaxUint64 {
 		return Proof{}, fmt.Errorf("leaf reader too big, number of label groups (%d) * labels per group (%d) "+
-			"overflows uint64", leafReader.Width(), difficulty.LabelsPerGroup())
+			"overflows uint64", width, difficulty.LabelsPerGroup())
 	}
 	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(LowestLayerToCacheDuringProofGeneration),
 		cache.MakeSliceReadWriterFactory())
 
-	tree := merkle.NewTreeBuilder().WithHashFunc(challenge.GetSha256Parent).WithCacheWriter(cacheWriter).Build()
+	tree, err := merkle.NewTreeBuilder().WithHashFunc(challenge.GetSha256Parent).WithCacheWriter(cacheWriter).Build()
+	if err != nil {
+		return Proof{}, err
+	}
 	for {
 		leaf, err := leafReader.ReadNext()
 		if err == io.EOF {
@@ -67,7 +74,7 @@ func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, diff
 	cacheWriter.SetLayer(0, leafReader)
 	cacheReader, err := cacheWriter.GetReader()
 
-	numOfLabels := leafReader.Width() * difficulty.LabelsPerGroup()
+	numOfLabels := width * difficulty.LabelsPerGroup()
 	provenLeafIndices := CalcProvenLeafIndices(
 		proof.MerkleRoot, numOfLabels, numOfProvenLabels, difficulty)
 
