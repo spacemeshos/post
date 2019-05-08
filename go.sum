@@ -92,8 +92,6 @@ github.com/sirupsen/logrus v1.2.0 h1:juTguoYk5qI21pwyTXY3B3Y5cOTH3ZUyZCg1v/mihuo
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/spacemeshos/go-spacemesh v0.0.0-20190218131258-f9290a04382c h1:F2uZn5a+Gs6NJVMv4wjIpknq90wrqANi6AdkGzsbNqw=
 github.com/spacemeshos/go-spacemesh v0.0.0-20190218131258-f9290a04382c/go.mod h1:tY7flNGGFec6jgu03jBYCbFmntvpxOS8dG3dt0Eznl8=
-github.com/spacemeshos/merkle-tree v0.0.0-20190507150432-5a11a4c3082d h1:ljSdcfJRCqiNWhn7vZJNP+vpH5aTO5/2l/8UE2lUjFg=
-github.com/spacemeshos/merkle-tree v0.0.0-20190507150432-5a11a4c3082d/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
 github.com/spacemeshos/merkle-tree v0.0.0-20190508113057-1a71b988924a h1:/CO5P93Jlt/bQIMTmKCVr001J6BteK6KRwoeVu6Zzwk=
 github.com/spacemeshos/merkle-tree v0.0.0-20190508113057-1a71b988924a/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
 github.com/spacemeshos/sha256-simd v0.0.0-20190111104731-8575aafc88c9 h1:Cc+np6ORem5wrvO+YHQ1sdu71ItiQVRiYB4ugazpgxM=
