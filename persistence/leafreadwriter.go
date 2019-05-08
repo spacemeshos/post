@@ -41,7 +41,7 @@ func newLeafReader(name string) (*LeafReader, error) {
 }
 
 func (l *LeafReader) Seek(index uint64) error {
-	_, err := l.f.Seek(int64(index*32), io.SeekStart)
+	_, err := l.f.Seek(int64(index*merkle.NodeSize), io.SeekStart)
 	if err != nil {
 		log.Error("failed to seek in leaf reader: %v", err)
 		return err
@@ -59,13 +59,17 @@ func (l *LeafReader) ReadNext() ([]byte, error) {
 	return ret, nil
 }
 
-func (l *LeafReader) Width() uint64 {
+func (l *LeafReader) Width() (uint64, error) {
 	info, err := l.f.Stat()
 	if err != nil {
 		log.Error("failed to get stats for leaf reader: %v", err)
-		return 0
+		return 0, err
 	}
-	return uint64(info.Size()) / merkle.NodeSize
+	return uint64(info.Size()) / merkle.NodeSize, nil
+}
+
+func (l *LeafReader) Flush() error {
+	return nil
 }
 
 func (l *LeafReader) Append(p []byte) (n int, err error) {
