@@ -1,11 +1,17 @@
 package proving
 
-import "fmt"
-
-const MinDifficulty = 5 // 1 byte per label
-const MaxDifficulty = 8 // 1 bit per label
+import (
+	"fmt"
+)
 
 type Difficulty uint8
+
+func (d Difficulty) Validate() error {
+	if d < MinDifficulty || d > MaxDifficulty {
+		return fmt.Errorf("difficulty must be between %d and %d (received %d)", MinDifficulty, MaxDifficulty, d)
+	}
+	return nil
+}
 
 // LabelsPerGroup returns the number of labels in a label group. A value between 32 and 256.
 func (d Difficulty) LabelsPerGroup() uint64 {
@@ -48,11 +54,4 @@ func (d Difficulty) IndexInGroup(labelIndex uint64) uint64 {
 // IndexInByte returns the relative label index within the byte that contains it.
 func (d Difficulty) IndexInByte(labelIndex uint64) uint64 {
 	return labelIndex & (d.LabelsPerByte() - 1)
-}
-
-func (d Difficulty) Validate() error {
-	if d < MinDifficulty || d > MaxDifficulty {
-		return fmt.Errorf("difficulty must be between %d and %d (received %d)", MinDifficulty, MaxDifficulty, d)
-	}
-	return nil
 }

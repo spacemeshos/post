@@ -15,18 +15,19 @@ import (
 
 const (
 	defaultDifficulty        = 5
-	defaultSpace             = proving.Space(16 * LabelGroupSize)
+	defaultSpace             = 16 * LabelGroupSize
 	defaultNumOfProvenLabels = 4
 )
 
 var (
-	defaultId = hexDecode("deadbeef")
+	defaultId        = hexDecode("deadbeef")
+	defaultChallenge = hexDecode("this is a challenge")
 )
 
 func TestInitialize(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	proof, err := initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
 	expectedMerkleRoot := hexDecode("2292f95c87626f5a281fa811ba825ffce79442f8999e1ddc8e8c9bbac15e3fcb")
@@ -56,17 +57,42 @@ func TestInitialize(t *testing.T) {
 func TestInitializeErrors(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, 4)
+	proof, err := initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, 4)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 4)")
-	r.EqualValues(proving.Proof{}, proof)
+	r.Nil(proof)
 
-	proof, err = Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, 9)
+	proof, err = initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, 9)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 9)")
-	r.EqualValues(proving.Proof{}, proof)
+	r.Nil(proof)
 
-	proof, err = Initialize(defaultId, proving.MaxSpace+1, proving.NumOfProvenLabels, defaultDifficulty)
-	r.EqualError(err, fmt.Sprintf("space (%d) is greater than the supported max (%d)", proving.MaxSpace+1, proving.MaxSpace))
-	r.EqualValues(proving.Proof{}, proof)
+	proof, err = initialize(defaultId, MaxSpace+1, defaultSpace, NumOfProvenLabels, defaultDifficulty)
+	r.EqualError(err, fmt.Sprintf("space (%d) is greater than the supported max (%d)", MaxSpace+1, MaxSpace))
+	r.Nil(proof)
+}
+
+func TestInitializeMultipleFiles(t *testing.T) {
+	r := require.New(t)
+
+	proof, err := initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	r.NoError(err)
+	execProof, err := proving.GenerateProof(defaultId, defaultChallenge, defaultNumOfProvenLabels, defaultDifficulty)
+	r.NoError(err)
+
+	for numOfFiles := uint64(2); numOfFiles <= 16; numOfFiles *= 2 {
+		cleanup()
+		multiFilesProof, err := initialize(defaultId, defaultSpace, defaultSpace/numOfFiles, defaultNumOfProvenLabels, defaultDifficulty)
+		r.NoError(err)
+		multiFilesExecProof, err := proving.GenerateProof(defaultId, defaultChallenge, defaultNumOfProvenLabels, defaultDifficulty)
+		r.NoError(err)
+
+		r.Equal(proof.MerkleRoot, multiFilesProof.MerkleRoot)
+		r.EqualValues(proof.ProvenLeaves, multiFilesProof.ProvenLeaves)
+		r.EqualValues(proof.ProofNodes, multiFilesProof.ProofNodes)
+
+		r.Equal(execProof.MerkleRoot, multiFilesExecProof.MerkleRoot)
+		r.EqualValues(execProof.ProvenLeaves, multiFilesExecProof.ProvenLeaves)
+		r.EqualValues(execProof.ProofNodes, multiFilesExecProof.ProofNodes)
+	}
 }
 
 func hexDecode(hexStr string) []byte {
@@ -85,8 +111,8 @@ func (n nodes) String() string {
 }
 
 func BenchmarkInitialize(b *testing.B) {
-	space := proving.Space(1 << 30) // 1 GB.
-	proof, err := Initialize(defaultId, space, proving.NumOfProvenLabels, defaultDifficulty)
+	space := uint64(1) << 30 // 1 GB.
+	proof, err := initialize(defaultId, space, space, NumOfProvenLabels, defaultDifficulty)
 	require.NoError(b, err)
 
 	expectedMerkleRoot, _ := hex.DecodeString("42dd3ed26e6f30f8098ec0b5093147551b32573ef9ed6670076248b4fd0fac30")

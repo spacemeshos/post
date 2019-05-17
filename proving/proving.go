@@ -6,14 +6,19 @@ import (
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/merkle-tree/cache"
 	"github.com/spacemeshos/post/persistence"
+	"github.com/spacemeshos/post/shared"
 	"io"
 	"math"
 )
 
-// NumOfProvenLabels is the recommended setting for this argument to ensure proof safety.
-const NumOfProvenLabels = 100
-
-const LowestLayerToCacheDuringProofGeneration = 11
+const (
+	LabelGroupSize                          = shared.LabelGroupSize
+	MaxSpace                                = shared.MaxSpace
+	MaxNumOfFiles                           = shared.MaxNumOfFiles
+	MinDifficulty                           = shared.MinDifficulty
+	MaxDifficulty                           = shared.MaxDifficulty
+	LowestLayerToCacheDuringProofGeneration = shared.LowestLayerToCacheDuringProofGeneration
+)
 
 func GenerateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, difficulty Difficulty) (proof Proof,
 	err error) {
@@ -37,11 +42,11 @@ func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, diff
 	proof.Challenge = challenge
 	proof.Identity = id
 
-	leafReader, err := persistence.NewLeafReader(id)
+	reader, err := persistence.NewLabelsReader(id)
 	if err != nil {
 		return Proof{}, err
 	}
-	width, err := leafReader.Width()
+	width, err := reader.Width()
 	if err != nil {
 		return Proof{}, err
 	}
@@ -57,7 +62,7 @@ func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, diff
 		return Proof{}, err
 	}
 	for {
-		leaf, err := leafReader.ReadNext()
+		leaf, err := reader.ReadNext()
 		if err == io.EOF {
 			break
 		}
@@ -71,7 +76,7 @@ func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, diff
 	}
 	proof.MerkleRoot = tree.Root()
 
-	cacheWriter.SetLayer(0, leafReader)
+	cacheWriter.SetLayer(0, reader)
 	cacheReader, err := cacheWriter.GetReader()
 
 	numOfLabels := width * difficulty.LabelsPerGroup()

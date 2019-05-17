@@ -8,85 +8,116 @@ import (
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/proving"
+	"github.com/spacemeshos/post/shared"
+)
+
+const (
+	NumOfProvenLabels                       = shared.NumOfProvenLabels
+	LabelGroupSize                          = shared.LabelGroupSize
+	MaxSpace                                = shared.MaxSpace
+	LowestLayerToCacheDuringProofGeneration = shared.LowestLayerToCacheDuringProofGeneration
+)
+
+type (
+	CacheReader = cache.CacheReader
 )
 
 // Initialize takes an id (public key), space (in bytes), numOfProvenLabels and difficulty.
 // Difficulty determines the number of bits per label that are stored. Each leaf in the tree is 32 bytes = 256 bits.
 // The number of bits per label is 256 / LabelsPerGroup. LabelsPerGroup = 1 << difficulty.
 // Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
-func Initialize(id []byte, space proving.Space, numOfProvenLabels uint8, difficulty proving.Difficulty) (
-	proof proving.Proof, err error) {
+func Initialize(id []byte, space uint64, numOfProvenLabels uint8, difficulty proving.Difficulty) (*proving.Proof, error) {
+	return initialize(id, space, space, numOfProvenLabels, difficulty)
+}
 
-	if err = space.Validate(LabelGroupSize); err != nil {
-		return proving.Proof{}, err
+func initialize(id []byte, space uint64, filesize uint64, numOfProvenLabels uint8, difficulty proving.Difficulty) (*proving.Proof, error) {
+	if err := proving.ValidateSpace(space); err != nil {
+		return nil, err
 	}
-	if err = difficulty.Validate(); err != nil {
-		return proving.Proof{}, err
+
+	if err := difficulty.Validate(); err != nil {
+		return nil, err
 	}
 
-	proof.Challenge = proving.ZeroChallenge
-	proof.Identity = id
-
-	labelsWriter, err := persistence.NewPostLabelsFileWriter(id)
+	chunks, err := proving.NumOfFiles(space, filesize)
 	if err != nil {
-		return proving.Proof{}, err
+		return nil, err
 	}
+	labelGroupsPerChunk := proving.NumOfLabelGroups(filesize)
 
-	numOfLabelGroups := space.LabelGroups(LabelGroupSize)
-	merkleRoot, cacheReader, err := initialize(id, numOfLabelGroups, difficulty, labelsWriter)
-	if err2 := labelsWriter.Close(); err2 != nil {
+	results := make([]*initResult, chunks)
+	for i := 0; i < chunks; i++ {
+		result, err := initializeChunk(id, i, labelGroupsPerChunk, difficulty)
 		if err != nil {
-			err = fmt.Errorf("%v, %v", err, err2)
-		} else {
-			err = err2
+			return nil, err
 		}
-	}
-	if err != nil {
-		err = fmt.Errorf("failed to initialize post: %v", err)
-		log.Error(err.Error())
-		return proving.Proof{}, err
+
+		results[i] = result
 	}
 
-	leafReader := cacheReader.GetLayerReader(0)
-	width, err := leafReader.Width()
+	result, err := merge(results)
 	if err != nil {
-		err = fmt.Errorf("failed to get leaf reader width: %v", err)
-		log.Error(err.Error())
-		return proving.Proof{}, err
+		return nil, err
 	}
-	provenLeafIndices := proving.CalcProvenLeafIndices(
-		merkleRoot, width<<difficulty, numOfProvenLabels, difficulty)
 
-	proof.MerkleRoot = merkleRoot
-	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, cacheReader)
+	width, err := result.reader.GetLayerReader(0).Width()
 	if err != nil {
-		return proving.Proof{}, err
+		err = fmt.Errorf("failed to get leaves reader width: %v", err)
+		log.Error(err.Error())
+		return nil, err
+	}
+
+	provenLeafIndices := proving.CalcProvenLeafIndices(result.root, width<<difficulty, numOfProvenLabels, difficulty)
+	_, provenLeaves, proofNodes, err := merkle.GenerateProof(provenLeafIndices, result.reader)
+	if err != nil {
+		return nil, err
+	}
+
+	proof := &proving.Proof{
+		Challenge:    proving.ZeroChallenge,
+		Identity:     id,
+		MerkleRoot:   result.root,
+		ProvenLeaves: provenLeaves,
+		ProofNodes:   proofNodes,
 	}
 
 	return proof, err
 }
 
-func initialize(id []byte, numOfLabelGroups uint64, difficulty proving.Difficulty,
-	labelsWriter *persistence.PostLabelsFileWriter) (merkleRoot []byte, cacheReader *cache.Reader, err error) {
+type initResult struct {
+	reader CacheReader
+	root   []byte
+}
 
-	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(proving.LowestLayerToCacheDuringProofGeneration), cache.MakeSliceReadWriterFactory())
-	merkleTree, err := merkle.NewTreeBuilder().
+func initializeChunk(id []byte, chunkPosition int, labelGroupsPerChunk uint64, difficulty proving.Difficulty) (*initResult, error) {
+	// Initialize the labels file writer.
+	labelsWriter, err := persistence.NewLabelsWriter(id, chunkPosition)
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize the labels merkle tree with the execution-phase zero challenge.
+	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(LowestLayerToCacheDuringProofGeneration), cache.MakeSliceReadWriterFactory())
+	tree, err := merkle.NewTreeBuilder().
 		WithHashFunc(proving.ZeroChallenge.GetSha256Parent).
 		WithCacheWriter(cacheWriter).
 		Build()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	for position := uint64(0); position < numOfLabelGroups; position++ {
-		lg := CalcLabelGroup(id, position, difficulty)
+	// Calculate labels in groups, write them to disk
+	// and append them as leaves in the merkle tree.
+	for position := uint64(0); position < labelGroupsPerChunk; position++ {
+		offset := uint64(chunkPosition) * labelGroupsPerChunk
+		lg := CalcLabelGroup(id, position+offset, difficulty)
 		err := labelsWriter.Write(lg)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		err = merkleTree.AddLeaf(lg)
+		err = tree.AddLeaf(lg)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if (position+1)%config.Post.LogEveryXLabels == 0 {
 			log.Info("found %v labels", position+1)
@@ -95,14 +126,46 @@ func initialize(id []byte, numOfLabelGroups uint64, difficulty proving.Difficult
 
 	log.With().Info("completed PoST label list construction")
 
-	leafReader, err := labelsWriter.GetLeafReader()
+	labelsReader, err := labelsWriter.GetReader()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	cacheWriter.SetLayer(0, leafReader)
-	cacheReader, err = cacheWriter.GetReader()
+
+	if err := labelsWriter.Close(); err != nil {
+		return nil, err
+	}
+
+	cacheWriter.SetLayer(0, labelsReader)
+	cacheReader, err := cacheWriter.GetReader()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return merkleTree.Root(), cacheReader, nil
+
+	return &initResult{reader: cacheReader, root: tree.Root()}, nil
+}
+
+func merge(results []*initResult) (*initResult, error) {
+	switch len(results) {
+	case 0:
+		return nil, nil
+	case 1:
+		return results[0], nil
+	default:
+		readers := make([]CacheReader, len(results))
+		for i, result := range results {
+			readers[i] = result.reader
+		}
+
+		reader, err := cache.Merge(readers)
+		if err != nil {
+			return nil, err
+		}
+
+		reader, root, err := cache.BuildTop(reader)
+		if err != nil {
+			return nil, err
+		}
+
+		return &initResult{reader, root}, nil
+	}
 }

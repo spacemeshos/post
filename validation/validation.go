@@ -13,8 +13,8 @@ import (
 
 // Validate ensures the validity of the given proof. It returns nil if the proof is valid or an error describing the
 // failure, otherwise.
-func Validate(proof proving.Proof, space proving.Space, numOfProvenLabels uint8, difficulty proving.Difficulty) error {
-	if err := space.Validate(initialization.LabelGroupSize); err != nil {
+func Validate(proof *proving.Proof, space uint64, numOfProvenLabels uint8, difficulty proving.Difficulty) error {
+	if err := proving.ValidateSpace(space); err != nil {
 		log.Error(err.Error())
 		return err
 	}
@@ -23,8 +23,8 @@ func Validate(proof proving.Proof, space proving.Space, numOfProvenLabels uint8,
 		return err
 	}
 
-	numOfLabelGroups := space.LabelGroups(initialization.LabelGroupSize)
-	err := validate(proof, numOfLabelGroups, numOfProvenLabels, difficulty)
+	numOfLabelGroups := proving.NumOfLabelGroups(space)
+	err := validate(*proof, numOfLabelGroups, numOfProvenLabels, difficulty)
 	if err != nil {
 		err = fmt.Errorf("validation failed: %v", err)
 		log.Info(err.Error())
