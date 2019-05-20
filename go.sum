@@ -93,16 +93,6 @@ github.com/sirupsen/logrus v1.2.0 h1:juTguoYk5qI21pwyTXY3B3Y5cOTH3ZUyZCg1v/mihuo
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/spacemeshos/go-spacemesh v0.0.0-20190218131258-f9290a04382c h1:F2uZn5a+Gs6NJVMv4wjIpknq90wrqANi6AdkGzsbNqw=
 github.com/spacemeshos/go-spacemesh v0.0.0-20190218131258-f9290a04382c/go.mod h1:tY7flNGGFec6jgu03jBYCbFmntvpxOS8dG3dt0Eznl8=
-github.com/spacemeshos/merkle-tree v0.0.0-20190508113057-1a71b988924a h1:/CO5P93Jlt/bQIMTmKCVr001J6BteK6KRwoeVu6Zzwk=
-github.com/spacemeshos/merkle-tree v0.0.0-20190508113057-1a71b988924a/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
-github.com/spacemeshos/merkle-tree v0.0.0-20190515130439-516ccde24669 h1:jd+LUhm0O9B0vG1C/LBIqZgQ25SqKx9pgfaoibEYVkE=
-github.com/spacemeshos/merkle-tree v0.0.0-20190515130439-516ccde24669/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
-github.com/spacemeshos/merkle-tree v0.0.0-20190516131630-fa084e188123 h1:KwJBZc1biFWG2M+G/1brjEch+3x8c1oFaEmXRZRAsxc=
-github.com/spacemeshos/merkle-tree v0.0.0-20190516131630-fa084e188123/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
-github.com/spacemeshos/merkle-tree v0.0.0-20190516142306-14d56eab8777 h1:PziGbeGPTsimJCmZ93Ae8/wEenSo6X8jptgTGJHV8I8=
-github.com/spacemeshos/merkle-tree v0.0.0-20190516142306-14d56eab8777/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
-github.com/spacemeshos/merkle-tree v0.0.0-20190516182455-58d29a79ffa5 h1:fHQs3bA3rTcZ+HZFJQn4oU4DwftxMRFWnu+He0LNCDo=
-github.com/spacemeshos/merkle-tree v0.0.0-20190516182455-58d29a79ffa5/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
 github.com/spacemeshos/merkle-tree v0.0.0-20190517113914-1670e9ad4d58 h1:uHKiHRdazgCkYYNkzRwLAbmSuoogNao6Mz/u8H7gPZw=
 github.com/spacemeshos/merkle-tree v0.0.0-20190517113914-1670e9ad4d58/go.mod h1:mPxjt4RONPxSUhxOq4bhSJyKVGQJ0VMSyRiE51dDLgE=
 github.com/spacemeshos/sha256-simd v0.0.0-20190111104731-8575aafc88c9 h1:Cc+np6ORem5wrvO+YHQ1sdu71ItiQVRiYB4ugazpgxM=
