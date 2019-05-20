@@ -2,17 +2,15 @@ package initialization
 
 import (
 	"encoding/binary"
-	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/sha256-simd"
 )
-
-const LabelGroupSize = merkle.NodeSize
 
 func CalcLabelGroup(identity []byte, groupPosition uint64, difficulty proving.Difficulty) []byte {
 	labelGroup := make([]byte, LabelGroupSize)
 	labelsPerGroup := difficulty.LabelsPerGroup()
 	offset := groupPosition * labelsPerGroup
+
 	for labelIndex := uint64(0); labelIndex < labelsPerGroup; labelIndex++ {
 		label := CalcLabel(identity, labelIndex+offset, difficulty)
 		byteIndex := difficulty.ByteIndex(labelIndex)

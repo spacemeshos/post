@@ -9,52 +9,58 @@ import (
 	"path/filepath"
 )
 
-const LabelSize = 32
-
 // OwnerReadWriteExec is a standard owner read / write / exec file permission.
 const OwnerReadWriteExec = 0700
 
 // OwnerReadWrite is a standard owner read / write file permission.
 const OwnerReadWrite = 0600
 
-type PostLabelsFileWriter struct {
-	f *os.File
-	w *bufio.Writer
+type Writer struct {
+	f        *os.File
+	w        *bufio.Writer
+	itemSize uint64
 }
 
-func NewPostLabelsFileWriter(id []byte) (*PostLabelsFileWriter, error) {
+func NewLabelsWriter(id []byte, index int) (*Writer, error) {
 	if len(id) > 64 {
 		return nil, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
 	}
+
 	labelsPath := filepath.Join(GetPostDataPath(), hex.EncodeToString(id))
 	log.Info("creating directory: \"%v\"", labelsPath)
 	err := os.MkdirAll(labelsPath, OwnerReadWriteExec)
 	if err != nil {
 		return nil, err
 	}
-	fullFilename := filepath.Join(labelsPath, filename)
-	f, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_WRONLY, OwnerReadWrite)
+
+	filename := filepath.Join(labelsPath, fmt.Sprintf("%x-%d", id, index))
+	return newWriter(filename, LabelGroupSize)
+}
+
+func newWriter(filename string, itemSize uint64) (*Writer, error) {
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, OwnerReadWrite)
 	if err != nil {
 		return nil, err
 	}
-	return &PostLabelsFileWriter{
-		f: f,
-		w: bufio.NewWriter(f),
+	return &Writer{
+		f:        f,
+		w:        bufio.NewWriter(f),
+		itemSize: itemSize,
 	}, nil
 }
 
-func (w *PostLabelsFileWriter) Write(label Label) error {
-	nn, err := w.w.Write(label)
+func (w *Writer) Write(item []byte) error {
+	nn, err := w.w.Write(item)
 	if err != nil {
-		return fmt.Errorf("failed to write label: %v", err)
+		return fmt.Errorf("failed to write: %v", err)
 	}
-	if nn != LabelSize {
-		return fmt.Errorf("failed to write label: expected label size of %v bytes, but wrote %v bytes (len(label)=%v)", LabelSize, nn, len(label))
+	if uint64(nn) != w.itemSize {
+		return fmt.Errorf("failed to write: expected size of %v bytes, but wrote %v bytes (len(lg)=%v)", w.itemSize, nn, len(item))
 	}
 	return nil
 }
 
-func (w *PostLabelsFileWriter) Close() error {
+func (w *Writer) Close() error {
 	err := w.w.Flush()
 	if err != nil {
 		return err
@@ -66,6 +72,7 @@ func (w *PostLabelsFileWriter) Close() error {
 			log.Uint64("size_in_bytes", uint64(info.Size())),
 		)
 	}
+
 	err = w.f.Close()
 	if err != nil {
 		return err
@@ -74,11 +81,11 @@ func (w *PostLabelsFileWriter) Close() error {
 	return nil
 }
 
-func (w *PostLabelsFileWriter) GetLeafReader() (*LeafReader, error) {
+func (w *Writer) GetReader() (*Reader, error) {
 	err := w.w.Flush()
 	if err != nil {
 		return nil, err
 	}
-	name := w.f.Name()
-	return newLeafReader(name)
+
+	return newReader(w.f.Name(), w.itemSize)
 }

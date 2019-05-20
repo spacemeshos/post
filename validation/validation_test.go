@@ -7,6 +7,7 @@ import (
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/proving"
+	"github.com/spacemeshos/post/shared"
 	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
@@ -15,7 +16,7 @@ import (
 
 const (
 	defaultDifficulty        = 5
-	defaultSpace             = proving.Space(16 * initialization.LabelGroupSize)
+	defaultSpace             = 16 * shared.LabelGroupSize
 	defaultNumOfProvenLabels = 4
 )
 
@@ -83,7 +84,7 @@ func TestValidateBadDifficulty(t *testing.T) {
 
 	const difficulty = 4
 
-	err := Validate(proving.Proof{}, defaultSpace, defaultNumOfProvenLabels, difficulty)
+	err := Validate(new(proving.Proof), defaultSpace, defaultNumOfProvenLabels, difficulty)
 	r.EqualError(err, fmt.Sprintf("difficulty must be between 5 and 8 (received %d)", difficulty))
 }
 
@@ -91,7 +92,7 @@ func testGenerateProof(r *require.Assertions, id []byte, difficulty proving.Diff
 	proof2, err := proving.GenerateProof(id, defaultChallenge, defaultNumOfProvenLabels, difficulty)
 	r.NoError(err)
 
-	err = Validate(proof2, defaultSpace, defaultNumOfProvenLabels, difficulty)
+	err = Validate(&proof2, defaultSpace, defaultNumOfProvenLabels, difficulty)
 	r.Nil(err)
 }
 

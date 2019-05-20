@@ -1,27 +1,44 @@
 package proving
 
-import "fmt"
+import (
+	"fmt"
+)
 
-// In bytes. 1 peta-byte of storage.
-// This would protect against number of labels uint64 overflow as well,
-// since the number of labels per byte can be 8 at most (3 extra bit shifts).
-const MaxSpace = 1 << 40 // 1099511627777
-
-type Space uint64
-
-// Validate validates whether the given space amount is valid.
-func (s Space) Validate(labelGroupSize uint64) error {
-	if s > MaxSpace {
-		return fmt.Errorf("space (%d) is greater than the supported max (%d)", s, MaxSpace)
+// ValidateSpace validates whether the given space amount is valid.
+func ValidateSpace(space uint64) error {
+	if space > MaxSpace {
+		return fmt.Errorf("space (%d) is greater than the supported max (%d)", space, MaxSpace)
 	}
-	if uint64(s)%labelGroupSize != 0 {
-		return fmt.Errorf("space (%d) must be a multiple of %d", s, labelGroupSize)
+	if uint64(space)%LabelGroupSize != 0 {
+		return fmt.Errorf("space (%d) must be a multiple of %d", space, LabelGroupSize)
 	}
 
 	return nil
 }
 
-// LabelGroups returns the number of label groups of a given space amount.
-func (s Space) LabelGroups(labelGroupSize uint64) uint64 {
-	return uint64(s) / labelGroupSize
+func ValidateFileSize(space uint64, filesize uint64) error {
+	if space%filesize != 0 {
+		return fmt.Errorf("space (%d) must be a multiple of filesize (%d)", space, filesize)
+	}
+	if filesize < LabelGroupSize {
+		return fmt.Errorf("filesize (%d) must be greater than %d", filesize, LabelGroupSize)
+	}
+	if space/filesize > MaxNumOfFiles {
+		return fmt.Errorf("number of chunks (%d) is greater than the supported max (%d)", filesize, MaxNumOfFiles)
+	}
+
+	return nil
+}
+
+func NumOfFiles(space uint64, filesize uint64) (int, error) {
+	if err := ValidateFileSize(space, filesize); err != nil {
+		return 0, err
+	}
+
+	return int(space / filesize), nil
+}
+
+// NumOfLabelGroups returns the number of label groups of a given space amount.
+func NumOfLabelGroups(space uint64) uint64 {
+	return uint64(space) / LabelGroupSize
 }
