@@ -1,11 +1,10 @@
 package initialization
 
 import (
+	"errors"
 	"fmt"
-	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/merkle-tree/cache"
-	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
@@ -19,18 +18,23 @@ const (
 )
 
 type (
+	Difficulty  = shared.Difficulty
 	CacheReader = cache.CacheReader
+)
+
+var (
+	ErrIdNotInitialized = errors.New("id not initialized")
 )
 
 // Initialize takes an id (public key), space (in bytes), numOfProvenLabels and difficulty.
 // Difficulty determines the number of bits per label that are stored. Each leaf in the tree is 32 bytes = 256 bits.
 // The number of bits per label is 256 / LabelsPerGroup. LabelsPerGroup = 1 << difficulty.
 // Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
-func Initialize(id []byte, space uint64, numOfProvenLabels uint8, difficulty proving.Difficulty) (*proving.Proof, error) {
-	return initialize(id, space, space, numOfProvenLabels, difficulty)
+func Initialize(id []byte, space uint64, numOfProvenLabels uint8, difficulty Difficulty, dir string, lograte uint64) (*proving.Proof, error) {
+	return initialize(id, space, space, numOfProvenLabels, difficulty, dir, lograte)
 }
 
-func initialize(id []byte, space uint64, filesize uint64, numOfProvenLabels uint8, difficulty proving.Difficulty) (*proving.Proof, error) {
+func initialize(id []byte, space uint64, filesize uint64, numOfProvenLabels uint8, difficulty Difficulty, dir string, lograte uint64) (*proving.Proof, error) {
 	if err := proving.ValidateSpace(space); err != nil {
 		return nil, err
 	}
@@ -47,7 +51,7 @@ func initialize(id []byte, space uint64, filesize uint64, numOfProvenLabels uint
 
 	results := make([]*initResult, chunks)
 	for i := 0; i < chunks; i++ {
-		result, err := initializeChunk(id, i, labelGroupsPerChunk, difficulty)
+		result, err := initializeChunk(id, i, labelGroupsPerChunk, difficulty, dir, lograte)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +78,7 @@ func initialize(id []byte, space uint64, filesize uint64, numOfProvenLabels uint
 	}
 
 	proof := &proving.Proof{
-		Challenge:    proving.ZeroChallenge,
+		Challenge:    shared.ZeroChallenge,
 		Identity:     id,
 		MerkleRoot:   result.root,
 		ProvenLeaves: provenLeaves,
@@ -89,9 +93,9 @@ type initResult struct {
 	root   []byte
 }
 
-func initializeChunk(id []byte, chunkPosition int, labelGroupsPerChunk uint64, difficulty proving.Difficulty) (*initResult, error) {
+func initializeChunk(id []byte, chunkPosition int, labelGroupsPerChunk uint64, difficulty proving.Difficulty, dir string, lograte uint64) (*initResult, error) {
 	// Initialize the labels file writer.
-	labelsWriter, err := persistence.NewLabelsWriter(id, chunkPosition)
+	labelsWriter, err := persistence.NewLabelsWriter(id, chunkPosition, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +103,7 @@ func initializeChunk(id []byte, chunkPosition int, labelGroupsPerChunk uint64, d
 	// Initialize the labels merkle tree with the execution-phase zero challenge.
 	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(LowestLayerToCacheDuringProofGeneration), cache.MakeSliceReadWriterFactory())
 	tree, err := merkle.NewTreeBuilder().
-		WithHashFunc(proving.ZeroChallenge.GetSha256Parent).
+		WithHashFunc(shared.ZeroChallenge.GetSha256Parent).
 		WithCacheWriter(cacheWriter).
 		Build()
 	if err != nil {
@@ -119,12 +123,12 @@ func initializeChunk(id []byte, chunkPosition int, labelGroupsPerChunk uint64, d
 		if err != nil {
 			return nil, err
 		}
-		if (position+1)%config.Post.LogEveryXLabels == 0 {
-			log.Info("found %v labels", position+1)
+		if (position+1)%lograte == 0 {
+			log.Infof("completed %v labels", position+1)
 		}
 	}
 
-	log.With().Info("completed PoST label list construction")
+	log.Info("completed PoST label list construction")
 
 	labelsReader, err := labelsWriter.GetReader()
 	if err != nil {
@@ -168,4 +172,17 @@ func merge(results []*initResult) (*initResult, error) {
 
 		return &initResult{reader, root}, nil
 	}
+}
+
+func Reset(dir string) (*persistence.ResetResult, error) {
+	res, err := persistence.Reset(dir)
+	if err != nil {
+		if err == persistence.ErrDirNotFound {
+			return nil, ErrIdNotInitialized
+		}
+
+		return nil, fmt.Errorf("reset failure: %v", err)
+	}
+
+	return res, nil
 }

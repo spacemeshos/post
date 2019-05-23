@@ -2,7 +2,6 @@ package proving
 
 import (
 	"fmt"
-	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/merkle-tree/cache"
 	"github.com/spacemeshos/post/persistence"
@@ -15,15 +14,18 @@ const (
 	LabelGroupSize                          = shared.LabelGroupSize
 	MaxSpace                                = shared.MaxSpace
 	MaxNumOfFiles                           = shared.MaxNumOfFiles
-	MinDifficulty                           = shared.MinDifficulty
-	MaxDifficulty                           = shared.MaxDifficulty
 	LowestLayerToCacheDuringProofGeneration = shared.LowestLayerToCacheDuringProofGeneration
 )
 
-func GenerateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, difficulty Difficulty) (proof Proof,
+type (
+	Difficulty = shared.Difficulty
+	Challenge  = shared.Challenge
+)
+
+func GenerateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, difficulty Difficulty, dir string) (proof *Proof,
 	err error) {
 
-	proof, err = generateProof(id, challenge, numOfProvenLabels, difficulty)
+	proof, err = generateProof(id, challenge, numOfProvenLabels, difficulty, dir)
 	if err != nil {
 		err = fmt.Errorf("proof generation failed: %v", err)
 		log.Error(err.Error())
@@ -31,27 +33,26 @@ func GenerateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, diff
 	return proof, err
 }
 
-func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, difficulty Difficulty) (proof Proof,
-	err error) {
-
-	err = difficulty.Validate()
+func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, difficulty Difficulty, dir string) (*Proof, error) {
+	err := difficulty.Validate()
 	if err != nil {
-		return Proof{}, err
+		return nil, err
 	}
 
+	proof := new(Proof)
 	proof.Challenge = challenge
 	proof.Identity = id
 
-	reader, err := persistence.NewLabelsReader(id)
+	reader, err := persistence.NewLabelsReader(dir)
 	if err != nil {
-		return Proof{}, err
+		return nil, err
 	}
 	width, err := reader.Width()
 	if err != nil {
-		return Proof{}, err
+		return nil, err
 	}
 	if width*difficulty.LabelsPerGroup() >= math.MaxUint64 {
-		return Proof{}, fmt.Errorf("leaf reader too big, number of label groups (%d) * labels per group (%d) "+
+		return nil, fmt.Errorf("leaf reader too big, number of label groups (%d) * labels per group (%d) "+
 			"overflows uint64", width, difficulty.LabelsPerGroup())
 	}
 	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(LowestLayerToCacheDuringProofGeneration),
@@ -59,7 +60,7 @@ func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, diff
 
 	tree, err := merkle.NewTreeBuilder().WithHashFunc(challenge.GetSha256Parent).WithCacheWriter(cacheWriter).Build()
 	if err != nil {
-		return Proof{}, err
+		return nil, err
 	}
 	for {
 		leaf, err := reader.ReadNext()
@@ -67,11 +68,11 @@ func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, diff
 			break
 		}
 		if err != nil {
-			return Proof{}, err
+			return nil, err
 		}
 		err = tree.AddLeaf(leaf)
 		if err != nil {
-			return Proof{}, err
+			return nil, err
 		}
 	}
 	proof.MerkleRoot = tree.Root()
@@ -85,7 +86,7 @@ func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, diff
 
 	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, cacheReader)
 	if err != nil {
-		return Proof{}, err
+		return nil, err
 	}
 
 	return proof, nil

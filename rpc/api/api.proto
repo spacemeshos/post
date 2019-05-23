@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+import "google/api/annotations.proto";
+
+package api;
+
+service Post {
+    rpc Initialize (InitializeRequest) returns (InitializeResponse) {
+        option (google.api.http) = {
+            post: "/v1/initialize",
+            body: "*",
+        };
+    }
+
+    rpc Execute (ExecuteRequest) returns (ExecuteResponse) {
+        option (google.api.http) = {
+            post: "/v1/execute",
+            body: "*",
+        };
+    }
+
+    rpc GetProof (GetProofRequest) returns (GetProofResponse) {
+        option (google.api.http) = {
+            post: "/v1/execute",
+            body: "*",
+        };
+    }
+
+    rpc Reset (ResetRequest) returns (ResetResponse) {
+        option (google.api.http) = {
+            post: "/v1/reset"
+        };
+    }
+
+    rpc GetInfo (GetInfoRequest) returns (GetInfoResponse) {
+        option (google.api.http) = {
+            get: "/v1/info"
+        };
+    }
+
+    rpc Shutdown (ShutdownRequest) returns (ShutdownResponse) {
+        option (google.api.http) = {
+            post: "/v1/shutdown"
+        };
+    }
+}
+
+message InitializeRequest {
+     bytes id = 1 [json_name = "id"];
+}
+
+message InitializeResponse {
+    Proof proof = 1 [json_name = "proof"];
+}
+
+message ExecuteRequest {
+    bytes challenge = 1 [json_name = "challenge"];
+}
+
+message ExecuteResponse {
+    Proof proof = 1 [json_name = "proof"];
+}
+
+message GetProofRequest {
+    bytes challenge = 1 [json_name = "challenge"];
+}
+
+message GetProofResponse {
+    Proof proof = 1 [json_name = "proof"];
+}
+
+message ResetRequest {
+}
+
+message ResetResponse {
+    string deletedDir = 1 [json_name = "deleted_dir"];
+    int32 numOfDeletedFiles = 2 [json_name = "num_of_deleted_files"];
+}
+
+message GetInfoRequest {
+}
+
+message GetInfoResponse {
+    string version = 1 [json_name = "version"];
+    Params params = 2 [json_name = "params"];
+    State state = 3 [json_name = "state"];
+}
+
+message ShutdownRequest {
+}
+
+message ShutdownResponse {
+}
+
+message Proof {
+    bytes id = 1 [json_name = "id"];
+    bytes challenge = 2 [json_name = "challenge"];
+    bytes merkleRoot = 3 [json_name = "merkle_root"];
+    repeated bytes provenLeaves = 4 [json_name = "proven_leaves"];
+    repeated bytes proofNodes = 5 [json_name = "proof_nodes"];
+}
+
+message Params {
+    int64 spacePerUnit = 1 [json_name = "space_per_unit"];
+    int32 difficulty = 2 [json_name = "difficulty"];
+    int32 t = 3 [json_name = "t"];
+    int32 cacheLayer = 4 [json_name = "cache_layer"];
+}
+
+message State {
+    bytes id = 1 [json_name = "id"];
+    string dir = 3 [json_name = "dir"];
+    repeated string provenChallenges = 2 [json_name = "proven_challenges"];
+}

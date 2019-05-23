@@ -2,10 +2,8 @@ package persistence
 
 import (
 	"bufio"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree/cache"
 	"io"
 	"io/ioutil"
@@ -23,14 +21,7 @@ type (
 // NewLabelsReader returns a new labels reader from the initialization files.
 // If the initialization was split into multiple files, they will be grouped
 // into one unified reader.
-func NewLabelsReader(id []byte) (LayerReadWriter, error) {
-	if len(id) > 64 {
-		err := fmt.Errorf("failed to create labels group reader: id cannot be longer than 64 bytes (got %d bytes)",
-			len(id))
-		return nil, err
-	}
-
-	dir := filepath.Join(GetPostDataPath(), hex.EncodeToString(id))
+func NewLabelsReader(dir string) (LayerReadWriter, error) {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("initialization directory not found: %v", err)

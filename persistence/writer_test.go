@@ -5,10 +5,16 @@ import (
 	"encoding/hex"
 	"github.com/stretchr/testify/require"
 	"io"
+	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 )
+
+var (
+	tempdir, _ = ioutil.TempDir("", "post-test")
+)
+
+type LabelGroup []byte
 
 func TestLabelsReaderAndWriter(t *testing.T) {
 	req := require.New(t)
@@ -16,7 +22,7 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 	labelsToWriter := make([]LabelGroup, 0)
 
 	for i, labelGroupGroup := range labelGroupGroupGroups {
-		writer, err := NewLabelsWriter(id, i)
+		writer, err := NewLabelsWriter(id, i, tempdir)
 		req.NoError(err)
 
 		for _, labelGroup := range labelGroupGroup {
@@ -30,7 +36,7 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 		req.NoError(err)
 	}
 
-	reader, err := NewLabelsReader(id)
+	reader, err := NewLabelsReader(tempdir)
 	req.NoError(err)
 
 	labelsFromReader := make([]LabelGroup, len(labelsToWriter))
@@ -84,7 +90,7 @@ func TestMain(m *testing.M) {
 }
 
 func cleanup() {
-	_ = os.RemoveAll(filepath.Join(GetPostDataPath(), "deadbeef"))
+	_ = os.RemoveAll(tempdir)
 }
 
 func NewLabelGroup(cnt uint64) []byte {

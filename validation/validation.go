@@ -3,7 +3,6 @@ package validation
 import (
 	"errors"
 	"fmt"
-	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/proving"
