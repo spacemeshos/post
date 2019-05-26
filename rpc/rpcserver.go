@@ -47,7 +47,7 @@ func NewRPCServer(s *signal.Signal, params *shared.Params, datadir string, logra
 
 func (r *rpcServer) Initialize(ctx context.Context, in *api.InitializeRequest) (*api.InitializeResponse, error) {
 	dir := shared.GetDir(r.datadir, in.Id)
-	proof, err := initialization.Initialize(in.Id, r.params.SpacePerUnit, r.params.NumOfProvenLabels, r.params.Difficulty, dir, r.lograte)
+	proof, err := initialization.Initialize(in.Id, r.params.SpacePerUnit, r.params.NumOfProvenLabels, r.params.Difficulty, false, dir, r.lograte)
 	if err != nil {
 		return nil, err
 	}

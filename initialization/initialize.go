@@ -8,6 +8,7 @@ import (
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
+	"runtime"
 )
 
 const (
@@ -30,11 +31,11 @@ var (
 // Difficulty determines the number of bits per label that are stored. Each leaf in the tree is 32 bytes = 256 bits.
 // The number of bits per label is 256 / LabelsPerGroup. LabelsPerGroup = 1 << difficulty.
 // Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
-func Initialize(id []byte, space uint64, numOfProvenLabels uint8, difficulty Difficulty, dir string, lograte uint64) (*proving.Proof, error) {
-	return initialize(id, space, space, numOfProvenLabels, difficulty, dir, lograte)
+func Initialize(id []byte, space uint64, numOfProvenLabels uint8, difficulty proving.Difficulty, parallel bool, dir string, lograte uint64) (*proving.Proof, error) {
+	return initialize(id, space, space, numOfProvenLabels, difficulty, parallel, dir, lograte)
 }
 
-func initialize(id []byte, space uint64, filesize uint64, numOfProvenLabels uint8, difficulty Difficulty, dir string, lograte uint64) (*proving.Proof, error) {
+func initialize(id []byte, space uint64, filesize uint64, numOfProvenLabels uint8, difficulty shared.Difficulty, parallel bool,  dir string, lograte uint64) (*proving.Proof, error) {
 	if err := proving.ValidateSpace(space); err != nil {
 		return nil, err
 	}
@@ -43,20 +44,15 @@ func initialize(id []byte, space uint64, filesize uint64, numOfProvenLabels uint
 		return nil, err
 	}
 
-	chunks, err := proving.NumOfFiles(space, filesize)
+	numOfChunks, err := proving.NumOfFiles(space, filesize)
 	if err != nil {
 		return nil, err
 	}
 	labelGroupsPerChunk := proving.NumOfLabelGroups(filesize)
 
-	results := make([]*initResult, chunks)
-	for i := 0; i < chunks; i++ {
-		result, err := initializeChunk(id, i, labelGroupsPerChunk, difficulty, dir, lograte)
-		if err != nil {
-			return nil, err
-		}
-
-		results[i] = result
+	results, err := initializeChunks(id, difficulty, numOfChunks, labelGroupsPerChunk, parallel, dir, lograte)
+	if err != nil {
+		return nil, err
 	}
 
 	result, err := merge(results)
@@ -93,9 +89,63 @@ type initResult struct {
 	root   []byte
 }
 
-func initializeChunk(id []byte, chunkPosition int, labelGroupsPerChunk uint64, difficulty proving.Difficulty, dir string, lograte uint64) (*initResult, error) {
+type initChunkResult struct {
+	index int
+	*initResult
+}
+
+func initializeChunks(id []byte, difficulty proving.Difficulty, numOfChunks int, labelGroupsPerChunk uint64, parallel bool, dir string, lograte uint64) ([]*initResult, error) {
+	var numOfWorkers int
+	if parallel {
+		numOfWorkers = min(runtime.NumCPU(), numOfChunks)
+	} else {
+		numOfWorkers = 1
+	}
+
+	jobsChan := make(chan int, numOfChunks)
+	resultsChan := make(chan *initChunkResult, numOfChunks)
+	errChan := make(chan error, 0)
+
+	for i := 0; i < numOfChunks; i++ {
+		jobsChan <- i
+	}
+	close(jobsChan)
+
+	for i := 0; i < numOfWorkers; i++ {
+		go func() {
+			for {
+				index, more := <-jobsChan
+				if !more {
+					return
+				}
+
+				res, err := initializeChunk(id, index, labelGroupsPerChunk, difficulty, dir, lograte)
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				resultsChan <- &initChunkResult{index, res}
+			}
+		}()
+	}
+
+	results := make([]*initResult, numOfChunks)
+	for i := 0; i < numOfChunks; i++ {
+		select {
+		case res := <-resultsChan:
+			results[res.index] = res.initResult
+		case err := <-errChan:
+			return nil, err
+		}
+	}
+
+	return results, nil
+}
+
+func initializeChunk(id []byte, chunkIndex int, labelGroupsPerChunk uint64, difficulty proving.Difficulty, dir string, lograte uint64) (*initResult, error) {
 	// Initialize the labels file writer.
-	labelsWriter, err := persistence.NewLabelsWriter(id, chunkPosition, dir)
+	labelsWriter, err := persistence.NewLabelsWriter(id, chunkIndex, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +163,7 @@ func initializeChunk(id []byte, chunkPosition int, labelGroupsPerChunk uint64, d
 	// Calculate labels in groups, write them to disk
 	// and append them as leaves in the merkle tree.
 	for position := uint64(0); position < labelGroupsPerChunk; position++ {
-		offset := uint64(chunkPosition) * labelGroupsPerChunk
+		offset := uint64(chunkIndex) * labelGroupsPerChunk
 		lg := CalcLabelGroup(id, position+offset, difficulty)
 		err := labelsWriter.Write(lg)
 		if err != nil {
@@ -145,7 +195,9 @@ func initializeChunk(id []byte, chunkPosition int, labelGroupsPerChunk uint64, d
 		return nil, err
 	}
 
-	return &initResult{reader: cacheReader, root: tree.Root()}, nil
+	res := &initResult{cacheReader, tree.Root()}
+
+	return res, nil
 }
 
 func merge(results []*initResult) (*initResult, error) {
@@ -185,4 +237,11 @@ func Reset(dir string) (*persistence.ResetResult, error) {
 	}
 
 	return res, nil
+}
+
+func min(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
 }

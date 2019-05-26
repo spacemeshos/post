@@ -30,7 +30,7 @@ var (
 func TestValidate(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, tempdir, lograte)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
 	r.NoError(err)
 
 	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
@@ -44,7 +44,7 @@ func TestValidate2(t *testing.T) {
 
 	const difficulty = 6
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, difficulty, tempdir, lograte)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, difficulty, false, tempdir, lograte)
 	r.NoError(err)
 
 	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, difficulty)
@@ -58,7 +58,7 @@ func TestValidate3(t *testing.T) {
 
 	const difficulty = 7
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, difficulty, tempdir, lograte)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, difficulty, false, tempdir, lograte)
 	r.NoError(err)
 
 	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, difficulty)
@@ -72,7 +72,7 @@ func TestValidate4(t *testing.T) {
 
 	const difficulty = 8
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, difficulty, tempdir, lograte)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, difficulty, false, tempdir, lograte)
 	r.NoError(err)
 
 	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, difficulty)
@@ -111,7 +111,7 @@ func TestGenerateProofFailure(t *testing.T) {
 func TestValidateFail(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, tempdir, lograte)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
 	r.NoError(err)
 
 	proof.Identity = append([]byte{0}, proof.Identity[1:]...)
@@ -123,7 +123,7 @@ func TestValidateFail(t *testing.T) {
 func TestValidateFail2(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, tempdir, lograte)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
 	r.NoError(err)
 
 	proof.Challenge = []byte{1}
@@ -135,7 +135,7 @@ func TestValidateFail2(t *testing.T) {
 func TestValidateFail3(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, tempdir, lograte)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
 	r.NoError(err)
 
 	proof.ProvenLeaves[0] = append([]byte{}, proof.ProvenLeaves[0]...)
@@ -148,7 +148,7 @@ func TestValidateFail3(t *testing.T) {
 func TestValidateFail4(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, tempdir, lograte)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
 	r.NoError(err)
 
 	proof.ProvenLeaves = proof.ProvenLeaves[1:]
@@ -160,7 +160,7 @@ func TestValidateFail4(t *testing.T) {
 func TestValidateFail5(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, tempdir, lograte)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
 	r.NoError(err)
 
 	proof.ProofNodes[0] = append([]byte{}, proof.ProofNodes[0]...)
@@ -173,7 +173,7 @@ func TestValidateFail5(t *testing.T) {
 func TestValidateFail6(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, tempdir, lograte)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
 	r.NoError(err)
 
 	proof.ProofNodes = proof.ProofNodes[1:]
@@ -185,7 +185,7 @@ func TestValidateFail6(t *testing.T) {
 func TestValidateFail7(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, tempdir, lograte)
+	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
 	r.NoError(err)
 
 	proof.MerkleRoot = append([]byte{}, proof.MerkleRoot...)
