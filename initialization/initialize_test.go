@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/proving"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
@@ -27,7 +26,7 @@ var (
 func TestInitialize(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	proof, err := initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false)
 	r.NoError(err)
 
 	expectedMerkleRoot := hexDecode("2292f95c87626f5a281fa811ba825ffce79442f8999e1ddc8e8c9bbac15e3fcb")
@@ -57,30 +56,31 @@ func TestInitialize(t *testing.T) {
 func TestInitializeErrors(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, 4)
+	proof, err := initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, 4, false)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 4)")
 	r.Nil(proof)
 
-	proof, err = initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, 9)
+	proof, err = initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, 9, false)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 9)")
 	r.Nil(proof)
 
-	proof, err = initialize(defaultId, MaxSpace+1, defaultSpace, NumOfProvenLabels, defaultDifficulty)
+	proof, err = initialize(defaultId, MaxSpace+1, defaultSpace, NumOfProvenLabels, defaultDifficulty, false)
 	r.EqualError(err, fmt.Sprintf("space (%d) is greater than the supported max (%d)", MaxSpace+1, MaxSpace))
 	r.Nil(proof)
 }
 
 func TestInitializeMultipleFiles(t *testing.T) {
 	r := require.New(t)
+	space := uint64(defaultSpace)
 
-	proof, err := initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	proof, err := initialize(defaultId, space, space, defaultNumOfProvenLabels, defaultDifficulty, false)
 	r.NoError(err)
 	execProof, err := proving.GenerateProof(defaultId, defaultChallenge, defaultNumOfProvenLabels, defaultDifficulty)
 	r.NoError(err)
 
 	for numOfFiles := uint64(2); numOfFiles <= 16; numOfFiles *= 2 {
 		cleanup()
-		multiFilesProof, err := initialize(defaultId, defaultSpace, defaultSpace/numOfFiles, defaultNumOfProvenLabels, defaultDifficulty)
+		multiFilesProof, err := initialize(defaultId, space, space/numOfFiles, defaultNumOfProvenLabels, defaultDifficulty, true)
 		r.NoError(err)
 		multiFilesExecProof, err := proving.GenerateProof(defaultId, defaultChallenge, defaultNumOfProvenLabels, defaultDifficulty)
 		r.NoError(err)
@@ -112,11 +112,11 @@ func (n nodes) String() string {
 
 func BenchmarkInitialize(b *testing.B) {
 	space := uint64(1) << 30 // 1 GB.
-	proof, err := initialize(defaultId, space, space, NumOfProvenLabels, defaultDifficulty)
+	_, err := initialize(defaultId, space, space, NumOfProvenLabels, defaultDifficulty, false)
 	require.NoError(b, err)
 
-	expectedMerkleRoot, _ := hex.DecodeString("42dd3ed26e6f30f8098ec0b5093147551b32573ef9ed6670076248b4fd0fac30")
-	assert.Equal(b, expectedMerkleRoot, proof.MerkleRoot)
+	//expectedMerkleRoot, _ := hex.DecodeString("42dd3ed26e6f30f8098ec0b5093147551b32573ef9ed6670076248b4fd0fac30")
+	//assert.Equal(b, expectedMerkleRoot, proof.MerkleRoot)
 	/*
 		2019-04-30T11:49:10.271+0300    INFO    Spacemesh       creating directory: "/Users/moshababo/.spacemesh-data/post-data/deadbeef"
 		2019-04-30T11:49:45.168+0300    INFO    Spacemesh       found 5000000 labels
