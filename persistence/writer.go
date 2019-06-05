@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/spacemeshos/post/shared"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -29,24 +28,25 @@ type Writer struct {
 	f        *os.File
 	w        *bufio.Writer
 	itemSize uint64
+	logger   shared.Logger
 }
 
-func NewLabelsWriter(id []byte, index int, dir string) (*Writer, error) {
+func NewLabelsWriter(id []byte, index int, dir string, logger shared.Logger) (*Writer, error) {
 	if len(id) > 64 {
 		return nil, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
 	}
 
-	log.Infof("creating directory: \"%v\"", dir)
+	logger.Info("creating directory: \"%v\"", dir)
 	err := os.MkdirAll(dir, OwnerReadWriteExec)
 	if err != nil {
 		return nil, err
 	}
 
 	filename := filepath.Join(dir, fmt.Sprintf("%x-%d", id, index))
-	return newWriter(filename, LabelGroupSize)
+	return newWriter(filename, LabelGroupSize, logger)
 }
 
-func newWriter(filename string, itemSize uint64) (*Writer, error) {
+func newWriter(filename string, itemSize uint64, logger shared.Logger) (*Writer, error) {
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, OwnerReadWrite)
 	if err != nil {
 		return nil, err
@@ -55,6 +55,7 @@ func newWriter(filename string, itemSize uint64) (*Writer, error) {
 		f:        f,
 		w:        bufio.NewWriter(f),
 		itemSize: itemSize,
+		logger:   logger,
 	}, nil
 }
 
@@ -76,7 +77,7 @@ func (w *Writer) Close() error {
 	}
 	w.w = nil
 	if info, err := w.f.Stat(); err == nil {
-		log.Infof("closing file \"%v\", %v bytes written", info.Name(), info.Size())
+		w.logger.Info("closing file \"%v\", %v bytes written", info.Name(), info.Size())
 	}
 
 	err = w.f.Close()
@@ -93,31 +94,5 @@ func (w *Writer) GetReader() (*Reader, error) {
 		return nil, err
 	}
 
-	return newReader(w.f.Name(), w.itemSize)
-}
-
-type ResetResult struct {
-	DeletedDir        string
-	NumOfDeletedFiles int
-}
-
-func Reset(dir string) (*ResetResult, error) {
-	files, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return nil, ErrDirNotFound
-	}
-
-	if len(files) == 0 {
-		return nil, ErrDirEmpty
-	}
-
-	err = os.RemoveAll(dir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete directory (%v)", dir)
-	}
-
-	return &ResetResult{
-		DeletedDir:        dir,
-		NumOfDeletedFiles: len(files),
-	}, nil
+	return newReader(w.f.Name(), w.itemSize, w.logger)
 }

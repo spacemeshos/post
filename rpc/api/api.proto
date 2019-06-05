@@ -12,23 +12,37 @@ service Post {
         };
     }
 
-    rpc Execute (ExecuteRequest) returns (ExecuteResponse) {
+    rpc InitializeAsync (InitializeAsyncRequest) returns (InitializeAsyncResponse) {
         option (google.api.http) = {
+            post: "/v1/initializeasync",
+            body: "*",
+        };
+    }
+
+    rpc Execute (ExecuteRequest) returns (ExecuteResponse) {
+             option (google.api.http) = {
             post: "/v1/execute",
+            body: "*",
+        };
+    }
+
+    rpc ExecuteAsync (ExecuteAsyncRequest) returns (ExecuteAsyncResponse) {
+        option (google.api.http) = {
+            post: "/v1/executeasync",
             body: "*",
         };
     }
 
     rpc GetProof (GetProofRequest) returns (GetProofResponse) {
         option (google.api.http) = {
-            post: "/v1/execute",
-            body: "*",
+            get: "/v1/proof/{id}/{challenge}"
         };
     }
 
     rpc Reset (ResetRequest) returns (ResetResponse) {
         option (google.api.http) = {
-            post: "/v1/reset"
+            post: "/v1/reset",
+            body: "*",
         };
     }
 
@@ -53,16 +67,33 @@ message InitializeResponse {
     Proof proof = 1 [json_name = "proof"];
 }
 
+message InitializeAsyncRequest {
+    bytes id = 1 [json_name = "id"];
+}
+
+message InitializeAsyncResponse{
+}
+
 message ExecuteRequest {
-    bytes challenge = 1 [json_name = "challenge"];
+    bytes id = 1 [json_name = "id"];
+    bytes challenge = 2 [json_name = "challenge"];
 }
 
 message ExecuteResponse {
     Proof proof = 1 [json_name = "proof"];
 }
 
+message ExecuteAsyncRequest {
+    bytes id = 1 [json_name = "id"];
+    bytes challenge = 2 [json_name = "challenge"];
+}
+
+message ExecuteAsyncResponse {
+}
+
 message GetProofRequest {
-    bytes challenge = 1 [json_name = "challenge"];
+    bytes id = 1 [json_name = "id"];
+    bytes challenge = 2 [json_name = "challenge"];
 }
 
 message GetProofResponse {
@@ -70,11 +101,10 @@ message GetProofResponse {
 }
 
 message ResetRequest {
+    bytes id = 1 [json_name = "id"];
 }
 
 message ResetResponse {
-    string deletedDir = 1 [json_name = "deleted_dir"];
-    int32 numOfDeletedFiles = 2 [json_name = "num_of_deleted_files"];
 }
 
 message GetInfoRequest {
@@ -82,7 +112,7 @@ message GetInfoRequest {
 
 message GetInfoResponse {
     string version = 1 [json_name = "version"];
-    Params params = 2 [json_name = "params"];
+    Config config = 2 [json_name = "config"];
     State state = 3 [json_name = "state"];
 }
 
@@ -100,11 +130,12 @@ message Proof {
     repeated bytes proofNodes = 5 [json_name = "proof_nodes"];
 }
 
-message Params {
-    int64 spacePerUnit = 1 [json_name = "space_per_unit"];
-    int32 difficulty = 2 [json_name = "difficulty"];
-    int32 t = 3 [json_name = "t"];
-    int32 cacheLayer = 4 [json_name = "cache_layer"];
+message Config {
+    string datadir = 1 [json_name = "datadir"];
+    int64 spacePerUnit = 2 [json_name = "space_per_unit"];
+    int32 difficulty = 3 [json_name = "difficulty"];
+    int32 labels = 4 [json_name = "labels"];
+    int32 cacheLayer = 5 [json_name = "cache_layer"];
 }
 
 message State {

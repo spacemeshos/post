@@ -6,29 +6,44 @@ import (
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/proving"
+	"github.com/spacemeshos/post/shared"
 	"math"
 	"strconv"
 )
 
+type (
+	Config     = shared.Config
+	Difficulty = proving.Difficulty
+)
+
+var (
+	ValidateSpace    = shared.ValidateSpace
+	NumOfLabelGroups = shared.NumOfLabelGroups
+)
+
+type Validator struct {
+	cfg *Config
+}
+
+func NewValidator(cfg *Config) *Validator { return &Validator{cfg} }
+
 // Validate ensures the validity of the given proof. It returns nil if the proof is valid or an error describing the
 // failure, otherwise.
-func Validate(proof *proving.Proof, space uint64, numOfProvenLabels uint8, difficulty proving.Difficulty) error {
-	if err := proving.ValidateSpace(space); err != nil {
-		log.Error(err.Error())
+func (v *Validator) Validate(proof *proving.Proof) error {
+	if err := ValidateSpace(v.cfg.SpacePerUnit); err != nil {
 		return err
 	}
+	difficulty := Difficulty(v.cfg.Difficulty)
 	if err := difficulty.Validate(); err != nil {
-		log.Error(err.Error())
 		return err
 	}
 
-	numOfLabelGroups := proving.NumOfLabelGroups(space)
-	err := validate(*proof, numOfLabelGroups, numOfProvenLabels, difficulty)
+	numOfLabelGroups := NumOfLabelGroups(v.cfg.SpacePerUnit)
+	err := validate(*proof, numOfLabelGroups, uint8(v.cfg.NumOfProvenLabels), difficulty)
 	if err != nil {
-		err = fmt.Errorf("validation failed: %v", err)
-		log.Info(err.Error())
+		return fmt.Errorf("validation failed: %v", err)
 	}
-	return err
+	return nil
 }
 
 func validate(proof proving.Proof, numOfLabelGroups uint64, numOfProvenLabels uint8, difficulty proving.Difficulty) error {

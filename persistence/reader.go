@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/spacemeshos/merkle-tree/cache"
+	"github.com/spacemeshos/post/shared"
 	"io"
 	"io/ioutil"
 	"os"
@@ -21,7 +22,7 @@ type (
 // NewLabelsReader returns a new labels reader from the initialization files.
 // If the initialization was split into multiple files, they will be grouped
 // into one unified reader.
-func NewLabelsReader(dir string) (LayerReadWriter, error) {
+func NewLabelsReader(dir string, logger shared.Logger) (LayerReadWriter, error) {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("initialization directory not found: %v", err)
@@ -32,13 +33,16 @@ func NewLabelsReader(dir string) (LayerReadWriter, error) {
 	}
 	sort.Sort(numericalSorter(files))
 
-	readers := make([]LayerReadWriter, len(files))
-	for i, file := range files {
-		reader, err := newReader(filepath.Join(dir, file.Name()), LabelGroupSize)
+	readers := make([]LayerReadWriter, 0)
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		reader, err := newReader(filepath.Join(dir, file.Name()), LabelGroupSize, logger)
 		if err != nil {
 			return nil, err
 		}
-		readers[i] = reader
+		readers = append(readers, reader)
 	}
 
 	if len(readers) == 1 {
@@ -56,25 +60,27 @@ type Reader struct {
 	f        *os.File
 	b        *bufio.Reader
 	itemSize uint64
+	logger   shared.Logger
 }
 
-func newReader(name string, itemSize uint64) (*Reader, error) {
+func newReader(name string, itemSize uint64, logger shared.Logger) (*Reader, error) {
 	f, err := os.OpenFile(name, os.O_RDONLY, OwnerReadWrite)
 	if err != nil {
-		log.Error("failed to open file for labels reader: %v", err)
+		logger.Error("failed to open file for labels reader: %v", err)
 		return nil, err
 	}
 	return &Reader{
 		f:        f,
 		b:        bufio.NewReader(f),
 		itemSize: itemSize,
+		logger:   logger,
 	}, nil
 }
 
 func (r *Reader) Seek(index uint64) error {
 	_, err := r.f.Seek(int64(index*r.itemSize), io.SeekStart)
 	if err != nil {
-		log.Error("failed to seek in labels reader: %v", err)
+		r.logger.Error("failed to seek in labels reader: %v", err)
 		return err
 	}
 	r.b.Reset(r.f)
@@ -93,7 +99,7 @@ func (r *Reader) ReadNext() ([]byte, error) {
 func (r *Reader) Width() (uint64, error) {
 	info, err := r.f.Stat()
 	if err != nil {
-		log.Error("failed to get stats for leaf reader: %v", err)
+		r.logger.Error("failed to get stats for leaf reader: %v", err)
 		return 0, err
 	}
 	return uint64(info.Size()) / r.itemSize, nil

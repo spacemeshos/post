@@ -6,7 +6,6 @@ import (
 	"github.com/spacemeshos/post/shared"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -14,8 +13,7 @@ import (
 // serverConfig contains all the args and data required to launch a post server
 // instance  and connect to it via rpc client.
 type serverConfig struct {
-	params    *shared.Params
-	logLevel  string
+	shared.Config
 	rpcListen string
 	baseDir   string
 	dataDir   string
@@ -23,7 +21,7 @@ type serverConfig struct {
 }
 
 // newConfig returns a newConfig with all default values.
-func newConfig(params *shared.Params) (*serverConfig, error) {
+func newConfig(cfg *shared.Config) (*serverConfig, error) {
 	baseDir, err := baseDir()
 	if err != nil {
 		return nil, err
@@ -34,31 +32,25 @@ func newConfig(params *shared.Params) (*serverConfig, error) {
 		return nil, err
 	}
 
-	cfg := &serverConfig{
-		params:    params,
+	return &serverConfig{
+		Config:    *cfg,
 		baseDir:   baseDir,
-		logLevel:  "debug",
-		rpcListen: "127.0.0.1:18551",
+		rpcListen: "127.0.0.1:18558",
 		exe:       postPath,
-		dataDir:   filepath.Join(baseDir, "datadir"),
-	}
-
-	return cfg, nil
+	}, nil
 }
 
 // genArgs generates a slice of command line arguments from serverConfig instance.
 func (cfg *serverConfig) genArgs() []string {
 	var args []string
 
-	if cfg.params != nil {
-		args = append(args, fmt.Sprintf("--space=%v", cfg.params.SpacePerUnit))
-		args = append(args, fmt.Sprintf("--difficulty=%v", cfg.params.Difficulty))
-		args = append(args, fmt.Sprintf("--t=%v", cfg.params.NumOfProvenLabels))
-		args = append(args, fmt.Sprintf("--cachelayer=%v", cfg.params.LowestLayerToCacheDuringProofGeneration))
-	}
-
-	args = append(args, fmt.Sprintf("--datadir=%v", cfg.dataDir))
+	args = append(args, fmt.Sprintf("--homedir=%v", cfg.baseDir))
 	args = append(args, fmt.Sprintf("--rpclisten=%v", cfg.rpcListen))
+
+	args = append(args, fmt.Sprintf("--space=%v", cfg.SpacePerUnit))
+	args = append(args, fmt.Sprintf("--difficulty=%v", cfg.Difficulty))
+	args = append(args, fmt.Sprintf("--labels=%v", cfg.NumOfProvenLabels))
+	args = append(args, fmt.Sprintf("--cachelayer=%v", cfg.LowestLayerToCacheDuringProofGeneration))
 
 	return args
 }
@@ -80,9 +72,9 @@ type server struct {
 }
 
 // newNode creates a new post server instance according to the passed cfg.
-func newServer(cfg *serverConfig) (*server, error) {
+func newServer(serverCfg *serverConfig) (*server, error) {
 	return &server{
-		cfg:     cfg,
+		cfg:     serverCfg,
 		errChan: make(chan error),
 	}, nil
 }
@@ -162,5 +154,5 @@ func (s *server) stop() error {
 
 // cleanup cleans up the temporary files/directories created by the server process.
 func (s *server) cleanup() error {
-	return os.RemoveAll(s.cfg.dataDir)
+	return os.RemoveAll(s.cfg.baseDir)
 }

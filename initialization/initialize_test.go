@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/spacemeshos/post/proving"
+	"github.com/spacemeshos/post/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
@@ -13,23 +14,28 @@ import (
 	"testing"
 )
 
-const (
-	defaultDifficulty        = 5
-	defaultSpace             = 16 * LabelGroupSize
-	defaultNumOfProvenLabels = 4
-)
-
 var (
-	defaultId        = hexDecode("deadbeef")
-	defaultChallenge = hexDecode("this is a challenge")
-	tempdir, _       = ioutil.TempDir("", "post-test")
-	lograte          = uint64(math.MaxUint64)
+	tempdir, _ = ioutil.TempDir("", "post-test")
+	id         = hexDecode("deadbeef")
+	challenge  = hexDecode("this is a challenge")
+	logger     = shared.DisabledLogger{}
+	cfg        = &Config{
+		SpacePerUnit:                            16 * LabelGroupSize,
+		FileSize:                                16 * LabelGroupSize,
+		Difficulty:                              5,
+		NumOfProvenLabels:                       4,
+		LowestLayerToCacheDuringProofGeneration: 0,
+		DataDir:                                 tempdir,
+		LabelsLogRate:                           uint64(math.MaxUint64),
+		EnableParallelism:                       false,
+	}
 )
 
 func TestInitialize(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	proof, err := initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
+	proof, err := NewInitializer(cfg, logger).Initialize(id)
 	r.NoError(err)
 
 	expectedMerkleRoot := hexDecode("2292f95c87626f5a281fa811ba825ffce79442f8999e1ddc8e8c9bbac15e3fcb")
@@ -59,42 +65,56 @@ func TestInitialize(t *testing.T) {
 func TestInitializeErrors(t *testing.T) {
 	r := require.New(t)
 
-	proof, err := initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, 4, false, tempdir, lograte)
+	newCfg := *cfg
+	newCfg.Difficulty = 4
+	proof, err := NewInitializer(&newCfg, logger).Initialize(id)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 4)")
 	r.Nil(proof)
 
-	proof, err = initialize(defaultId, defaultSpace, defaultSpace, defaultNumOfProvenLabels, 9, false, tempdir, lograte)
+	newCfg = *cfg
+	newCfg.Difficulty = 9
+	proof, err = NewInitializer(&newCfg, logger).Initialize(id)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 9)")
 	r.Nil(proof)
 
-	proof, err = initialize(defaultId, MaxSpace+1, defaultSpace, NumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
+	newCfg = *cfg
+	newCfg.SpacePerUnit = MaxSpace + 1
+	proof, err = NewInitializer(&newCfg, logger).Initialize(id)
 	r.EqualError(err, fmt.Sprintf("space (%d) is greater than the supported max (%d)", MaxSpace+1, MaxSpace))
 	r.Nil(proof)
 }
 
 func TestInitializeMultipleFiles(t *testing.T) {
 	r := require.New(t)
-	space := uint64(defaultSpace)
 
-	proof, err := initialize(defaultId, space, space, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
+	initProof, err := NewInitializer(cfg, logger).Initialize(id)
 	r.NoError(err)
-	execProof, err := proving.GenerateProof(defaultId, defaultChallenge, defaultNumOfProvenLabels, defaultDifficulty, tempdir)
+
+	execProof, err := proving.NewProver(cfg, logger).GenerateProof(id, challenge)
 	r.NoError(err)
+
+	cleanup()
 
 	for numOfFiles := uint64(2); numOfFiles <= 16; numOfFiles *= 2 {
-		cleanup()
-		multiFilesProof, err := initialize(defaultId, space, space/numOfFiles, defaultNumOfProvenLabels, defaultDifficulty, true, tempdir, lograte)
-		r.NoError(err)
-		multiFilesExecProof, err := proving.GenerateProof(defaultId, defaultChallenge, defaultNumOfProvenLabels, defaultDifficulty, tempdir)
+
+		newCfg := *cfg
+		newCfg.FileSize = cfg.SpacePerUnit / numOfFiles
+
+		multiFilesInitProof, err := NewInitializer(&newCfg, logger).Initialize(id)
 		r.NoError(err)
 
-		r.Equal(proof.MerkleRoot, multiFilesProof.MerkleRoot)
-		r.EqualValues(proof.ProvenLeaves, multiFilesProof.ProvenLeaves)
-		r.EqualValues(proof.ProofNodes, multiFilesProof.ProofNodes)
+		multiFilesExecProof, err := proving.NewProver(&newCfg, logger).GenerateProof(id, challenge)
+		r.NoError(err)
+
+		r.Equal(initProof.MerkleRoot, multiFilesInitProof.MerkleRoot)
+		r.EqualValues(initProof.ProvenLeaves, multiFilesInitProof.ProvenLeaves)
+		r.EqualValues(initProof.ProofNodes, multiFilesInitProof.ProofNodes)
 
 		r.Equal(execProof.MerkleRoot, multiFilesExecProof.MerkleRoot)
 		r.EqualValues(execProof.ProvenLeaves, multiFilesExecProof.ProvenLeaves)
 		r.EqualValues(execProof.ProofNodes, multiFilesExecProof.ProofNodes)
+
+		cleanup()
 	}
 }
 
@@ -114,8 +134,14 @@ func (n nodes) String() string {
 }
 
 func BenchmarkInitialize(b *testing.B) {
+	defer cleanup()
+
 	space := uint64(1) << 30 // 1 GB.
-	proof, err := initialize(defaultId, space, space, NumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
+
+	newCfg := *cfg
+	newCfg.SpacePerUnit = space
+	newCfg.FileSize = space
+	proof, err := NewInitializer(&newCfg, logger).Initialize(id)
 	require.NoError(b, err)
 
 	expectedMerkleRoot, _ := hex.DecodeString("42dd3ed26e6f30f8098ec0b5093147551b32573ef9ed6670076248b4fd0fac30")
@@ -142,7 +168,6 @@ func BenchmarkInitialize(b *testing.B) {
 func TestMain(m *testing.M) {
 	flag.Parse()
 	res := m.Run()
-	cleanup()
 	os.Exit(res)
 }
 

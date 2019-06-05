@@ -17,12 +17,12 @@
   "paths": {
     "/v1/execute": {
       "post": {
-        "operationId": "GetProof",
+        "operationId": "Execute",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/apiGetProofResponse"
+              "$ref": "#/definitions/apiExecuteResponse"
             }
           }
         },
@@ -32,7 +32,33 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/apiGetProofRequest"
+              "$ref": "#/definitions/apiExecuteRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Post"
+        ]
+      }
+    },
+    "/v1/executeasync": {
+      "post": {
+        "operationId": "ExecuteAsync",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/apiExecuteAsyncResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/apiExecuteAsyncRequest"
             }
           }
         ],
@@ -83,6 +109,64 @@
         ]
       }
     },
+    "/v1/initializeasync": {
+      "post": {
+        "operationId": "InitializeAsync",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/apiInitializeAsyncResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/apiInitializeAsyncRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Post"
+        ]
+      }
+    },
+    "/v1/proof/{id}/{challenge}": {
+      "get": {
+        "operationId": "GetProof",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/apiGetProofResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "byte"
+          },
+          {
+            "name": "challenge",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "byte"
+          }
+        ],
+        "tags": [
+          "Post"
+        ]
+      }
+    },
     "/v1/reset": {
       "post": {
         "operationId": "Reset",
@@ -94,6 +178,16 @@
             }
           }
         },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/apiResetRequest"
+            }
+          }
+        ],
         "tags": [
           "Post"
         ]
@@ -117,9 +211,53 @@
     }
   },
   "definitions": {
+    "apiConfig": {
+      "type": "object",
+      "properties": {
+        "datadir": {
+          "type": "string"
+        },
+        "spacePerUnit": {
+          "type": "string",
+          "format": "int64"
+        },
+        "difficulty": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "labels": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "cacheLayer": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "apiExecuteAsyncRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "byte"
+        },
+        "challenge": {
+          "type": "string",
+          "format": "byte"
+        }
+      }
+    },
+    "apiExecuteAsyncResponse": {
+      "type": "object"
+    },
     "apiExecuteRequest": {
       "type": "object",
       "properties": {
+        "id": {
+          "type": "string",
+          "format": "byte"
+        },
         "challenge": {
           "type": "string",
           "format": "byte"
@@ -140,20 +278,11 @@
         "version": {
           "type": "string"
         },
-        "params": {
-          "$ref": "#/definitions/apiParams"
+        "config": {
+          "$ref": "#/definitions/apiConfig"
         },
         "state": {
           "$ref": "#/definitions/apiState"
-        }
-      }
-    },
-    "apiGetProofRequest": {
-      "type": "object",
-      "properties": {
-        "challenge": {
-          "type": "string",
-          "format": "byte"
         }
       }
     },
@@ -164,6 +293,18 @@
           "$ref": "#/definitions/apiProof"
         }
       }
+    },
+    "apiInitializeAsyncRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "byte"
+        }
+      }
+    },
+    "apiInitializeAsyncResponse": {
+      "type": "object"
     },
     "apiInitializeRequest": {
       "type": "object",
@@ -179,27 +320,6 @@
       "properties": {
         "proof": {
           "$ref": "#/definitions/apiProof"
-        }
-      }
-    },
-    "apiParams": {
-      "type": "object",
-      "properties": {
-        "spacePerUnit": {
-          "type": "string",
-          "format": "int64"
-        },
-        "difficulty": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "t": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "cacheLayer": {
-          "type": "integer",
-          "format": "int32"
         }
       }
     },
@@ -234,17 +354,17 @@
         }
       }
     },
-    "apiResetResponse": {
+    "apiResetRequest": {
       "type": "object",
       "properties": {
-        "deletedDir": {
-          "type": "string"
-        },
-        "numOfDeletedFiles": {
-          "type": "integer",
-          "format": "int32"
+        "id": {
+          "type": "string",
+          "format": "byte"
         }
       }
+    },
+    "apiResetResponse": {
+      "type": "object"
     },
     "apiShutdownResponse": {
       "type": "object"

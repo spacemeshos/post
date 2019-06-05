@@ -14,184 +14,210 @@ import (
 	"testing"
 )
 
-const (
-	defaultDifficulty        = 5
-	defaultSpace             = 16 * shared.LabelGroupSize
-	defaultNumOfProvenLabels = 4
-)
-
 var (
-	defaultId        = hexDecode("deadbeef")
-	defaultChallenge = hexDecode("this is a challenge")
-	tempdir, _       = ioutil.TempDir("", "post-test")
-	lograte          = uint64(math.MaxUint64)
+	tempdir, _ = ioutil.TempDir("", "post-test")
+	id         = hexDecode("deadbeef")
+	challenge  = hexDecode("this is a challenge")
+	logger     = shared.DisabledLogger{}
+	cfg        = &Config{
+		SpacePerUnit:                            16 * shared.LabelGroupSize,
+		FileSize:                                16 * shared.LabelGroupSize,
+		Difficulty:                              5,
+		NumOfProvenLabels:                       4,
+		LowestLayerToCacheDuringProofGeneration: 0,
+		DataDir:                                 tempdir,
+		LabelsLogRate:                           uint64(math.MaxUint64),
+		EnableParallelism:                       false,
+	}
+	NewInitializer = initialization.NewInitializer
+	NewProver      = proving.NewProver
 )
 
 func TestValidate(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
+	proof, err := NewInitializer(cfg, logger).Initialize(id)
 	r.NoError(err)
 
-	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	err = NewValidator(cfg).Validate(proof)
 	r.Nil(err)
 
-	testGenerateProof(r, defaultId, defaultDifficulty, tempdir)
+	testGenerateProof(r, id, cfg)
 }
 
 func TestValidate2(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	const difficulty = 6
+	newCfg := *cfg
+	newCfg.Difficulty = 6
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, difficulty, false, tempdir, lograte)
+	proof, err := NewInitializer(&newCfg, logger).Initialize(id)
 	r.NoError(err)
 
-	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, difficulty)
+	err = NewValidator(&newCfg).Validate(proof)
 	r.Nil(err)
 
-	testGenerateProof(r, defaultId, difficulty, tempdir)
+	testGenerateProof(r, id, &newCfg)
 }
 
 func TestValidate3(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	const difficulty = 7
+	newCfg := *cfg
+	newCfg.Difficulty = 7
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, difficulty, false, tempdir, lograte)
+	proof, err := NewInitializer(&newCfg, logger).Initialize(id)
 	r.NoError(err)
 
-	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, difficulty)
+	err = NewValidator(&newCfg).Validate(proof)
 	r.Nil(err)
 
-	testGenerateProof(r, defaultId, difficulty, tempdir)
+	testGenerateProof(r, id, &newCfg)
 }
 
 func TestValidate4(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	const difficulty = 8
+	newCfg := *cfg
+	newCfg.Difficulty = 8
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, difficulty, false, tempdir, lograte)
+	proof, err := NewInitializer(&newCfg, logger).Initialize(id)
 	r.NoError(err)
 
-	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, difficulty)
+	err = NewValidator(&newCfg).Validate(proof)
 	r.Nil(err)
 
-	testGenerateProof(r, defaultId, difficulty, tempdir)
+	testGenerateProof(r, id, &newCfg)
 }
 
 func TestValidateBadDifficulty(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	const difficulty = 4
+	newCfg := *cfg
+	newCfg.Difficulty = 4
 
-	err := Validate(new(proving.Proof), defaultSpace, defaultNumOfProvenLabels, difficulty)
-	r.EqualError(err, fmt.Sprintf("difficulty must be between 5 and 8 (received %d)", difficulty))
+	err := NewValidator(&newCfg).Validate(new(proving.Proof))
+	r.EqualError(err, fmt.Sprintf("difficulty must be between 5 and 8 (received %d)", newCfg.Difficulty))
 }
 
-func testGenerateProof(r *require.Assertions, id []byte, difficulty proving.Difficulty, dir string) {
-	proof2, err := proving.GenerateProof(id, defaultChallenge, defaultNumOfProvenLabels, difficulty, dir)
+func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
+	proof, err := NewProver(cfg, logger).GenerateProof(id, challenge)
 	r.NoError(err)
 
-	err = Validate(proof2, defaultSpace, defaultNumOfProvenLabels, difficulty)
+	err = NewValidator(cfg).Validate(proof)
 	r.Nil(err)
 }
 
 func TestGenerateProofFailure(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	const difficulty = 4
+	newCfg := *cfg
+	newCfg.Difficulty = 4
 
-	proof, err := proving.GenerateProof(defaultId, defaultChallenge, defaultNumOfProvenLabels, difficulty, tempdir)
-	r.EqualError(err, fmt.Sprintf("proof generation failed: difficulty must be between 5 and 8 (received %d)", difficulty))
+	_, err := NewInitializer(cfg, logger).Initialize(id)
+	r.NoError(err)
+	proof, err := NewProver(&newCfg, logger).GenerateProof(id, challenge)
+	r.EqualError(err, fmt.Sprintf("proof generation failed: difficulty must be between 5 and 8 (received %d)", newCfg.Difficulty))
 	r.Empty(proof)
 }
 
 func TestValidateFail(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
+	proof, err := NewInitializer(cfg, logger).Initialize(id)
 	r.NoError(err)
 
 	proof.Identity = append([]byte{0}, proof.Identity[1:]...)
 
-	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: label at index 91 should be 01101111, but found 00011101")
 }
 
 func TestValidateFail2(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
+	proof, err := NewInitializer(cfg, logger).Initialize(id)
 	r.NoError(err)
 
 	proof.Challenge = []byte{1}
 
-	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 }
 
 func TestValidateFail3(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
+	proof, err := NewInitializer(cfg, logger).Initialize(id)
 	r.NoError(err)
 
 	proof.ProvenLeaves[0] = append([]byte{}, proof.ProvenLeaves[0]...)
 	proof.ProvenLeaves[0][0] += 1
 
-	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 }
 
 func TestValidateFail4(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
+	proof, err := NewInitializer(cfg, logger).Initialize(id)
 	r.NoError(err)
 
 	proof.ProvenLeaves = proof.ProvenLeaves[1:]
 
-	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: number of derived leaf indices (4) doesn't match number of included proven leaves (3)")
 }
 
 func TestValidateFail5(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
+	proof, err := NewInitializer(cfg, logger).Initialize(id)
 	r.NoError(err)
 
 	proof.ProofNodes[0] = append([]byte{}, proof.ProofNodes[0]...)
 	proof.ProofNodes[0][0] += 1
 
-	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 }
 
 func TestValidateFail6(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
+	proof, err := NewInitializer(cfg, logger).Initialize(id)
 	r.NoError(err)
 
 	proof.ProofNodes = proof.ProofNodes[1:]
 
-	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 }
 
 func TestValidateFail7(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
-	proof, err := initialization.Initialize(defaultId, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty, false, tempdir, lograte)
+	proof, err := NewInitializer(cfg, logger).Initialize(id)
 	r.NoError(err)
 
 	proof.MerkleRoot = append([]byte{}, proof.MerkleRoot...)
 	proof.MerkleRoot[0] += 1
 
-	err = Validate(proof, defaultSpace, defaultNumOfProvenLabels, defaultDifficulty)
+	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 }
 

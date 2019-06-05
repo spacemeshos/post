@@ -20,13 +20,13 @@ type Harness struct {
 }
 
 // NewHarness creates and initializes a new instance of Harness.
-func NewHarness(params *shared.Params) (*Harness, error) {
-	cfg, err := newConfig(params)
+func NewHarness(cfg *shared.Config) (*Harness, error) {
+	serverCfg, err := newConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	server, err := newServer(cfg)
+	server, err := newServer(serverCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func NewHarness(params *shared.Params) (*Harness, error) {
 
 	// Verify the client connectivity.
 	// If failed, shutdown the server.
-	conn, err := connectClient(cfg.rpcListen)
+	conn, err := connectClient(serverCfg.rpcListen)
 	if err != nil {
 		_ = server.shutdown()
 		return nil, err

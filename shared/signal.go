@@ -1,8 +1,4 @@
-// Copyright (c) 2013-2017 The btcsuite developers
-// Copyright (c) 2015-2016 The Decred developers
-// Copyright (c) 2017-2019 The Spacemesh developers
-
-package signal
+package shared
 
 import (
 	"os"
@@ -22,14 +18,17 @@ type Signal struct {
 
 	// shutdownChannel is closed once the main interrupt handler exits.
 	shutdownChannel chan struct{}
+
+	logger Logger
 }
 
-func NewSignal() *Signal {
+func NewSignal(logger Logger) *Signal {
 	s := new(Signal)
 	s.interruptChannel = make(chan os.Signal, 1)
 	s.shutdownRequestChannel = make(chan struct{})
 	s.quit = make(chan struct{})
 	s.shutdownChannel = make(chan struct{})
+	s.logger = logger
 
 	signal.Notify(s.interruptChannel, os.Interrupt)
 	go s.mainInterruptHandler()
@@ -49,11 +48,11 @@ func (s *Signal) mainInterruptHandler() {
 	shutdown := func() {
 		// Ignore more than one shutdown signal.
 		if isShutdown {
-			log.Infof("Already shutting down...")
+			s.logger.Info("Already shutting down...")
 			return
 		}
 		isShutdown = true
-		log.Infof("Shutting down...")
+		s.logger.Info("Shutting down...")
 
 		// Signal the main interrupt handler to exit, and stop accept
 		// post-facto requests.
@@ -63,15 +62,15 @@ func (s *Signal) mainInterruptHandler() {
 	for {
 		select {
 		case <-s.interruptChannel:
-			log.Infof("Received SIGINT (Ctrl+C).")
+			s.logger.Info("Received SIGINT (Ctrl+C).")
 			shutdown()
 
 		case <-s.shutdownRequestChannel:
-			log.Infof("Received shutdown request.")
+			s.logger.Info("Received shutdown request.")
 			shutdown()
 
 		case <-s.quit:
-			log.Infof("Gracefully shutting down...")
+			s.logger.Info("Gracefully shutting down...")
 			close(s.shutdownChannel)
 			return
 		}

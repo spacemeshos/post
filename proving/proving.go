@@ -11,31 +11,44 @@ import (
 )
 
 const (
-	LabelGroupSize                          = shared.LabelGroupSize
-	MaxSpace                                = shared.MaxSpace
-	MaxNumOfFiles                           = shared.MaxNumOfFiles
-	LowestLayerToCacheDuringProofGeneration = shared.LowestLayerToCacheDuringProofGeneration
+	LabelGroupSize = shared.LabelGroupSize
+)
+
+var (
+	VerifyInitialized = shared.VerifyInitialized
 )
 
 type (
+	Config     = shared.Config
+	Logger     = shared.Logger
 	Difficulty = shared.Difficulty
 	Challenge  = shared.Challenge
 )
 
-func GenerateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, difficulty Difficulty, dir string) (proof *Proof,
-	err error) {
+type Prover struct {
+	cfg    *Config
+	logger Logger
+}
 
-	proof, err = generateProof(id, challenge, numOfProvenLabels, difficulty, dir)
+func NewProver(cfg *Config, logger Logger) *Prover { return &Prover{cfg, logger} }
+
+func (p *Prover) GenerateProof(id []byte, challenge Challenge) (proof *Proof,
+	err error) {
+	proof, err = p.generateProof(id, challenge)
 	if err != nil {
 		err = fmt.Errorf("proof generation failed: %v", err)
-		log.Error(err.Error())
+		p.logger.Error(err.Error())
 	}
 	return proof, err
 }
 
-func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, difficulty Difficulty, dir string) (*Proof, error) {
-	err := difficulty.Validate()
-	if err != nil {
+func (p *Prover) generateProof(id []byte, challenge Challenge) (*Proof, error) {
+	if err := VerifyInitialized(p.cfg, id); err != nil {
+		return nil, err
+	}
+
+	difficulty := Difficulty(p.cfg.Difficulty)
+	if err := difficulty.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -43,7 +56,8 @@ func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, diff
 	proof.Challenge = challenge
 	proof.Identity = id
 
-	reader, err := persistence.NewLabelsReader(dir)
+	dir := shared.GetInitDir(p.cfg.DataDir, id)
+	reader, err := persistence.NewLabelsReader(dir, p.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +69,7 @@ func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, diff
 		return nil, fmt.Errorf("leaf reader too big, number of label groups (%d) * labels per group (%d) "+
 			"overflows uint64", width, difficulty.LabelsPerGroup())
 	}
-	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(LowestLayerToCacheDuringProofGeneration),
+	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(p.cfg.LowestLayerToCacheDuringProofGeneration),
 		cache.MakeSliceReadWriterFactory())
 
 	tree, err := merkle.NewTreeBuilder().WithHashFunc(challenge.GetSha256Parent).WithCacheWriter(cacheWriter).Build()
@@ -82,7 +96,7 @@ func generateProof(id []byte, challenge Challenge, numOfProvenLabels uint8, diff
 
 	numOfLabels := width * difficulty.LabelsPerGroup()
 	provenLeafIndices := CalcProvenLeafIndices(
-		proof.MerkleRoot, numOfLabels, numOfProvenLabels, difficulty)
+		proof.MerkleRoot, numOfLabels, uint8(p.cfg.NumOfProvenLabels), difficulty)
 
 	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, cacheReader)
 	if err != nil {
