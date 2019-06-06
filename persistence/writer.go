@@ -2,42 +2,51 @@ package persistence
 
 import (
 	"bufio"
-	"encoding/hex"
+	"errors"
 	"fmt"
-	"github.com/spacemeshos/go-spacemesh/log"
+	"github.com/spacemeshos/post/shared"
 	"os"
 	"path/filepath"
 )
 
-// OwnerReadWriteExec is a standard owner read / write / exec file permission.
-const OwnerReadWriteExec = 0700
+const (
+	LabelGroupSize = shared.LabelGroupSize
 
-// OwnerReadWrite is a standard owner read / write file permission.
-const OwnerReadWrite = 0600
+	// OwnerReadWriteExec is a standard owner read / write / exec file permission.
+	OwnerReadWriteExec = 0700
+
+	// OwnerReadWrite is a standard owner read / write file permission.
+	OwnerReadWrite = 0600
+)
+
+var (
+	ErrDirNotFound = errors.New("initialization directory not found")
+	ErrDirEmpty    = errors.New("initialization directory is empty")
+)
 
 type Writer struct {
 	f        *os.File
 	w        *bufio.Writer
 	itemSize uint64
+	logger   shared.Logger
 }
 
-func NewLabelsWriter(id []byte, index int) (*Writer, error) {
+func NewLabelsWriter(id []byte, index int, dir string, logger shared.Logger) (*Writer, error) {
 	if len(id) > 64 {
 		return nil, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
 	}
 
-	labelsPath := filepath.Join(GetPostDataPath(), hex.EncodeToString(id))
-	log.Info("creating directory: \"%v\"", labelsPath)
-	err := os.MkdirAll(labelsPath, OwnerReadWriteExec)
+	logger.Info("creating directory: \"%v\"", dir)
+	err := os.MkdirAll(dir, OwnerReadWriteExec)
 	if err != nil {
 		return nil, err
 	}
 
-	filename := filepath.Join(labelsPath, fmt.Sprintf("%x-%d", id, index))
-	return newWriter(filename, LabelGroupSize)
+	filename := filepath.Join(dir, fmt.Sprintf("%x-%d", id, index))
+	return newWriter(filename, LabelGroupSize, logger)
 }
 
-func newWriter(filename string, itemSize uint64) (*Writer, error) {
+func newWriter(filename string, itemSize uint64, logger shared.Logger) (*Writer, error) {
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, OwnerReadWrite)
 	if err != nil {
 		return nil, err
@@ -46,6 +55,7 @@ func newWriter(filename string, itemSize uint64) (*Writer, error) {
 		f:        f,
 		w:        bufio.NewWriter(f),
 		itemSize: itemSize,
+		logger:   logger,
 	}, nil
 }
 
@@ -67,10 +77,7 @@ func (w *Writer) Close() error {
 	}
 	w.w = nil
 	if info, err := w.f.Stat(); err == nil {
-		log.With().Info("closing file",
-			log.String("filename", info.Name()),
-			log.Uint64("size_in_bytes", uint64(info.Size())),
-		)
+		w.logger.Info("closing file \"%v\", %v bytes written", info.Name(), info.Size())
 	}
 
 	err = w.f.Close()
@@ -87,5 +94,5 @@ func (w *Writer) GetReader() (*Reader, error) {
 		return nil, err
 	}
 
-	return newReader(w.f.Name(), w.itemSize)
+	return newReader(w.f.Name(), w.itemSize, w.logger)
 }

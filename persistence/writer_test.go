@@ -3,20 +3,28 @@ package persistence
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"github.com/spacemeshos/post/shared"
 	"github.com/stretchr/testify/require"
 	"io"
+	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
 )
+
+var (
+	tempdir, _ = ioutil.TempDir("", "post-test")
+)
+
+type LabelGroup []byte
 
 func TestLabelsReaderAndWriter(t *testing.T) {
 	req := require.New(t)
 	id, labelGroupGroupGroups := generateIdAndLabels()
 	labelsToWriter := make([]LabelGroup, 0)
+	logger := shared.DisabledLogger{}
 
 	for i, labelGroupGroup := range labelGroupGroupGroups {
-		writer, err := NewLabelsWriter(id, i)
+		writer, err := NewLabelsWriter(id, i, tempdir, logger)
 		req.NoError(err)
 
 		for _, labelGroup := range labelGroupGroup {
@@ -30,7 +38,7 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 		req.NoError(err)
 	}
 
-	reader, err := NewLabelsReader(id)
+	reader, err := NewLabelsReader(tempdir, logger)
 	req.NoError(err)
 
 	labelsFromReader := make([]LabelGroup, len(labelsToWriter))
@@ -84,7 +92,7 @@ func TestMain(m *testing.M) {
 }
 
 func cleanup() {
-	_ = os.RemoveAll(filepath.Join(GetPostDataPath(), "deadbeef"))
+	_ = os.RemoveAll(tempdir)
 }
 
 func NewLabelGroup(cnt uint64) []byte {

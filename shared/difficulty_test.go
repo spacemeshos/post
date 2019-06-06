@@ -1,4 +1,4 @@
-package proving
+package shared
 
 import (
 	"github.com/stretchr/testify/require"

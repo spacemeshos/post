@@ -1,52 +1,71 @@
 package initialization
 
 import (
+	"encoding/hex"
 	"fmt"
-	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/merkle-tree/cache"
-	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
+	"github.com/spacemeshos/smutil/log"
+	"os"
 	"runtime"
 )
 
 const (
-	NumOfProvenLabels                       = shared.NumOfProvenLabels
-	LabelGroupSize                          = shared.LabelGroupSize
-	MaxSpace                                = shared.MaxSpace
-	LowestLayerToCacheDuringProofGeneration = shared.LowestLayerToCacheDuringProofGeneration
+	LabelGroupSize = shared.LabelGroupSize
+	MaxSpace       = shared.MaxSpace
 )
 
 type (
+	Config      = shared.Config
+	Logger      = shared.Logger
+	Difficulty  = shared.Difficulty
 	CacheReader = cache.CacheReader
 )
+
+var (
+	VerifyNotInitialized = shared.VerifyNotInitialized
+	VerifyInitialized    = shared.VerifyInitialized
+	ValidateSpace        = shared.ValidateSpace
+	NumOfFiles           = shared.NumOfFiles
+	NumOfLabelGroups     = shared.NumOfLabelGroups
+)
+
+type Initializer struct {
+	cfg    *Config
+	logger Logger
+}
+
+func NewInitializer(cfg *Config, logger Logger) *Initializer { return &Initializer{cfg, logger} }
 
 // Initialize takes an id (public key), space (in bytes), numOfProvenLabels and difficulty.
 // Difficulty determines the number of bits per label that are stored. Each leaf in the tree is 32 bytes = 256 bits.
 // The number of bits per label is 256 / LabelsPerGroup. LabelsPerGroup = 1 << difficulty.
 // Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
-func Initialize(id []byte, space uint64, numOfProvenLabels uint8, difficulty proving.Difficulty, parallel bool) (*proving.Proof, error) {
-	return initialize(id, space, space, numOfProvenLabels, difficulty, parallel)
-}
-
-func initialize(id []byte, space uint64, filesize uint64, numOfProvenLabels uint8, difficulty proving.Difficulty, parallel bool) (*proving.Proof, error) {
-	if err := proving.ValidateSpace(space); err != nil {
+func (init *Initializer) Initialize(id []byte) (*proving.Proof, error) {
+	if err := VerifyNotInitialized(init.cfg, id); err != nil {
 		return nil, err
 	}
 
+	if err := ValidateSpace(init.cfg.SpacePerUnit); err != nil {
+		return nil, err
+	}
+
+	difficulty := Difficulty(init.cfg.Difficulty)
 	if err := difficulty.Validate(); err != nil {
 		return nil, err
 	}
 
-	numOfChunks, err := proving.NumOfFiles(space, filesize)
+	numOfChunks, err := NumOfFiles(init.cfg.SpacePerUnit, init.cfg.FileSize)
 	if err != nil {
 		return nil, err
 	}
-	labelGroupsPerChunk := proving.NumOfLabelGroups(filesize)
+	labelGroupsPerChunk := NumOfLabelGroups(init.cfg.FileSize)
 
-	results, err := initializeChunks(id, difficulty, numOfChunks, labelGroupsPerChunk, parallel)
+	dir := shared.GetInitDir(init.cfg.DataDir, id)
+	results, err := initChunks(id, difficulty, init.cfg.LowestLayerToCacheDuringProofGeneration, numOfChunks, labelGroupsPerChunk, init.cfg.EnableParallelism, dir, init.cfg.LabelsLogRate, init.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -63,14 +82,14 @@ func initialize(id []byte, space uint64, filesize uint64, numOfProvenLabels uint
 		return nil, err
 	}
 
-	provenLeafIndices := proving.CalcProvenLeafIndices(result.root, width<<difficulty, numOfProvenLabels, difficulty)
+	provenLeafIndices := proving.CalcProvenLeafIndices(result.root, width<<difficulty, uint8(init.cfg.NumOfProvenLabels), difficulty)
 	_, provenLeaves, proofNodes, err := merkle.GenerateProof(provenLeafIndices, result.reader)
 	if err != nil {
 		return nil, err
 	}
 
 	proof := &proving.Proof{
-		Challenge:    proving.ZeroChallenge,
+		Challenge:    shared.ZeroChallenge,
 		Identity:     id,
 		MerkleRoot:   result.root,
 		ProvenLeaves: provenLeaves,
@@ -78,6 +97,22 @@ func initialize(id []byte, space uint64, filesize uint64, numOfProvenLabels uint
 	}
 
 	return proof, err
+}
+
+func (init *Initializer) Reset(id []byte) error {
+	if err := VerifyInitialized(init.cfg, id); err != nil {
+		return err
+	}
+
+	dir := shared.GetInitDir(init.cfg.DataDir, id)
+	err := os.RemoveAll(dir)
+	if err != nil {
+		return fmt.Errorf("failed to delete directory (%v)", dir)
+	}
+
+	init.logger.Info("id %v reset, directory %v deleted", hex.EncodeToString(id), dir)
+
+	return nil
 }
 
 type initResult struct {
@@ -90,7 +125,8 @@ type initChunkResult struct {
 	*initResult
 }
 
-func initializeChunks(id []byte, difficulty proving.Difficulty, numOfChunks int, labelGroupsPerChunk uint64, parallel bool) ([]*initResult, error) {
+func initChunks(id []byte, difficulty proving.Difficulty, lowestLayerToCacheDuringProofGeneration uint, numOfChunks int,
+	labelGroupsPerChunk uint64, parallel bool, dir string, logRate uint64, logger Logger) ([]*initResult, error) {
 	var numOfWorkers int
 	if parallel {
 		numOfWorkers = min(runtime.NumCPU(), numOfChunks)
@@ -115,7 +151,7 @@ func initializeChunks(id []byte, difficulty proving.Difficulty, numOfChunks int,
 					return
 				}
 
-				res, err := initializeChunk(id, index, labelGroupsPerChunk, difficulty)
+				res, err := initChunk(id, difficulty, lowestLayerToCacheDuringProofGeneration, index, labelGroupsPerChunk, dir, logRate, logger)
 				if err != nil {
 					errChan <- err
 					return
@@ -139,17 +175,17 @@ func initializeChunks(id []byte, difficulty proving.Difficulty, numOfChunks int,
 	return results, nil
 }
 
-func initializeChunk(id []byte, chunkIndex int, labelGroupsPerChunk uint64, difficulty proving.Difficulty) (*initResult, error) {
+func initChunk(id []byte, difficulty proving.Difficulty, lowestLayerToCacheDuringProofGeneration uint, chunkIndex int, labelGroupsPerChunk uint64, dir string, logRate uint64, logger Logger) (*initResult, error) {
 	// Initialize the labels file writer.
-	labelsWriter, err := persistence.NewLabelsWriter(id, chunkIndex)
+	labelsWriter, err := persistence.NewLabelsWriter(id, chunkIndex, dir, logger)
 	if err != nil {
 		return nil, err
 	}
 
 	// Initialize the labels merkle tree with the execution-phase zero challenge.
-	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(LowestLayerToCacheDuringProofGeneration), cache.MakeSliceReadWriterFactory())
+	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(lowestLayerToCacheDuringProofGeneration), cache.MakeSliceReadWriterFactory())
 	tree, err := merkle.NewTreeBuilder().
-		WithHashFunc(proving.ZeroChallenge.GetSha256Parent).
+		WithHashFunc(shared.ZeroChallenge.GetSha256Parent).
 		WithCacheWriter(cacheWriter).
 		Build()
 	if err != nil {
@@ -169,12 +205,12 @@ func initializeChunk(id []byte, chunkIndex int, labelGroupsPerChunk uint64, diff
 		if err != nil {
 			return nil, err
 		}
-		if (position+1)%config.Post.LogEveryXLabels == 0 {
-			log.Info("found %v labels", position+1)
+		if (position+1)%logRate == 0 {
+			logger.Info("completed %v labels", position+1)
 		}
 	}
 
-	log.With().Info("completed PoST label list construction")
+	logger.Info("completed PoST label list construction")
 
 	labelsReader, err := labelsWriter.GetReader()
 	if err != nil {

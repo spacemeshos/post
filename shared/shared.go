@@ -1,17 +1,13 @@
 package shared
 
 import (
+	"errors"
 	"github.com/spacemeshos/merkle-tree"
 	"math"
 )
 
 const (
 	LabelGroupSize = merkle.NodeSize
-
-	// NumOfProvenLabels is the recommended setting for this argument to ensure proof safety.
-	NumOfProvenLabels = 100
-
-	LowestLayerToCacheDuringProofGeneration = 11
 
 	// In bytes. 1 peta-byte of storage.
 	// This would protect against number of labels uint64 overflow as well,
@@ -22,4 +18,9 @@ const (
 
 	MinDifficulty = 5 // 1 byte per label
 	MaxDifficulty = 8 // 1 bit per label
+)
+
+var (
+	ErrNotInitialized     = errors.New("not initialized")
+	ErrAlreadyInitialized = errors.New("already initialized")
 )

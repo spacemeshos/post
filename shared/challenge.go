@@ -1,10 +1,10 @@
-package proving
+package shared
 
 import "github.com/spacemeshos/sha256-simd"
 
-var ZeroChallenge = make(Challenge, 0)
-
 type Challenge []byte
+
+var ZeroChallenge = make(Challenge, 0)
 
 func (ch Challenge) GetSha256Parent(lChild, rChild []byte) []byte {
 	children := append(lChild, rChild...)
