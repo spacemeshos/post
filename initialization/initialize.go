@@ -133,7 +133,7 @@ func (init *Initializer) initFiles(id []byte, numOfFiles int, labelGroupsPerFile
 	errChan := make(chan error, 0)
 	dir := shared.GetInitDir(init.cfg.DataDir, id)
 
-	init.logger.Info("initialization: starting writing files, total: %v, parallelism degree: %v, dir: %v", numOfFiles, numOfWorkers, dir)
+	init.logger.Info("initialization: start writing %v files, parallelism degree: %v, dir: %v", numOfFiles, numOfWorkers, dir)
 
 	for i := 0; i < numOfFiles; i++ {
 		jobsChan <- i
@@ -189,7 +189,7 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 		return nil, err
 	}
 
-	init.logger.Info("initialization: starting file %v, parallelism degree: %v",
+	init.logger.Info("initialization: start writing file %v, parallelism degree: %v",
 		fileIndex, infileParallelism)
 
 	numOfWorkers := infileParallelism
