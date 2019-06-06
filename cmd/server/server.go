@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/peer"
 	"net"
 	"net/http"
+	"os"
 )
 
 var Cmd = &cobra.Command{
@@ -23,7 +24,8 @@ var Cmd = &cobra.Command{
 
 		logger, err := s.Initialize(cmd, args)
 		if err != nil {
-			panic(err)
+			_, _ = fmt.Fprintln(os.Stderr, "server initialization failure:", err)
+			return
 		}
 
 		logger.Info("Version: %s, SpacePerUnit: %v, Difficulty: %v",
@@ -31,7 +33,8 @@ var Cmd = &cobra.Command{
 
 		err = s.Start(cmd, args, logger)
 		if err != nil {
-			panic(err)
+			logger.Error("server start failure: %v", err)
+			return
 		}
 	},
 }
