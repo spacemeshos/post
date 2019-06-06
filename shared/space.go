@@ -24,7 +24,7 @@ func ValidateFileSize(space uint64, filesize uint64) error {
 		return fmt.Errorf("filesize (%d) must be greater than %d", filesize, LabelGroupSize)
 	}
 	if space/filesize > MaxNumOfFiles {
-		return fmt.Errorf("number of chunks (%d) is greater than the supported max (%d)", filesize, MaxNumOfFiles)
+		return fmt.Errorf("number of files (%d) is greater than the supported max (%d)", space/filesize, MaxNumOfFiles)
 	}
 
 	return nil

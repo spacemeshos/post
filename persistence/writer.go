@@ -28,25 +28,23 @@ type Writer struct {
 	f        *os.File
 	w        *bufio.Writer
 	itemSize uint64
-	logger   shared.Logger
 }
 
-func NewLabelsWriter(id []byte, index int, dir string, logger shared.Logger) (*Writer, error) {
+func NewLabelsWriter(id []byte, index int, dir string) (*Writer, error) {
 	if len(id) > 64 {
 		return nil, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
 	}
 
-	logger.Info("creating directory: \"%v\"", dir)
 	err := os.MkdirAll(dir, OwnerReadWriteExec)
 	if err != nil {
 		return nil, err
 	}
 
 	filename := filepath.Join(dir, fmt.Sprintf("%x-%d", id, index))
-	return newWriter(filename, LabelGroupSize, logger)
+	return newWriter(filename, LabelGroupSize)
 }
 
-func newWriter(filename string, itemSize uint64, logger shared.Logger) (*Writer, error) {
+func newWriter(filename string, itemSize uint64) (*Writer, error) {
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, OwnerReadWrite)
 	if err != nil {
 		return nil, err
@@ -55,7 +53,6 @@ func newWriter(filename string, itemSize uint64, logger shared.Logger) (*Writer,
 		f:        f,
 		w:        bufio.NewWriter(f),
 		itemSize: itemSize,
-		logger:   logger,
 	}, nil
 }
 
@@ -70,22 +67,25 @@ func (w *Writer) Write(item []byte) error {
 	return nil
 }
 
-func (w *Writer) Close() error {
+func (w *Writer) Close() (os.FileInfo, error) {
 	err := w.w.Flush()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	w.w = nil
-	if info, err := w.f.Stat(); err == nil {
-		w.logger.Info("closing file \"%v\", %v bytes written", info.Name(), info.Size())
+
+	info, err := w.f.Stat()
+	if err != nil {
+		return nil, err
 	}
 
 	err = w.f.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	w.f = nil
-	return nil
+
+	return info, nil
 }
 
 func (w *Writer) GetReader() (*Reader, error) {
@@ -94,5 +94,7 @@ func (w *Writer) GetReader() (*Reader, error) {
 		return nil, err
 	}
 
-	return newReader(w.f.Name(), w.itemSize, w.logger)
+	return newReader(w.f.Name(), w.itemSize)
 }
+
+func (w *Writer) Filename() string { return w.f.Name() }

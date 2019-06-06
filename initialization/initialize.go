@@ -58,14 +58,13 @@ func (init *Initializer) Initialize(id []byte) (*proving.Proof, error) {
 		return nil, err
 	}
 
-	numOfChunks, err := NumOfFiles(init.cfg.SpacePerUnit, init.cfg.FileSize)
+	numOfFiles, err := NumOfFiles(init.cfg.SpacePerUnit, init.cfg.FileSize)
 	if err != nil {
 		return nil, err
 	}
-	labelGroupsPerChunk := NumOfLabelGroups(init.cfg.FileSize)
+	labelGroupsPerFile := NumOfLabelGroups(init.cfg.FileSize)
 
-	dir := shared.GetInitDir(init.cfg.DataDir, id)
-	results, err := initChunks(id, difficulty, init.cfg.LowestLayerToCacheDuringProofGeneration, numOfChunks, labelGroupsPerChunk, init.cfg.EnableParallelism, dir, init.cfg.LabelsLogRate, init.logger)
+	results, err := init.initFiles(id, numOfFiles, labelGroupsPerFile)
 	if err != nil {
 		return nil, err
 	}
@@ -120,25 +119,23 @@ type initResult struct {
 	root   []byte
 }
 
-type initChunkResult struct {
+type initFileResult struct {
 	index int
 	*initResult
 }
 
-func initChunks(id []byte, difficulty proving.Difficulty, lowestLayerToCacheDuringProofGeneration uint, numOfChunks int,
-	labelGroupsPerChunk uint64, parallel bool, dir string, logRate uint64, logger Logger) ([]*initResult, error) {
-	var numOfWorkers int
-	if parallel {
-		numOfWorkers = min(runtime.NumCPU(), numOfChunks)
-	} else {
-		numOfWorkers = 1
-	}
+func (init *Initializer) initFiles(id []byte, numOfFiles int, labelGroupsPerFile uint64) ([]*initResult, error) {
+	filesParallelism, infileParallelism := init.CalcParallelism(runtime.NumCPU())
 
-	jobsChan := make(chan int, numOfChunks)
-	resultsChan := make(chan *initChunkResult, numOfChunks)
+	numOfWorkers := filesParallelism
+	jobsChan := make(chan int, numOfFiles)
+	resultsChan := make(chan *initFileResult, numOfFiles)
 	errChan := make(chan error, 0)
+	dir := shared.GetInitDir(init.cfg.DataDir, id)
 
-	for i := 0; i < numOfChunks; i++ {
+	init.logger.Info("initialization: starting writing files, total: %v, parallelism degree: %v, dir: %v", numOfFiles, numOfWorkers, dir)
+
+	for i := 0; i < numOfFiles; i++ {
 		jobsChan <- i
 	}
 	close(jobsChan)
@@ -151,19 +148,19 @@ func initChunks(id []byte, difficulty proving.Difficulty, lowestLayerToCacheDuri
 					return
 				}
 
-				res, err := initChunk(id, difficulty, lowestLayerToCacheDuringProofGeneration, index, labelGroupsPerChunk, dir, logRate, logger)
+				res, err := init.initFile(id, index, labelGroupsPerFile, dir, infileParallelism)
 				if err != nil {
 					errChan <- err
 					return
 				}
 
-				resultsChan <- &initChunkResult{index, res}
+				resultsChan <- &initFileResult{index, res}
 			}
 		}()
 	}
 
-	results := make([]*initResult, numOfChunks)
-	for i := 0; i < numOfChunks; i++ {
+	results := make([]*initResult, numOfFiles)
+	for i := 0; i < numOfFiles; i++ {
 		select {
 		case res := <-resultsChan:
 			results[res.index] = res.initResult
@@ -175,15 +172,15 @@ func initChunks(id []byte, difficulty proving.Difficulty, lowestLayerToCacheDuri
 	return results, nil
 }
 
-func initChunk(id []byte, difficulty proving.Difficulty, lowestLayerToCacheDuringProofGeneration uint, chunkIndex int, labelGroupsPerChunk uint64, dir string, logRate uint64, logger Logger) (*initResult, error) {
+func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile uint64, dir string, infileParallelism int) (*initResult, error) {
 	// Initialize the labels file writer.
-	labelsWriter, err := persistence.NewLabelsWriter(id, chunkIndex, dir, logger)
+	labelsWriter, err := persistence.NewLabelsWriter(id, fileIndex, dir)
 	if err != nil {
 		return nil, err
 	}
 
 	// Initialize the labels merkle tree with the execution-phase zero challenge.
-	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(lowestLayerToCacheDuringProofGeneration), cache.MakeSliceReadWriterFactory())
+	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(init.cfg.LowestLayerToCacheDuringProofGeneration), cache.MakeSliceReadWriterFactory())
 	tree, err := merkle.NewTreeBuilder().
 		WithHashFunc(shared.ZeroChallenge.GetSha256Parent).
 		WithCacheWriter(cacheWriter).
@@ -192,34 +189,69 @@ func initChunk(id []byte, difficulty proving.Difficulty, lowestLayerToCacheDurin
 		return nil, err
 	}
 
-	// Calculate labels in groups, write them to disk
-	// and append them as leaves in the merkle tree.
-	for position := uint64(0); position < labelGroupsPerChunk; position++ {
-		offset := uint64(chunkIndex) * labelGroupsPerChunk
-		lg := CalcLabelGroup(id, position+offset, difficulty)
-		err := labelsWriter.Write(lg)
-		if err != nil {
-			return nil, err
-		}
-		err = tree.AddLeaf(lg)
-		if err != nil {
-			return nil, err
-		}
-		if (position+1)%logRate == 0 {
-			logger.Info("completed %v labels", position+1)
-		}
+	init.logger.Info("initialization: starting file %v, parallelism degree: %v",
+		fileIndex, infileParallelism)
+
+	numOfWorkers := infileParallelism
+	workersOutputChans := make([]chan []byte, numOfWorkers)
+	errChan := make(chan error, 0)
+	finishedChan := make(chan struct{}, 0)
+
+	fileOffset := uint64(fileIndex) * labelGroupsPerFile
+	for i := 0; i < numOfWorkers; i++ {
+		i := i
+		workersOutputChans[i] = make(chan []byte, 1000) // TODO: make chan buffer configurable
+		offset := i
+		go func() {
+			// Calculate labels in groups, write them to disk
+			// and append them as leaves in the merkle tree.
+			for position := uint64(offset); position < labelGroupsPerFile; position += uint64(numOfWorkers) {
+				lg := CalcLabelGroup(id, position+fileOffset, Difficulty(init.cfg.Difficulty))
+				workersOutputChans[i] <- lg
+			}
+		}()
 	}
 
-	logger.Info("completed PoST label list construction")
+	go func() {
+		for i := uint64(0); i < labelGroupsPerFile; i++ {
+			// Consume workers output in a round-robin fashion.
+			lg := <-workersOutputChans[i%uint64(numOfWorkers)]
+			err := labelsWriter.Write(lg)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			err = tree.AddLeaf(lg)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			if (i+1)%init.cfg.LabelsLogRate == 0 {
+				init.logger.Info("initialization: file %v completed %v labels", fileIndex, i+1)
+			}
+		}
+
+		close(finishedChan)
+	}()
+
+	select {
+	case <-finishedChan:
+	case err := <-errChan:
+		return nil, err
+	}
 
 	labelsReader, err := labelsWriter.GetReader()
 	if err != nil {
 		return nil, err
 	}
 
-	if err := labelsWriter.Close(); err != nil {
+	info, err := labelsWriter.Close()
+	if err != nil {
 		return nil, err
 	}
+
+	init.logger.Info("initialization: completed file %v, bytes written: %v", fileIndex, info.Size())
 
 	cacheWriter.SetLayer(0, labelsReader)
 	cacheReader, err := cacheWriter.GetReader()
@@ -227,9 +259,25 @@ func initChunk(id []byte, difficulty proving.Difficulty, lowestLayerToCacheDurin
 		return nil, err
 	}
 
-	res := &initResult{cacheReader, tree.Root()}
+	return &initResult{cacheReader, tree.Root()}, nil
+}
 
-	return res, nil
+func (init *Initializer) CalcParallelism(maxParallelism int) (files int, infile int) {
+	maxParallelism = max(maxParallelism, 1)
+	files = max(int(init.cfg.MaxFilesParallelism), 1)
+	files = min(files, maxParallelism)
+	infile = max(int(init.cfg.MaxInFileParallelism), 1)
+	infile = min(infile, maxParallelism)
+
+	// Potentially reduce files parallelism in favor of in-file parallelism.
+	for i := files; i > 0; i-- {
+		if i*infile <= maxParallelism {
+			files = i
+			break
+		}
+	}
+
+	return
 }
 
 func merge(results []*initResult) (*initResult, error) {
@@ -260,6 +308,13 @@ func merge(results []*initResult) (*initResult, error) {
 
 func min(x, y int) int {
 	if x < y {
+		return x
+	}
+	return y
+}
+
+func max(x, y int) int {
+	if x > y {
 		return x
 	}
 	return y

@@ -27,7 +27,6 @@ var (
 		LowestLayerToCacheDuringProofGeneration: 0,
 		DataDir:                                 tempdir,
 		LabelsLogRate:                           uint64(math.MaxUint64),
-		EnableParallelism:                       false,
 	}
 	NewInitializer = initialization.NewInitializer
 	NewProver      = proving.NewProver

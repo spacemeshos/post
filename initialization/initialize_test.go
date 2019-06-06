@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
+	"github.com/spacemeshos/smutil/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
@@ -27,7 +28,6 @@ var (
 		LowestLayerToCacheDuringProofGeneration: 0,
 		DataDir:                                 tempdir,
 		LabelsLogRate:                           uint64(math.MaxUint64),
-		EnableParallelism:                       false,
 	}
 )
 
@@ -64,6 +64,7 @@ func TestInitialize(t *testing.T) {
 
 func TestInitializeErrors(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
 	newCfg := *cfg
 	newCfg.Difficulty = 4
@@ -94,11 +95,11 @@ func TestInitializeMultipleFiles(t *testing.T) {
 	r.NoError(err)
 
 	cleanup()
-
 	for numOfFiles := uint64(2); numOfFiles <= 16; numOfFiles *= 2 {
-
 		newCfg := *cfg
 		newCfg.FileSize = cfg.SpacePerUnit / numOfFiles
+		newCfg.MaxFilesParallelism = uint(numOfFiles)
+		newCfg.MaxInFileParallelism = uint(numOfFiles)
 
 		multiFilesInitProof, err := NewInitializer(&newCfg, logger).Initialize(id)
 		r.NoError(err)
@@ -116,6 +117,35 @@ func TestInitializeMultipleFiles(t *testing.T) {
 
 		cleanup()
 	}
+}
+
+func TestInitializerCalcParallelism(t *testing.T) {
+	r := require.New(t)
+
+	files, infile := NewInitializer(&Config{}, logger).
+		CalcParallelism(0)
+	r.Equal(files, 1)
+	r.Equal(infile, 1)
+
+	files, infile = NewInitializer(&Config{MaxFilesParallelism: 2, MaxInFileParallelism: 1}, logger).
+		CalcParallelism(2)
+	r.Equal(files, 2)
+	r.Equal(infile, 1)
+
+	files, infile = NewInitializer(&Config{MaxFilesParallelism: 2, MaxInFileParallelism: 3}, logger).
+		CalcParallelism(5)
+	r.Equal(files, 1)
+	r.Equal(infile, 3)
+
+	files, infile = NewInitializer(&Config{MaxFilesParallelism: 2, MaxInFileParallelism: 3}, logger).
+		CalcParallelism(7)
+	r.Equal(files, 2)
+	r.Equal(infile, 3)
+
+	files, infile = NewInitializer(&Config{MaxFilesParallelism: 2, MaxInFileParallelism: 100}, logger).
+		CalcParallelism(6)
+	r.Equal(files, 1)
+	r.Equal(infile, 6)
 }
 
 func hexDecode(hexStr string) []byte {
@@ -165,9 +195,25 @@ func BenchmarkInitialize(b *testing.B) {
 	*/
 }
 
+func BenchmarkInitializeParallelism(b *testing.B) {
+	defer cleanup()
+
+	newCfg := *cfg
+	newCfg.SpacePerUnit = uint64(1) << 25
+	newCfg.FileSize = uint64(1) << 24
+	newCfg.MaxFilesParallelism = 2
+	newCfg.MaxInFileParallelism = 6
+	proof, err := NewInitializer(&newCfg, log.AppLog).Initialize(id)
+	require.NoError(b, err)
+
+	expectedMerkleRoot, _ := hex.DecodeString("14b729e5c4028b4b245d60009464dc7979811bdbbd7cade81dbe9b1a17b4af8b")
+	assert.Equal(b, expectedMerkleRoot, proof.MerkleRoot)
+}
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 	res := m.Run()
+	cleanup()
 	os.Exit(res)
 }
 

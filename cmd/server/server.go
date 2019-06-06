@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime"
 )
 
 var Cmd = &cobra.Command{
@@ -28,8 +29,8 @@ var Cmd = &cobra.Command{
 			return
 		}
 
-		logger.Info("Version: %s, SpacePerUnit: %v, Difficulty: %v",
-			shared.Version(), s.cfg.PostCfg.SpacePerUnit, s.cfg.PostCfg.Difficulty)
+		logger.Info("Version: %s, SpacePerUnit: %v, Difficulty: %v, NumCPU: %v",
+			shared.Version(), s.cfg.PostCfg.SpacePerUnit, s.cfg.PostCfg.Difficulty, runtime.NumCPU())
 
 		err = s.Start(cmd, args, logger)
 		if err != nil {

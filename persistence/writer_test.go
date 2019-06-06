@@ -3,7 +3,6 @@ package persistence
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"github.com/spacemeshos/post/shared"
 	"github.com/stretchr/testify/require"
 	"io"
 	"io/ioutil"
@@ -21,10 +20,9 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 	req := require.New(t)
 	id, labelGroupGroupGroups := generateIdAndLabels()
 	labelsToWriter := make([]LabelGroup, 0)
-	logger := shared.DisabledLogger{}
 
 	for i, labelGroupGroup := range labelGroupGroupGroups {
-		writer, err := NewLabelsWriter(id, i, tempdir, logger)
+		writer, err := NewLabelsWriter(id, i, tempdir)
 		req.NoError(err)
 
 		for _, labelGroup := range labelGroupGroup {
@@ -34,11 +32,11 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 			// For later assertion.
 			labelsToWriter = append(labelsToWriter, labelGroup)
 		}
-		err = writer.Close()
+		_, err = writer.Close()
 		req.NoError(err)
 	}
 
-	reader, err := NewLabelsReader(tempdir, logger)
+	reader, err := NewLabelsReader(tempdir)
 	req.NoError(err)
 
 	labelsFromReader := make([]LabelGroup, len(labelsToWriter))
