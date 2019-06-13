@@ -26,14 +26,6 @@ var (
 	defaultConfig = shared.DefaultConfig()
 )
 
-type testMode int
-
-const (
-	single testMode = iota
-	mid
-	full
-)
-
 func main() {
 	datadir := flag.String("datadir", defaultConfig.DataDir, "filesystem datadir path")
 	space := flag.Uint64("space", 1<<23, "space per unit, in bytes")
@@ -45,7 +37,6 @@ func main() {
 	cases := genTestCases(*datadir, *space, *single)
 	data := make([][]string, 0)
 	for i, cfg := range cases {
-
 		log.Printf("test %v/%v starting...", i+1, len(cases))
 		tStart := time.Now()
 
