@@ -4,6 +4,7 @@ import (
 	"code.cloudfoundry.org/bytefmt"
 	"encoding/hex"
 	"flag"
+	"fmt"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/proving"
@@ -25,14 +26,23 @@ var (
 	defaultConfig = shared.DefaultConfig()
 )
 
+type testMode int
+
+const (
+	single testMode = iota
+	mid
+	full
+)
+
 func main() {
-	datadir := flag.String("datadir", defaultConfig.DataDir, "")
-	space := flag.Uint64("space", 1<<23, "")
+	datadir := flag.String("datadir", defaultConfig.DataDir, "filesystem datadir path")
+	space := flag.Uint64("space", 1<<23, "space per unit, in bytes")
+	single := flag.Bool("single", false, "whether to execute a single test instead of the complete set")
 	flag.Parse()
 
 	log.Printf("bench config: datadir: %v, space: %v", *datadir, *space)
 
-	cases := genTestCases(*datadir, *space)
+	cases := genTestCases(*datadir, *space, *single)
 	data := make([][]string, 0)
 	for i, cfg := range cases {
 
@@ -92,10 +102,12 @@ func main() {
 	}
 
 	header := []string{"space", "filesize", "p-files", "p-infile", "init", "init-v", "exec", "exec-v"}
-	report(header, data)
+	report(*datadir, header, data)
 }
 
-func report(header []string, data [][]string) {
+func report(datadir string, header []string, data [][]string) {
+	fmt.Printf("\n\nBENCHMARKS: datadir=%v\n", datadir)
+
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader(header)
 	table.SetBorder(true)
@@ -103,13 +115,19 @@ func report(header []string, data [][]string) {
 	table.Render()
 }
 
-func genTestCases(datadir string, space uint64) []Config {
+func genTestCases(datadir string, space uint64, single bool) []Config {
 	def := *defaultConfig
 	cases := make([]Config, 0)
 
 	def.DataDir = datadir
 	def.SpacePerUnit = space
 	def.FileSize = space
+
+	if single {
+		cases = append(cases, def)
+		return cases
+	}
+
 	def.MaxFilesParallelism = 1
 	def.MaxInFileParallelism = 1
 
