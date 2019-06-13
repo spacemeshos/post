@@ -8,7 +8,8 @@ import (
 const (
 	DefaultDataDirName                             = "data"
 	DefaultLabelsLogRate                           = 5000000
-	DefaultEnableParallelism                       = true
+	DefaultMaxFilesParallelism                     = 1
+	DefaultMaxInFileParallelism                    = 6
 	DefaultSpacePerUnit                            = 1 << 20 // 1MB. Temporary value.
 	DefaultFileSize                                = 1 << 20 // 1MB. Temporary value.
 	DefaultDifficulty                              = MinDifficulty
@@ -17,27 +18,29 @@ const (
 )
 
 var (
-	defaultDataDir = filepath.Join(smutil.GetUserHomeDirectory(), "post", DefaultDataDirName)
+	DefaultDataDir = filepath.Join(smutil.GetUserHomeDirectory(), "post", DefaultDataDirName)
 )
 
 type Config struct {
-	DataDir           string `mapstructure:"datadir"`
-	LabelsLogRate     uint64 `mapstructure:"lograte"`
-	EnableParallelism bool   `mapstructure:"parallel"`
+	DataDir              string `mapstructure:"datadir"`
+	LabelsLogRate        uint64 `mapstructure:"lograte"`
+	MaxFilesParallelism  uint   `mapstructure:"parallel-files"`
+	MaxInFileParallelism uint   `mapstructure:"parallel-infile"`
 
 	// Protocol params.
 	SpacePerUnit                            uint64 `mapstructure:"space"`
 	FileSize                                uint64 `mapstructure:"filesize"`
 	Difficulty                              uint   `mapstructure:"difficulty"`
-	NumOfProvenLabels                       uint   `mapstructure:"t"`
+	NumOfProvenLabels                       uint   `mapstructure:"labels"`
 	LowestLayerToCacheDuringProofGeneration uint   `mapstructure:"cachelayer"`
 }
 
 func DefaultConfig() *Config {
 	return &Config{
-		DataDir:                                 defaultDataDir,
+		DataDir:                                 DefaultDataDir,
 		LabelsLogRate:                           DefaultLabelsLogRate,
-		EnableParallelism:                       DefaultEnableParallelism,
+		MaxFilesParallelism:                     DefaultMaxFilesParallelism,
+		MaxInFileParallelism:                    DefaultMaxInFileParallelism,
 		SpacePerUnit:                            DefaultSpacePerUnit,
 		FileSize:                                DefaultFileSize,
 		Difficulty:                              DefaultDifficulty,

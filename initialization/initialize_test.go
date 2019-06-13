@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
+	"github.com/spacemeshos/smutil/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
@@ -15,21 +16,42 @@ import (
 )
 
 var (
-	tempdir, _ = ioutil.TempDir("", "post-test")
-	id         = hexDecode("deadbeef")
-	challenge  = hexDecode("this is a challenge")
-	logger     = shared.DisabledLogger{}
-	cfg        = &Config{
-		SpacePerUnit:                            16 * LabelGroupSize,
-		FileSize:                                16 * LabelGroupSize,
+	id                   = hexDecode("deadbeef")
+	challenge            = hexDecode("this is a challenge")
+	datadir, _           = ioutil.TempDir("", "post-test")
+	space                = uint64(16 * LabelGroupSize)
+	filesize             = uint64(16 * LabelGroupSize)
+	maxFilesParallelism  = uint(1)
+	maxInfileParallelism = uint(1)
+
+	logger = shared.DisabledLogger{}
+	cfg    *Config
+)
+
+func TestMain(m *testing.M) {
+	flag.StringVar(&datadir, "datadir", datadir, "")
+	flag.Uint64Var(&space, "space", space, "")
+	flag.Uint64Var(&filesize, "filesize", filesize, "")
+	flag.UintVar(&maxFilesParallelism, "parallel-files", maxFilesParallelism, "")
+	flag.UintVar(&maxInfileParallelism, "parallel-infile", maxInfileParallelism, "")
+	flag.Parse()
+
+	cfg = &Config{
+		SpacePerUnit:                            space,
+		FileSize:                                filesize,
 		Difficulty:                              5,
 		NumOfProvenLabels:                       4,
 		LowestLayerToCacheDuringProofGeneration: 0,
-		DataDir:                                 tempdir,
+		DataDir:                                 datadir,
+		MaxFilesParallelism:                     maxFilesParallelism,
+		MaxInFileParallelism:                    maxInfileParallelism,
 		LabelsLogRate:                           uint64(math.MaxUint64),
-		EnableParallelism:                       false,
 	}
-)
+
+	res := m.Run()
+	cleanup()
+	os.Exit(res)
+}
 
 func TestInitialize(t *testing.T) {
 	r := require.New(t)
@@ -64,6 +86,7 @@ func TestInitialize(t *testing.T) {
 
 func TestInitializeErrors(t *testing.T) {
 	r := require.New(t)
+	defer cleanup()
 
 	newCfg := *cfg
 	newCfg.Difficulty = 4
@@ -94,11 +117,11 @@ func TestInitializeMultipleFiles(t *testing.T) {
 	r.NoError(err)
 
 	cleanup()
-
 	for numOfFiles := uint64(2); numOfFiles <= 16; numOfFiles *= 2 {
-
 		newCfg := *cfg
 		newCfg.FileSize = cfg.SpacePerUnit / numOfFiles
+		newCfg.MaxFilesParallelism = uint(numOfFiles)
+		newCfg.MaxInFileParallelism = uint(numOfFiles)
 
 		multiFilesInitProof, err := NewInitializer(&newCfg, logger).Initialize(id)
 		r.NoError(err)
@@ -118,6 +141,35 @@ func TestInitializeMultipleFiles(t *testing.T) {
 	}
 }
 
+func TestInitializerCalcParallelism(t *testing.T) {
+	r := require.New(t)
+
+	files, infile := NewInitializer(&Config{}, logger).
+		CalcParallelism(0)
+	r.Equal(files, 1)
+	r.Equal(infile, 1)
+
+	files, infile = NewInitializer(&Config{MaxFilesParallelism: 2, MaxInFileParallelism: 1}, logger).
+		CalcParallelism(2)
+	r.Equal(files, 2)
+	r.Equal(infile, 1)
+
+	files, infile = NewInitializer(&Config{MaxFilesParallelism: 2, MaxInFileParallelism: 3}, logger).
+		CalcParallelism(5)
+	r.Equal(files, 1)
+	r.Equal(infile, 3)
+
+	files, infile = NewInitializer(&Config{MaxFilesParallelism: 2, MaxInFileParallelism: 3}, logger).
+		CalcParallelism(7)
+	r.Equal(files, 2)
+	r.Equal(infile, 3)
+
+	files, infile = NewInitializer(&Config{MaxFilesParallelism: 2, MaxInFileParallelism: 100}, logger).
+		CalcParallelism(6)
+	r.Equal(files, 1)
+	r.Equal(infile, 6)
+}
+
 func hexDecode(hexStr string) []byte {
 	node, _ := hex.DecodeString(hexStr)
 	return node
@@ -133,7 +185,7 @@ func (n nodes) String() string {
 	return s
 }
 
-func BenchmarkInitialize(b *testing.B) {
+func BenchmarkInitialize30(b *testing.B) {
 	defer cleanup()
 
 	space := uint64(1) << 30 // 1 GB.
@@ -165,12 +217,16 @@ func BenchmarkInitialize(b *testing.B) {
 	*/
 }
 
-func TestMain(m *testing.M) {
-	flag.Parse()
-	res := m.Run()
-	os.Exit(res)
+func BenchmarkInitializeGeneric(b *testing.B) {
+	// Use cli flags to utilize this test.
+	defer cleanup()
+	_, err := NewInitializer(cfg, log.AppLog).Initialize(id)
+	require.NoError(b, err)
 }
 
 func cleanup() {
-	_ = os.RemoveAll(tempdir)
+	err := os.RemoveAll(cfg.DataDir)
+	if err != nil {
+		panic(err)
+	}
 }
