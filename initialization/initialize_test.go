@@ -225,5 +225,8 @@ func BenchmarkInitializeGeneric(b *testing.B) {
 }
 
 func cleanup() {
-	_ = os.RemoveAll(cfg.DataDir)
+	err := os.RemoveAll(cfg.DataDir)
+	if err != nil {
+		panic(err)
+	}
 }

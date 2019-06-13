@@ -74,7 +74,8 @@ func (init *Initializer) Initialize(id []byte) (*proving.Proof, error) {
 		return nil, err
 	}
 
-	width, err := result.reader.GetLayerReader(0).Width()
+	leafReader := result.reader.GetLayerReader(0)
+	width, err := leafReader.Width()
 	if err != nil {
 		err = fmt.Errorf("failed to get leaves reader width: %v", err)
 		log.Error(err.Error())
@@ -83,6 +84,11 @@ func (init *Initializer) Initialize(id []byte) (*proving.Proof, error) {
 
 	provenLeafIndices := proving.CalcProvenLeafIndices(result.root, width<<difficulty, uint8(init.cfg.NumOfProvenLabels), difficulty)
 	_, provenLeaves, proofNodes, err := merkle.GenerateProof(provenLeafIndices, result.reader)
+	if err != nil {
+		return nil, err
+	}
+
+	err = leafReader.Close()
 	if err != nil {
 		return nil, err
 	}
