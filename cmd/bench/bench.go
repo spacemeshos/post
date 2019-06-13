@@ -40,7 +40,7 @@ func main() {
 	single := flag.Bool("single", false, "whether to execute a single test instead of the complete set")
 	flag.Parse()
 
-	log.Printf("bench config: datadir: %v, space: %v", *datadir, *space)
+	log.Printf("bench config: datadir: %v, space: %v", *datadir, bytefmt.ByteSize(*space))
 
 	cases := genTestCases(*datadir, *space, *single)
 	data := make([][]string, 0)
