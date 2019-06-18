@@ -103,5 +103,10 @@ func (p *Prover) generateProof(id []byte, challenge Challenge) (*Proof, error) {
 		return nil, err
 	}
 
+	err = reader.Close()
+	if err != nil {
+		return nil, err
+	}
+
 	return proof, nil
 }
