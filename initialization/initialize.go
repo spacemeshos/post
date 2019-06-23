@@ -199,42 +199,73 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 		fileIndex, infileParallelism)
 
 	numOfWorkers := infileParallelism
-	workersOutputChans := make([]chan []byte, numOfWorkers)
+	workersOutputChans := make([]chan [][]byte, numOfWorkers)
 	errChan := make(chan error, 0)
 	finishedChan := make(chan struct{}, 0)
+	batchSize := 100
+	chanBuffer := 100
 
+	// CPU workers.
 	fileOffset := uint64(fileIndex) * labelGroupsPerFile
 	for i := 0; i < numOfWorkers; i++ {
 		i := i
-		workersOutputChans[i] = make(chan []byte, 1000) // TODO: make chan buffer configurable
-		offset := i
+		workersOutputChans[i] = make(chan [][]byte, chanBuffer)
+		workerOffset := i
 		go func() {
-			// Calculate labels in groups, write them to disk
-			// and append them as leaves in the merkle tree.
-			for position := uint64(offset); position < labelGroupsPerFile; position += uint64(numOfWorkers) {
-				lg := CalcLabelGroup(id, position+fileOffset, Difficulty(init.cfg.Difficulty))
-				workersOutputChans[i] <- lg
+			// Calculate labels in groups and write them to channel in batches.
+			iterator := 0
+			position := uint64(workerOffset)
+			batch := make([][]byte, batchSize)
+			for position < labelGroupsPerFile {
+				batch[iterator%batchSize] = CalcLabelGroup(id, position+fileOffset, Difficulty(init.cfg.Difficulty))
+
+				if iterator%batchSize == batchSize-1 {
+					workersOutputChans[i] <- batch
+					batch = make([][]byte, batchSize)
+				}
+
+				iterator += 1
+				position += uint64(numOfWorkers)
 			}
+			workersOutputChans[i] <- batch
 		}()
 	}
 
+	// IO worker.
 	go func() {
-		for i := uint64(0); i < labelGroupsPerFile; i++ {
-			// Consume workers output in a round-robin fashion.
-			lg := <-workersOutputChans[i%uint64(numOfWorkers)]
-			err := labelsWriter.Write(lg)
-			if err != nil {
-				errChan <- err
-				return
-			}
-			err = tree.AddLeaf(lg)
-			if err != nil {
-				errChan <- err
-				return
+	loop:
+		for batchesIterator := 0; ; batchesIterator++ {
+			// Consume next batch from all workers.
+			batches := make([][][]byte, numOfWorkers)
+			for i, workerChan := range workersOutputChans {
+				batches[i] = <-workerChan
 			}
 
-			if (i+1)%init.cfg.LabelsLogRate == 0 {
-				init.logger.Info("initialization: file %v completed %v labels", fileIndex, i+1)
+			// Consume label groups from the batches in round-robin fashion.
+			for i := 0; i < batchSize*numOfWorkers; i++ {
+				batch := batches[i%numOfWorkers]
+				lg := batch[i/numOfWorkers]
+				if lg == nil {
+					break loop
+				}
+
+				// Write label group to disk, and append it as leaf in the merkle tree.
+				err := labelsWriter.Write(lg)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				err = tree.AddLeaf(lg)
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				num := i + 1 + batchSize*numOfWorkers*batchesIterator
+				if uint64(num)%init.cfg.LabelsLogRate == 0 {
+					init.logger.Info("initialization: file %v completed %v label groups", fileIndex, num)
+				}
+
 			}
 		}
 
