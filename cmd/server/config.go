@@ -154,11 +154,14 @@ func setFlags(cmd *cobra.Command, cfg *Config) {
 	flags.Uint64Var(&cfg.PostCfg.LabelsLogRate, "lograte",
 		cfg.PostCfg.LabelsLogRate, "Labels construction progress log rate")
 
-	flags.UintVar(&cfg.PostCfg.MaxFilesParallelism, "parallel-files",
-		cfg.PostCfg.MaxFilesParallelism, "Max degree of files parallelism")
+	flags.UintVar(&cfg.PostCfg.MaxWriteFilesParallelism, "parallel-files",
+		cfg.PostCfg.MaxWriteFilesParallelism, "Max degree of files write parallelism")
 
-	flags.UintVar(&cfg.PostCfg.MaxInFileParallelism, "parallel-infile",
-		cfg.PostCfg.MaxInFileParallelism, "Max degree of cpu work parallelism per file")
+	flags.UintVar(&cfg.PostCfg.MaxWriteInFileParallelism, "parallel-infile",
+		cfg.PostCfg.MaxWriteInFileParallelism, "Max degree of cpu work parallelism per file write")
+
+	flags.UintVar(&cfg.PostCfg.MaxReadFilesParallelism, "parallel-read",
+		cfg.PostCfg.MaxReadFilesParallelism, "Max degree of files read parallelism")
 
 	err := viper.BindPFlags(flags)
 	if err != nil {

@@ -19,10 +19,12 @@ const (
 )
 
 type (
-	Config      = shared.Config
-	Logger      = shared.Logger
-	Difficulty  = shared.Difficulty
-	CacheReader = cache.CacheReader
+	Config           = shared.Config
+	Logger           = shared.Logger
+	Difficulty       = shared.Difficulty
+	MTreeOutput      = shared.MTreeOutput
+	MTreeOutputEntry = shared.MTreeOutputEntry
+	CacheReader      = cache.CacheReader
 )
 
 var (
@@ -64,17 +66,17 @@ func (init *Initializer) Initialize(id []byte) (*proving.Proof, error) {
 	}
 	labelGroupsPerFile := NumOfLabelGroups(init.cfg.FileSize)
 
-	results, err := init.initFiles(id, numOfFiles, labelGroupsPerFile)
+	outputs, err := init.initFiles(id, numOfFiles, labelGroupsPerFile)
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := merge(results)
+	output, err := shared.Merge(outputs)
 	if err != nil {
 		return nil, err
 	}
 
-	leafReader := result.reader.GetLayerReader(0)
+	leafReader := output.Reader.GetLayerReader(0)
 	width, err := leafReader.Width()
 	if err != nil {
 		err = fmt.Errorf("failed to get leaves reader width: %v", err)
@@ -82,8 +84,8 @@ func (init *Initializer) Initialize(id []byte) (*proving.Proof, error) {
 		return nil, err
 	}
 
-	provenLeafIndices := proving.CalcProvenLeafIndices(result.root, width<<difficulty, uint8(init.cfg.NumOfProvenLabels), difficulty)
-	_, provenLeaves, proofNodes, err := merkle.GenerateProof(provenLeafIndices, result.reader)
+	provenLeafIndices := proving.CalcProvenLeafIndices(output.Root, width<<difficulty, uint8(init.cfg.NumOfProvenLabels), difficulty)
+	_, provenLeaves, proofNodes, err := merkle.GenerateProof(provenLeafIndices, output.Reader)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +98,7 @@ func (init *Initializer) Initialize(id []byte) (*proving.Proof, error) {
 	proof := &proving.Proof{
 		Challenge:    shared.ZeroChallenge,
 		Identity:     id,
-		MerkleRoot:   result.root,
+		MerkleRoot:   output.Root,
 		ProvenLeaves: provenLeaves,
 		ProofNodes:   proofNodes,
 	}
@@ -120,22 +122,11 @@ func (init *Initializer) Reset(id []byte) error {
 	return nil
 }
 
-type initResult struct {
-	reader CacheReader
-	root   []byte
-}
-
-type initFileResult struct {
-	index int
-	*initResult
-}
-
-func (init *Initializer) initFiles(id []byte, numOfFiles int, labelGroupsPerFile uint64) ([]*initResult, error) {
-	filesParallelism, infileParallelism := init.CalcParallelism(runtime.NumCPU())
-
+func (init *Initializer) initFiles(id []byte, numOfFiles int, labelGroupsPerFile uint64) ([]*MTreeOutput, error) {
+	filesParallelism, infileParallelism := init.CalcParallelism()
 	numOfWorkers := filesParallelism
 	jobsChan := make(chan int, numOfFiles)
-	resultsChan := make(chan *initFileResult, numOfFiles)
+	resultsChan := make(chan *MTreeOutputEntry, numOfFiles)
 	errChan := make(chan error, 0)
 	dir := shared.GetInitDir(init.cfg.DataDir, id)
 
@@ -154,31 +145,31 @@ func (init *Initializer) initFiles(id []byte, numOfFiles int, labelGroupsPerFile
 					return
 				}
 
-				res, err := init.initFile(id, index, labelGroupsPerFile, dir, infileParallelism)
+				output, err := init.initFile(id, index, labelGroupsPerFile, dir, infileParallelism)
 				if err != nil {
 					errChan <- err
 					return
 				}
 
-				resultsChan <- &initFileResult{index, res}
+				resultsChan <- &MTreeOutputEntry{Index: index, MTreeOutput: output}
 			}
 		}()
 	}
 
-	results := make([]*initResult, numOfFiles)
+	outputs := make([]*MTreeOutput, numOfFiles)
 	for i := 0; i < numOfFiles; i++ {
 		select {
 		case res := <-resultsChan:
-			results[res.index] = res.initResult
+			outputs[res.Index] = res.MTreeOutput
 		case err := <-errChan:
 			return nil, err
 		}
 	}
 
-	return results, nil
+	return outputs, nil
 }
 
-func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile uint64, dir string, infileParallelism int) (*initResult, error) {
+func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile uint64, dir string, infileParallelism int) (*MTreeOutput, error) {
 	// Initialize the labels file writer.
 	labelsWriter, err := persistence.NewLabelsWriter(id, fileIndex, dir)
 	if err != nil {
@@ -199,7 +190,7 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 		fileIndex, infileParallelism)
 
 	numOfWorkers := infileParallelism
-	workersOutputChans := make([]chan [][]byte, numOfWorkers)
+	workersChans := make([]chan [][]byte, numOfWorkers)
 	errChan := make(chan error, 0)
 	finishedChan := make(chan struct{}, 0)
 	batchSize := 100
@@ -209,7 +200,7 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 	fileOffset := uint64(fileIndex) * labelGroupsPerFile
 	for i := 0; i < numOfWorkers; i++ {
 		i := i
-		workersOutputChans[i] = make(chan [][]byte, chanBuffer)
+		workersChans[i] = make(chan [][]byte, chanBuffer)
 		workerOffset := i
 		go func() {
 			// Calculate labels in groups and write them to channel in batches.
@@ -220,14 +211,14 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 				batch[iterator%batchSize] = CalcLabelGroup(id, position+fileOffset, Difficulty(init.cfg.Difficulty))
 
 				if iterator%batchSize == batchSize-1 {
-					workersOutputChans[i] <- batch
+					workersChans[i] <- batch
 					batch = make([][]byte, batchSize)
 				}
 
 				iterator += 1
 				position += uint64(numOfWorkers)
 			}
-			workersOutputChans[i] <- batch
+			workersChans[i] <- batch
 		}()
 	}
 
@@ -237,7 +228,7 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 		for batchesIterator := 0; ; batchesIterator++ {
 			// Consume next batch from all workers.
 			batches := make([][][]byte, numOfWorkers)
-			for i, workerChan := range workersOutputChans {
+			for i, workerChan := range workersChans {
 				batches[i] = <-workerChan
 			}
 
@@ -296,63 +287,28 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 		return nil, err
 	}
 
-	return &initResult{cacheReader, tree.Root()}, nil
+	return &MTreeOutput{Reader: cacheReader, Root: tree.Root()}, nil
 }
 
-func (init *Initializer) CalcParallelism(maxParallelism int) (files int, infile int) {
-	maxParallelism = max(maxParallelism, 1)
-	files = max(int(init.cfg.MaxFilesParallelism), 1)
-	files = min(files, maxParallelism)
-	infile = max(int(init.cfg.MaxInFileParallelism), 1)
-	infile = min(infile, maxParallelism)
+func (init *Initializer) CalcParallelism() (files int, infile int) {
+	return init.calcParallelism(runtime.NumCPU())
+}
+
+func (init *Initializer) calcParallelism(max int) (files int, infile int) {
+	max = shared.Max(max, 1)
+	files = shared.Max(int(init.cfg.MaxWriteFilesParallelism), 1)
+	infile = shared.Max(int(init.cfg.MaxWriteInFileParallelism), 1)
+
+	files = shared.Min(files, max)
+	infile = shared.Min(infile, max)
 
 	// Potentially reduce files parallelism in favor of in-file parallelism.
 	for i := files; i > 0; i-- {
-		if i*infile <= maxParallelism {
+		if i*infile <= max {
 			files = i
 			break
 		}
 	}
 
 	return
-}
-
-func merge(results []*initResult) (*initResult, error) {
-	switch len(results) {
-	case 0:
-		return nil, nil
-	case 1:
-		return results[0], nil
-	default:
-		readers := make([]CacheReader, len(results))
-		for i, result := range results {
-			readers[i] = result.reader
-		}
-
-		reader, err := cache.Merge(readers)
-		if err != nil {
-			return nil, err
-		}
-
-		reader, root, err := cache.BuildTop(reader)
-		if err != nil {
-			return nil, err
-		}
-
-		return &initResult{reader, root}, nil
-	}
-}
-
-func min(x, y int) int {
-	if x < y {
-		return x
-	}
-	return y
-}
-
-func max(x, y int) int {
-	if x > y {
-		return x
-	}
-	return y
 }

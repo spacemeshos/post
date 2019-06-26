@@ -43,8 +43,8 @@ func TestMain(m *testing.M) {
 		NumOfProvenLabels:                       4,
 		LowestLayerToCacheDuringProofGeneration: 0,
 		DataDir:                                 datadir,
-		MaxFilesParallelism:                     maxFilesParallelism,
-		MaxInFileParallelism:                    maxInfileParallelism,
+		MaxWriteFilesParallelism:                maxFilesParallelism,
+		MaxWriteInFileParallelism:               maxInfileParallelism,
 		LabelsLogRate:                           uint64(math.MaxUint64),
 	}
 
@@ -110,6 +110,10 @@ func TestInitializeErrors(t *testing.T) {
 func TestInitializeMultipleFiles(t *testing.T) {
 	r := require.New(t)
 
+	cfg := cfg
+	cfg.SpacePerUnit = 1 << 10
+	cfg.FileSize = 1 << 10
+
 	initProof, err := NewInitializer(cfg, logger).Initialize(id)
 	r.NoError(err)
 
@@ -117,11 +121,12 @@ func TestInitializeMultipleFiles(t *testing.T) {
 	r.NoError(err)
 
 	cleanup()
-	for numOfFiles := uint64(2); numOfFiles <= 16; numOfFiles *= 2 {
+	for numOfFiles := uint64(2); numOfFiles <= 16; numOfFiles <<= 1 {
 		newCfg := *cfg
 		newCfg.FileSize = cfg.SpacePerUnit / numOfFiles
-		newCfg.MaxFilesParallelism = uint(numOfFiles)
-		newCfg.MaxInFileParallelism = uint(numOfFiles)
+		newCfg.MaxWriteFilesParallelism = uint(numOfFiles)
+		newCfg.MaxWriteInFileParallelism = uint(numOfFiles)
+		newCfg.MaxReadFilesParallelism = uint(numOfFiles)
 
 		multiFilesInitProof, err := NewInitializer(&newCfg, logger).Initialize(id)
 		r.NoError(err)
@@ -145,27 +150,27 @@ func TestInitializerCalcParallelism(t *testing.T) {
 	r := require.New(t)
 
 	files, infile := NewInitializer(&Config{}, logger).
-		CalcParallelism(0)
+		calcParallelism(0)
 	r.Equal(files, 1)
 	r.Equal(infile, 1)
 
-	files, infile = NewInitializer(&Config{MaxFilesParallelism: 2, MaxInFileParallelism: 1}, logger).
-		CalcParallelism(2)
+	files, infile = NewInitializer(&Config{MaxWriteFilesParallelism: 2, MaxWriteInFileParallelism: 1}, logger).
+		calcParallelism(2)
 	r.Equal(files, 2)
 	r.Equal(infile, 1)
 
-	files, infile = NewInitializer(&Config{MaxFilesParallelism: 2, MaxInFileParallelism: 3}, logger).
-		CalcParallelism(5)
+	files, infile = NewInitializer(&Config{MaxWriteFilesParallelism: 2, MaxWriteInFileParallelism: 3}, logger).
+		calcParallelism(5)
 	r.Equal(files, 1)
 	r.Equal(infile, 3)
 
-	files, infile = NewInitializer(&Config{MaxFilesParallelism: 2, MaxInFileParallelism: 3}, logger).
-		CalcParallelism(7)
+	files, infile = NewInitializer(&Config{MaxWriteFilesParallelism: 2, MaxWriteInFileParallelism: 3}, logger).
+		calcParallelism(7)
 	r.Equal(files, 2)
 	r.Equal(infile, 3)
 
-	files, infile = NewInitializer(&Config{MaxFilesParallelism: 2, MaxInFileParallelism: 100}, logger).
-		CalcParallelism(6)
+	files, infile = NewInitializer(&Config{MaxWriteFilesParallelism: 2, MaxWriteInFileParallelism: 100}, logger).
+		calcParallelism(6)
 	r.Equal(files, 1)
 	r.Equal(infile, 6)
 }

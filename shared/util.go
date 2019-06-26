@@ -81,3 +81,17 @@ func isInitialized(cfg *Config, id []byte) (bool, error) {
 
 	return numOfFiles == expectedNumOfFiles, nil
 }
+
+func Min(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
+}
+
+func Max(x, y int) int {
+	if x > y {
+		return x
+	}
+	return y
+}

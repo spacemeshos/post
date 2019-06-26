@@ -7,7 +7,7 @@ import (
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
 	"io"
-	"math"
+	"runtime"
 )
 
 const (
@@ -19,10 +19,14 @@ var (
 )
 
 type (
-	Config     = shared.Config
-	Logger     = shared.Logger
-	Difficulty = shared.Difficulty
-	Challenge  = shared.Challenge
+	Config           = shared.Config
+	Logger           = shared.Logger
+	Difficulty       = shared.Difficulty
+	Challenge        = shared.Challenge
+	MTreeOutput      = shared.MTreeOutput
+	MTreeOutputEntry = shared.MTreeOutputEntry
+	CacheReader      = cache.CacheReader
+	LayerReadWriter  = cache.LayerReadWriter
 )
 
 type Prover struct {
@@ -56,19 +60,60 @@ func (p *Prover) generateProof(id []byte, challenge Challenge) (*Proof, error) {
 	proof.Challenge = challenge
 	proof.Identity = id
 
+	result, err := p.generateMTree(id, challenge)
+	if err != nil {
+		return nil, err
+	}
+	proof.MerkleRoot = result.Root
+
+	leafReader := result.Reader.GetLayerReader(0)
+	width, err := leafReader.Width()
+	if err != nil {
+		return nil, err
+	}
+
+	provenLeafIndices := CalcProvenLeafIndices(
+		proof.MerkleRoot, width<<difficulty, uint8(p.cfg.NumOfProvenLabels), difficulty)
+
+	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, result.Reader)
+	if err != nil {
+		return nil, err
+	}
+
+	err = leafReader.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return proof, nil
+}
+
+func (p *Prover) generateMTree(id []byte, challenge Challenge) (*MTreeOutput, error) {
 	dir := shared.GetInitDir(p.cfg.DataDir, id)
-	reader, err := persistence.NewLabelsReader(dir)
+	readers, err := persistence.GetReaders(dir)
 	if err != nil {
 		return nil, err
 	}
-	width, err := reader.Width()
+
+	parallelism := p.CalcParallelism(len(readers))
+	if parallelism > 1 {
+		outputs, err := p.generateMTreeParallel(readers, challenge)
+		if err != nil {
+			return nil, err
+
+		}
+		return shared.Merge(outputs)
+	}
+
+	reader, err := persistence.Merge(readers)
 	if err != nil {
 		return nil, err
 	}
-	if width*difficulty.LabelsPerGroup() >= math.MaxUint64 {
-		return nil, fmt.Errorf("leaf reader too big, number of label groups (%d) * labels per group (%d) "+
-			"overflows uint64", width, difficulty.LabelsPerGroup())
-	}
+
+	return p.generateMTreeFromFile(reader, challenge)
+}
+
+func (p *Prover) generateMTreeFromFile(reader LayerReadWriter, challenge Challenge) (*MTreeOutput, error) {
 	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(p.cfg.LowestLayerToCacheDuringProofGeneration),
 		cache.MakeSliceReadWriterFactory())
 
@@ -76,6 +121,7 @@ func (p *Prover) generateProof(id []byte, challenge Challenge) (*Proof, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	for {
 		leaf, err := reader.ReadNext()
 		if err == io.EOF {
@@ -89,24 +135,66 @@ func (p *Prover) generateProof(id []byte, challenge Challenge) (*Proof, error) {
 			return nil, err
 		}
 	}
-	proof.MerkleRoot = tree.Root()
 
 	cacheWriter.SetLayer(0, reader)
 	cacheReader, err := cacheWriter.GetReader()
 
-	numOfLabels := width * difficulty.LabelsPerGroup()
-	provenLeafIndices := CalcProvenLeafIndices(
-		proof.MerkleRoot, numOfLabels, uint8(p.cfg.NumOfProvenLabels), difficulty)
+	return &MTreeOutput{
+		Reader: cacheReader,
+		Root:   tree.Root(),
+	}, nil
+}
 
-	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, cacheReader)
-	if err != nil {
-		return nil, err
+func (p *Prover) generateMTreeParallel(readers []LayerReadWriter, challenge Challenge) ([]*MTreeOutput, error) {
+	numOfFiles := len(readers)
+	numOfWorkers := p.CalcParallelism(numOfFiles)
+	jobsChan := make(chan int, numOfFiles)
+	resultsChan := make(chan *MTreeOutputEntry, numOfFiles)
+	errChan := make(chan error, 0)
+
+	p.logger.Info("execution: start executing %v files, parallelism degree: %v\n", numOfFiles, numOfWorkers)
+
+	for i := 0; i < numOfFiles; i++ {
+		jobsChan <- i
+	}
+	close(jobsChan)
+
+	for i := 0; i < numOfWorkers; i++ {
+		go func() {
+			for {
+				index, more := <-jobsChan
+				if !more {
+					return
+				}
+
+				output, err := p.generateMTreeFromFile(readers[index], challenge)
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				resultsChan <- &MTreeOutputEntry{Index: index, MTreeOutput: output}
+			}
+		}()
 	}
 
-	err = reader.Close()
-	if err != nil {
-		return nil, err
+	results := make([]*MTreeOutput, numOfFiles)
+	for i := 0; i < numOfFiles; i++ {
+		select {
+		case res := <-resultsChan:
+			results[res.Index] = res.MTreeOutput
+		case err := <-errChan:
+			return nil, err
+		}
 	}
 
-	return proof, nil
+	return results, nil
+}
+
+func (p *Prover) CalcParallelism(numOfFiles int) int {
+	max := shared.Max(int(p.cfg.MaxReadFilesParallelism), 1)
+	max = shared.Min(max, runtime.NumCPU())
+	max = shared.Min(max, numOfFiles)
+
+	return max
 }
