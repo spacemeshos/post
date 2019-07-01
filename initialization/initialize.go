@@ -241,12 +241,15 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 					break batchesLoop
 				}
 
-				// Write label group to disk, and append it as leaf in the merkle tree.
+				// Write label group to disk.
 				err := labelsWriter.Write(lg)
 				if err != nil {
 					errChan <- err
 					return
 				}
+
+				// Append label group as leaf in the merkle tree. The tree cache
+				// isn't suppose to handle writing of the leaf layer (0) to disk.
 				err = tree.AddLeaf(lg)
 				if err != nil {
 					errChan <- err
