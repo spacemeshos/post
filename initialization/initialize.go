@@ -221,7 +221,7 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 				if position%uint64(batchSize) == uint64(batchSize-1) {
 					workersOutputChans[i] <- batch
 					batch = make([][]byte, batchSize)
-					position += uint64(numOfWorkers * batchSize)
+					position += uint64((numOfWorkers - 1) * batchSize)
 				}
 
 				position += 1

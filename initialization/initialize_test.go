@@ -110,6 +110,10 @@ func TestInitializeErrors(t *testing.T) {
 func TestInitializeMultipleFiles(t *testing.T) {
 	r := require.New(t)
 
+	cfg := cfg
+	cfg.SpacePerUnit = 1 << 15
+	cfg.FileSize = 1 << 15
+
 	initProof, err := NewInitializer(cfg, logger).Initialize(id)
 	r.NoError(err)
 
