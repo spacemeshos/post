@@ -23,14 +23,14 @@ func ValidateFileSize(space uint64, filesize uint64) error {
 	if filesize < LabelGroupSize {
 		return fmt.Errorf("filesize (%d) must be greater than %d", filesize, LabelGroupSize)
 	}
-	if space/filesize > MaxNumOfFiles {
-		return fmt.Errorf("number of files (%d) is greater than the supported max (%d)", space/filesize, MaxNumOfFiles)
+	if space/filesize > MaxNumFiles {
+		return fmt.Errorf("number of files (%d) is greater than the supported max (%d)", space/filesize, MaxNumFiles)
 	}
 
 	return nil
 }
 
-func NumOfFiles(space uint64, filesize uint64) (int, error) {
+func NumFiles(space uint64, filesize uint64) (int, error) {
 	if err := ValidateFileSize(space, filesize); err != nil {
 		return 0, err
 	}
@@ -38,7 +38,7 @@ func NumOfFiles(space uint64, filesize uint64) (int, error) {
 	return int(space / filesize), nil
 }
 
-// NumOfLabelGroups returns the number of label groups of a given space amount.
-func NumOfLabelGroups(space uint64) uint64 {
+// NumLabelGroups returns the number of label groups of a given space amount.
+func NumLabelGroups(space uint64) uint64 {
 	return uint64(space) / LabelGroupSize
 }

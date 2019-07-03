@@ -17,8 +17,8 @@ type (
 )
 
 var (
-	ValidateSpace    = shared.ValidateSpace
-	NumOfLabelGroups = shared.NumOfLabelGroups
+	ValidateSpace  = shared.ValidateSpace
+	NumLabelGroups = shared.NumLabelGroups
 )
 
 type Validator struct {
@@ -38,17 +38,17 @@ func (v *Validator) Validate(proof *proving.Proof) error {
 		return err
 	}
 
-	numOfLabelGroups := NumOfLabelGroups(v.cfg.SpacePerUnit)
-	err := validate(*proof, numOfLabelGroups, uint8(v.cfg.NumOfProvenLabels), difficulty)
+	numLabelGroups := NumLabelGroups(v.cfg.SpacePerUnit)
+	err := validate(*proof, numLabelGroups, uint8(v.cfg.NumProvenLabels), difficulty)
 	if err != nil {
 		return fmt.Errorf("validation failed: %v", err)
 	}
 	return nil
 }
 
-func validate(proof proving.Proof, numOfLabelGroups uint64, numOfProvenLabels uint8, difficulty proving.Difficulty) error {
-	labelIndices := proving.DrawProvenLabelIndices(proof.MerkleRoot, numOfLabelGroups*difficulty.LabelsPerGroup(),
-		numOfProvenLabels)
+func validate(proof proving.Proof, numLabelGroups uint64, numProvenLabels uint8, difficulty proving.Difficulty) error {
+	labelIndices := proving.DrawProvenLabelIndices(proof.MerkleRoot, numLabelGroups*difficulty.LabelsPerGroup(),
+		numProvenLabels)
 	leafIndices := proving.ConvertLabelIndicesToLeafIndices(labelIndices, difficulty)
 	// The number of proven leaves could be less than the number of proven labels since more than one label could be in
 	// the same leaf. That's why we can only validate the number of proven leaves after drawing the proven labels and

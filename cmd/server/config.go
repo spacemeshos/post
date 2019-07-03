@@ -145,8 +145,8 @@ func setFlags(cmd *cobra.Command, cfg *Config) {
 	flags.UintVar(&cfg.PostCfg.Difficulty, "difficulty",
 		cfg.PostCfg.Difficulty, "Computational cost of the initialization")
 
-	flags.UintVar(&cfg.PostCfg.NumOfProvenLabels, "labels",
-		cfg.PostCfg.NumOfProvenLabels, "Number of labels to prove in non-interactive proof (security parameter)")
+	flags.UintVar(&cfg.PostCfg.NumProvenLabels, "labels",
+		cfg.PostCfg.NumProvenLabels, "Number of labels to prove in non-interactive proof (security parameter)")
 
 	flags.UintVar(&cfg.PostCfg.LowestLayerToCacheDuringProofGeneration, "cachelayer",
 		cfg.PostCfg.LowestLayerToCacheDuringProofGeneration, "Lowest layer to cache in-memory during proof generation (optimization parameter)")

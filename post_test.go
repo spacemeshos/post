@@ -110,6 +110,6 @@ func testInfo(h *integration.Harness, assert *require.Assertions, ctx context.Co
 	assert.Equal(info.Version, shared.Version())
 	assert.Equal(uint64(info.Config.SpacePerUnit), cfg.SpacePerUnit)
 	assert.Equal(uint(info.Config.Difficulty), cfg.Difficulty)
-	assert.Equal(uint(info.Config.Labels), cfg.NumOfProvenLabels)
+	assert.Equal(uint(info.Config.Labels), cfg.NumProvenLabels)
 	assert.Equal(uint(info.Config.CacheLayer), cfg.LowestLayerToCacheDuringProofGeneration)
 }

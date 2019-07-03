@@ -23,7 +23,7 @@ var (
 		SpacePerUnit:                            16 * shared.LabelGroupSize,
 		FileSize:                                16 * shared.LabelGroupSize,
 		Difficulty:                              5,
-		NumOfProvenLabels:                       4,
+		NumProvenLabels:                         4,
 		LowestLayerToCacheDuringProofGeneration: 0,
 		DataDir:                                 tempdir,
 		LabelsLogRate:                           uint64(math.MaxUint64),

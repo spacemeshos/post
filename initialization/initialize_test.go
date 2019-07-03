@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 		SpacePerUnit:                            space,
 		FileSize:                                filesize,
 		Difficulty:                              5,
-		NumOfProvenLabels:                       4,
+		NumProvenLabels:                         4,
 		LowestLayerToCacheDuringProofGeneration: 0,
 		DataDir:                                 datadir,
 		MaxWriteFilesParallelism:                maxFilesParallelism,
@@ -121,12 +121,12 @@ func TestInitializeMultipleFiles(t *testing.T) {
 	r.NoError(err)
 
 	cleanup()
-	for numOfFiles := uint64(2); numOfFiles <= 16; numOfFiles <<= 1 {
+	for numFiles := uint64(2); numFiles <= 16; numFiles <<= 1 {
 		newCfg := *cfg
-		newCfg.FileSize = cfg.SpacePerUnit / numOfFiles
-		newCfg.MaxWriteFilesParallelism = uint(numOfFiles)
-		newCfg.MaxWriteInFileParallelism = uint(numOfFiles)
-		newCfg.MaxReadFilesParallelism = uint(numOfFiles)
+		newCfg.FileSize = cfg.SpacePerUnit / numFiles
+		newCfg.MaxWriteFilesParallelism = uint(numFiles)
+		newCfg.MaxWriteInFileParallelism = uint(numFiles)
+		newCfg.MaxReadFilesParallelism = uint(numFiles)
 
 		multiFilesInitProof, err := NewInitializer(&newCfg, logger).Initialize(id)
 		r.NoError(err)

@@ -85,7 +85,7 @@ func (p *Prover) generateProof(id []byte, challenge Challenge) (*Proof, error) {
 	}
 
 	provenLeafIndices := CalcProvenLeafIndices(
-		proof.MerkleRoot, width<<difficulty, uint8(p.cfg.NumOfProvenLabels), difficulty)
+		proof.MerkleRoot, width<<difficulty, uint8(p.cfg.NumProvenLabels), difficulty)
 
 	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, output.Reader)
 	if err != nil {
@@ -133,20 +133,20 @@ func (p *Prover) generateMTree(reader LayerReadWriter, challenge Challenge) (*MT
 }
 
 func (p *Prover) generateMTrees(readers []LayerReadWriter, challenge Challenge) ([]*MTreeOutput, error) {
-	numOfFiles := len(readers)
-	numOfWorkers := p.CalcParallelism(numOfFiles)
-	jobsChan := make(chan int, numOfFiles)
-	resultsChan := make(chan *MTreeOutputEntry, numOfFiles)
+	numFiles := len(readers)
+	numWorkers := p.CalcParallelism(numFiles)
+	jobsChan := make(chan int, numFiles)
+	resultsChan := make(chan *MTreeOutputEntry, numFiles)
 	errChan := make(chan error, 0)
 
-	p.logger.Info("execution: start executing %v files, parallelism degree: %v\n", numOfFiles, numOfWorkers)
+	p.logger.Info("execution: start executing %v files, parallelism degree: %v\n", numFiles, numWorkers)
 
-	for i := 0; i < numOfFiles; i++ {
+	for i := 0; i < numFiles; i++ {
 		jobsChan <- i
 	}
 	close(jobsChan)
 
-	for i := 0; i < numOfWorkers; i++ {
+	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for {
 				index, more := <-jobsChan
@@ -165,8 +165,8 @@ func (p *Prover) generateMTrees(readers []LayerReadWriter, challenge Challenge) 
 		}()
 	}
 
-	results := make([]*MTreeOutput, numOfFiles)
-	for i := 0; i < numOfFiles; i++ {
+	results := make([]*MTreeOutput, numFiles)
+	for i := 0; i < numFiles; i++ {
 		select {
 		case res := <-resultsChan:
 			results[res.Index] = res.MTreeOutput
@@ -178,10 +178,10 @@ func (p *Prover) generateMTrees(readers []LayerReadWriter, challenge Challenge) 
 	return results, nil
 }
 
-func (p *Prover) CalcParallelism(numOfFiles int) int {
+func (p *Prover) CalcParallelism(numFiles int) int {
 	max := shared.Max(int(p.cfg.MaxReadFilesParallelism), 1)
 	max = shared.Min(max, runtime.NumCPU())
-	max = shared.Min(max, numOfFiles)
+	max = shared.Min(max, numFiles)
 
 	return max
 }

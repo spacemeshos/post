@@ -14,7 +14,7 @@ const (
 	DefaultSpacePerUnit                            = 1 << 20 // 1MB. Temporary value.
 	DefaultFileSize                                = 1 << 20 // 1MB. Temporary value.
 	DefaultDifficulty                              = MinDifficulty
-	DefaultNumOfProvenLabels                       = 100 // The recommended setting to ensure proof safety.
+	DefaultNumProvenLabels                         = 100 // The recommended setting to ensure proof safety.
 	DefaultLowestLayerToCacheDuringProofGeneration = 11
 )
 
@@ -33,7 +33,7 @@ type Config struct {
 	SpacePerUnit                            uint64 `mapstructure:"space"`
 	FileSize                                uint64 `mapstructure:"filesize"`
 	Difficulty                              uint   `mapstructure:"difficulty"`
-	NumOfProvenLabels                       uint   `mapstructure:"labels"`
+	NumProvenLabels                         uint   `mapstructure:"labels"`
 	LowestLayerToCacheDuringProofGeneration uint   `mapstructure:"cachelayer"`
 }
 
@@ -47,7 +47,7 @@ func DefaultConfig() *Config {
 		SpacePerUnit:                            DefaultSpacePerUnit,
 		FileSize:                                DefaultFileSize,
 		Difficulty:                              DefaultDifficulty,
-		NumOfProvenLabels:                       DefaultNumOfProvenLabels,
+		NumProvenLabels:                         DefaultNumProvenLabels,
 		LowestLayerToCacheDuringProofGeneration: DefaultLowestLayerToCacheDuringProofGeneration,
 	}
 }

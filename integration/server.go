@@ -49,7 +49,7 @@ func (cfg *serverConfig) genArgs() []string {
 
 	args = append(args, fmt.Sprintf("--space=%v", cfg.SpacePerUnit))
 	args = append(args, fmt.Sprintf("--difficulty=%v", cfg.Difficulty))
-	args = append(args, fmt.Sprintf("--labels=%v", cfg.NumOfProvenLabels))
+	args = append(args, fmt.Sprintf("--labels=%v", cfg.NumProvenLabels))
 	args = append(args, fmt.Sprintf("--cachelayer=%v", cfg.LowestLayerToCacheDuringProofGeneration))
 
 	return args

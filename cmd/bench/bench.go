@@ -132,7 +132,7 @@ func main() {
 
 		log.Printf("test %v/%v completed, %v", i+1, len(cases), time.Since(tStart))
 
-		numFiles, _ := shared.NumOfFiles(cfg.SpacePerUnit, cfg.FileSize)
+		numFiles, _ := shared.NumFiles(cfg.SpacePerUnit, cfg.FileSize)
 		pfiles, pinfile := init.CalcParallelism()
 		pread := prover.CalcParallelism(numFiles)
 

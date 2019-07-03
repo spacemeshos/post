@@ -31,8 +31,8 @@ var (
 	VerifyNotInitialized = shared.VerifyNotInitialized
 	VerifyInitialized    = shared.VerifyInitialized
 	ValidateSpace        = shared.ValidateSpace
-	NumOfFiles           = shared.NumOfFiles
-	NumOfLabelGroups     = shared.NumOfLabelGroups
+	NumFiles             = shared.NumFiles
+	NumLabelGroups       = shared.NumLabelGroups
 )
 
 type Initializer struct {
@@ -42,7 +42,7 @@ type Initializer struct {
 
 func NewInitializer(cfg *Config, logger Logger) *Initializer { return &Initializer{cfg, logger} }
 
-// Initialize takes an id (public key), space (in bytes), numOfProvenLabels and difficulty.
+// Initialize takes an id (public key), space (in bytes), numProvenLabels and difficulty.
 // Difficulty determines the number of bits per label that are stored. Each leaf in the tree is 32 bytes = 256 bits.
 // The number of bits per label is 256 / LabelsPerGroup. LabelsPerGroup = 1 << difficulty.
 // Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
@@ -60,13 +60,13 @@ func (init *Initializer) Initialize(id []byte) (*proving.Proof, error) {
 		return nil, err
 	}
 
-	numOfFiles, err := NumOfFiles(init.cfg.SpacePerUnit, init.cfg.FileSize)
+	numFiles, err := NumFiles(init.cfg.SpacePerUnit, init.cfg.FileSize)
 	if err != nil {
 		return nil, err
 	}
-	labelGroupsPerFile := NumOfLabelGroups(init.cfg.FileSize)
+	labelGroupsPerFile := NumLabelGroups(init.cfg.FileSize)
 
-	outputs, err := init.initFiles(id, numOfFiles, labelGroupsPerFile)
+	outputs, err := init.initFiles(id, numFiles, labelGroupsPerFile)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (init *Initializer) Initialize(id []byte) (*proving.Proof, error) {
 		return nil, err
 	}
 
-	provenLeafIndices := proving.CalcProvenLeafIndices(output.Root, width<<difficulty, uint8(init.cfg.NumOfProvenLabels), difficulty)
+	provenLeafIndices := proving.CalcProvenLeafIndices(output.Root, width<<difficulty, uint8(init.cfg.NumProvenLabels), difficulty)
 	_, provenLeaves, proofNodes, err := merkle.GenerateProof(provenLeafIndices, output.Reader)
 	if err != nil {
 		return nil, err
@@ -122,22 +122,22 @@ func (init *Initializer) Reset(id []byte) error {
 	return nil
 }
 
-func (init *Initializer) initFiles(id []byte, numOfFiles int, labelGroupsPerFile uint64) ([]*MTreeOutput, error) {
+func (init *Initializer) initFiles(id []byte, numFiles int, labelGroupsPerFile uint64) ([]*MTreeOutput, error) {
 	filesParallelism, infileParallelism := init.CalcParallelism()
-	numOfWorkers := filesParallelism
-	jobsChan := make(chan int, numOfFiles)
-	resultsChan := make(chan *MTreeOutputEntry, numOfFiles)
+	numWorkers := filesParallelism
+	jobsChan := make(chan int, numFiles)
+	resultsChan := make(chan *MTreeOutputEntry, numFiles)
 	errChan := make(chan error, 0)
 	dir := shared.GetInitDir(init.cfg.DataDir, id)
 
-	init.logger.Info("initialization: start writing %v files, parallelism degree: %v, dir: %v", numOfFiles, numOfWorkers, dir)
+	init.logger.Info("initialization: start writing %v files, parallelism degree: %v, dir: %v", numFiles, numWorkers, dir)
 
-	for i := 0; i < numOfFiles; i++ {
+	for i := 0; i < numFiles; i++ {
 		jobsChan <- i
 	}
 	close(jobsChan)
 
-	for i := 0; i < numOfWorkers; i++ {
+	for i := 0; i < numWorkers; i++ {
 		go func() {
 			for {
 				index, more := <-jobsChan
@@ -156,8 +156,8 @@ func (init *Initializer) initFiles(id []byte, numOfFiles int, labelGroupsPerFile
 		}()
 	}
 
-	outputs := make([]*MTreeOutput, numOfFiles)
-	for i := 0; i < numOfFiles; i++ {
+	outputs := make([]*MTreeOutput, numFiles)
+	for i := 0; i < numFiles; i++ {
 		select {
 		case res := <-resultsChan:
 			outputs[res.Index] = res.MTreeOutput
@@ -189,8 +189,8 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 	init.logger.Info("initialization: start writing file %v, parallelism degree: %v",
 		fileIndex, infileParallelism)
 
-	numOfWorkers := infileParallelism
-	workersChans := make([]chan [][]byte, numOfWorkers)
+	numWorkers := infileParallelism
+	workersChans := make([]chan [][]byte, numWorkers)
 	errChan := make(chan error, 0)
 	finishedChan := make(chan struct{}, 0)
 	batchSize := 100
@@ -198,7 +198,7 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 
 	// CPU workers.
 	fileOffset := uint64(fileIndex) * labelGroupsPerFile
-	for i := 0; i < numOfWorkers; i++ {
+	for i := 0; i < numWorkers; i++ {
 		i := i
 		workersChans[i] = make(chan [][]byte, chanBufferSize)
 		workerOffset := i
@@ -212,7 +212,7 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 				if position%uint64(batchSize) == uint64(batchSize-1) {
 					workersChans[i] <- batch
 					batch = make([][]byte, batchSize)
-					position += uint64((numOfWorkers - 1) * batchSize)
+					position += uint64((numWorkers - 1) * batchSize)
 				}
 
 				position += 1
@@ -226,7 +226,7 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 	batchesLoop:
 		for i := 0; ; i++ {
 			// Consume the next batch from the next worker.
-			batch := <-workersChans[i%numOfWorkers]
+			batch := <-workersChans[i%numWorkers]
 			for j, lg := range batch {
 				if lg == nil {
 					break batchesLoop

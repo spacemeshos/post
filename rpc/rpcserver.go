@@ -177,7 +177,7 @@ func (r *rpcServer) GetInfo(ctx context.Context, in *api.GetInfoRequest) (*api.G
 			Datadir:      r.cfg.DataDir,
 			SpacePerUnit: int64(r.cfg.SpacePerUnit),
 			Difficulty:   int32(r.cfg.Difficulty),
-			Labels:       int32(r.cfg.NumOfProvenLabels),
+			Labels:       int32(r.cfg.NumProvenLabels),
 			CacheLayer:   int32(r.cfg.LowestLayerToCacheDuringProofGeneration),
 		},
 	}

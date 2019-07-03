@@ -67,19 +67,19 @@ func isInitialized(cfg *Config, id []byte) (bool, error) {
 		return false, err
 	}
 
-	var numOfFiles int
+	var numFiles int
 	for _, file := range files {
 		if !file.IsDir() && uint64(file.Size()) == cfg.FileSize {
-			numOfFiles++
+			numFiles++
 		}
 	}
 
-	expectedNumOfFiles, err := NumOfFiles(cfg.SpacePerUnit, cfg.FileSize)
+	expectedNumFiles, err := NumFiles(cfg.SpacePerUnit, cfg.FileSize)
 	if err != nil {
 		return false, err
 	}
 
-	return numOfFiles == expectedNumOfFiles, nil
+	return numFiles == expectedNumFiles, nil
 }
 
 func Min(x, y int) int {
