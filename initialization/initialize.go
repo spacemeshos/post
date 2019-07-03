@@ -194,29 +194,28 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 	errChan := make(chan error, 0)
 	finishedChan := make(chan struct{}, 0)
 	batchSize := 100
-	chanBuffer := 100
+	chanBufferSize := 100
 
 	// CPU workers.
 	fileOffset := uint64(fileIndex) * labelGroupsPerFile
 	for i := 0; i < numOfWorkers; i++ {
 		i := i
-		workersChans[i] = make(chan [][]byte, chanBuffer)
+		workersChans[i] = make(chan [][]byte, chanBufferSize)
 		workerOffset := i
 		go func() {
 			// Calculate labels in groups and write them to channel in batches.
-			iterator := 0
-			position := uint64(workerOffset)
+			position := uint64(workerOffset * batchSize)
 			batch := make([][]byte, batchSize)
 			for position < labelGroupsPerFile {
-				batch[iterator%batchSize] = CalcLabelGroup(id, position+fileOffset, Difficulty(init.cfg.Difficulty))
+				batch[position%uint64(batchSize)] = CalcLabelGroup(id, position+fileOffset, Difficulty(init.cfg.Difficulty))
 
-				if iterator%batchSize == batchSize-1 {
+				if position%uint64(batchSize) == uint64(batchSize-1) {
 					workersChans[i] <- batch
 					batch = make([][]byte, batchSize)
+					position += uint64((numOfWorkers - 1) * batchSize)
 				}
 
-				iterator += 1
-				position += uint64(numOfWorkers)
+				position += 1
 			}
 			workersChans[i] <- batch
 		}()
@@ -224,39 +223,34 @@ func (init *Initializer) initFile(id []byte, fileIndex int, labelGroupsPerFile u
 
 	// IO worker.
 	go func() {
-	loop:
-		for batchesIterator := 0; ; batchesIterator++ {
-			// Consume next batch from all workers.
-			batches := make([][][]byte, numOfWorkers)
-			for i, workerChan := range workersChans {
-				batches[i] = <-workerChan
-			}
-
-			// Consume label groups from the batches in round-robin fashion.
-			for i := 0; i < batchSize*numOfWorkers; i++ {
-				batch := batches[i%numOfWorkers]
-				lg := batch[i/numOfWorkers]
+	batchesLoop:
+		for i := 0; ; i++ {
+			// Consume the next batch from the next worker.
+			batch := <-workersChans[i%numOfWorkers]
+			for j, lg := range batch {
 				if lg == nil {
-					break loop
+					break batchesLoop
 				}
 
-				// Write label group to disk, and append it as leaf in the merkle tree.
+				// Write label group to disk.
 				err := labelsWriter.Write(lg)
 				if err != nil {
 					errChan <- err
 					return
 				}
+
+				// Append label group as leaf in the merkle tree. The tree cache
+				// isn't suppose to handle writing of the leaf layer (0) to disk.
 				err = tree.AddLeaf(lg)
 				if err != nil {
 					errChan <- err
 					return
 				}
 
-				num := i + 1 + batchSize*numOfWorkers*batchesIterator
+				num := batchSize*i + j + 1
 				if uint64(num)%init.cfg.LabelsLogRate == 0 {
 					init.logger.Info("initialization: file %v completed %v label groups", fileIndex, num)
 				}
-
 			}
 		}
 

@@ -111,8 +111,8 @@ func TestInitializeMultipleFiles(t *testing.T) {
 	r := require.New(t)
 
 	cfg := cfg
-	cfg.SpacePerUnit = 1 << 10
-	cfg.FileSize = 1 << 10
+	cfg.SpacePerUnit = 1 << 15
+	cfg.FileSize = 1 << 15
 
 	initProof, err := NewInitializer(cfg, logger).Initialize(id)
 	r.NoError(err)
