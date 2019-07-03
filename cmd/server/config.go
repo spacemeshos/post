@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	"github.com/spacemeshos/post/shared"
+	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/smutil"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -28,13 +28,13 @@ var (
 
 type Config struct {
 	ServerCfg *ServerConfig  `mapstructure:"server"`
-	PostCfg   *shared.Config `mapstructure:"post"`
+	PostCfg   *config.Config `mapstructure:"post"`
 }
 
 func defaultConfig() *Config {
 	return &Config{
 		ServerCfg: defaultServerConfig(),
-		PostCfg:   shared.DefaultConfig(),
+		PostCfg:   config.DefaultConfig(),
 	}
 }
 

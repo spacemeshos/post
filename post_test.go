@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/integration"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/rpc/api"
@@ -24,7 +25,7 @@ var testCases = []*harnessTestCase{
 	{name: "initialize", test: testInitialize},
 }
 
-var cfg = shared.DefaultConfig()
+var cfg = config.DefaultConfig()
 
 func TestHarness(t *testing.T) {
 	assert := require.New(t)

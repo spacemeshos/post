@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/nullstyle/go-xdr/xdr3"
+	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/proving"
@@ -21,7 +22,7 @@ var (
 )
 
 type (
-	Config = shared.Config
+	Config = config.Config
 	Logger = shared.Logger
 )
 

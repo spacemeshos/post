@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/merkle-tree/cache"
+	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
@@ -14,12 +15,12 @@ import (
 )
 
 const (
-	LabelGroupSize = shared.LabelGroupSize
-	MaxSpace       = shared.MaxSpace
+	LabelGroupSize = config.LabelGroupSize
+	MaxSpace       = config.MaxSpace
 )
 
 type (
-	Config           = shared.Config
+	Config           = config.Config
 	Logger           = shared.Logger
 	Difficulty       = shared.Difficulty
 	MTreeOutput      = shared.MTreeOutput

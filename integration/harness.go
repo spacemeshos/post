@@ -3,8 +3,8 @@ package integration
 import (
 	"context"
 	"fmt"
+	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/rpc/api"
-	"github.com/spacemeshos/post/shared"
 	"google.golang.org/grpc"
 	"os"
 	"path/filepath"
@@ -20,7 +20,7 @@ type Harness struct {
 }
 
 // NewHarness creates and initializes a new instance of Harness.
-func NewHarness(cfg *shared.Config) (*Harness, error) {
+func NewHarness(cfg *config.Config) (*Harness, error) {
 	serverCfg, err := newConfig(cfg)
 	if err != nil {
 		return nil, err

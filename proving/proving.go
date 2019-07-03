@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/merkle-tree/cache"
+	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
 	"io"
@@ -11,7 +12,7 @@ import (
 )
 
 const (
-	LabelGroupSize = shared.LabelGroupSize
+	LabelGroupSize = config.LabelGroupSize
 )
 
 var (
@@ -19,7 +20,7 @@ var (
 )
 
 type (
-	Config           = shared.Config
+	Config           = config.Config
 	Logger           = shared.Logger
 	Difficulty       = shared.Difficulty
 	Challenge        = shared.Challenge

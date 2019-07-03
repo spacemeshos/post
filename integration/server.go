@@ -3,7 +3,7 @@ package integration
 import (
 	"bytes"
 	"fmt"
-	"github.com/spacemeshos/post/shared"
+	"github.com/spacemeshos/post/config"
 	"os"
 	"os/exec"
 	"strings"
@@ -13,7 +13,7 @@ import (
 // serverConfig contains all the args and data required to launch a post server
 // instance  and connect to it via rpc client.
 type serverConfig struct {
-	shared.Config
+	config.Config
 	rpcListen string
 	baseDir   string
 	dataDir   string
@@ -21,7 +21,7 @@ type serverConfig struct {
 }
 
 // newConfig returns a newConfig with all default values.
-func newConfig(cfg *shared.Config) (*serverConfig, error) {
+func newConfig(cfg *config.Config) (*serverConfig, error) {
 	baseDir, err := baseDir()
 	if err != nil {
 		return nil, err

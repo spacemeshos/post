@@ -3,6 +3,7 @@ package shared
 import (
 	"encoding/hex"
 	"errors"
+	"github.com/spacemeshos/post/config"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -27,7 +28,7 @@ func GetProofFilename(datadir string, id []byte, challenge []byte) string {
 	return filepath.Join(GetProofsDir(datadir, id), c)
 }
 
-func VerifyInitialized(cfg *Config, id []byte) error {
+func VerifyInitialized(cfg *config.Config, id []byte) error {
 	initialized, err := isInitialized(cfg, id)
 	if err != nil {
 		return err
@@ -40,7 +41,7 @@ func VerifyInitialized(cfg *Config, id []byte) error {
 	return nil
 }
 
-func VerifyNotInitialized(cfg *Config, id []byte) error {
+func VerifyNotInitialized(cfg *config.Config, id []byte) error {
 	initialized, err := isInitialized(cfg, id)
 	if err != nil {
 		return err
@@ -53,7 +54,7 @@ func VerifyNotInitialized(cfg *Config, id []byte) error {
 	return nil
 }
 
-func isInitialized(cfg *Config, id []byte) (bool, error) {
+func isInitialized(cfg *config.Config, id []byte) (bool, error) {
 	if id == nil {
 		return false, errors.New("id is missing")
 	}

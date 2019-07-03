@@ -4,13 +4,13 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/spacemeshos/post/shared"
+	"github.com/spacemeshos/post/config"
 	"os"
 	"path/filepath"
 )
 
 const (
-	LabelGroupSize = shared.LabelGroupSize
+	LabelGroupSize = config.LabelGroupSize
 
 	// OwnerReadWriteExec is a standard owner read / write / exec file permission.
 	OwnerReadWriteExec = 0700

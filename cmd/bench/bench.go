@@ -9,6 +9,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
+	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
@@ -23,12 +24,12 @@ import (
 	"time"
 )
 
-type Config = shared.Config
+type Config = config.Config
 
 var (
 	id, _        = hex.DecodeString("deadbeef")
 	challenge, _ = hex.DecodeString("this is a challenge")
-	defConfig    = shared.DefaultConfig()
+	defConfig    = config.DefaultConfig()
 )
 
 type benchMode int

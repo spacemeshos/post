@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/spacemeshos/merkle-tree"
+	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
@@ -12,7 +13,7 @@ import (
 )
 
 type (
-	Config     = shared.Config
+	Config     = config.Config
 	Difficulty = proving.Difficulty
 )
 

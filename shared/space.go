@@ -9,7 +9,7 @@ func ValidateSpace(space uint64) error {
 	if space > MaxSpace {
 		return fmt.Errorf("space (%d) is greater than the supported max (%d)", space, MaxSpace)
 	}
-	if uint64(space)%LabelGroupSize != 0 {
+	if space%LabelGroupSize != 0 {
 		return fmt.Errorf("space (%d) must be a multiple of %d", space, LabelGroupSize)
 	}
 
@@ -23,7 +23,7 @@ func ValidateFileSize(space uint64, filesize uint64) error {
 	if filesize < LabelGroupSize {
 		return fmt.Errorf("filesize (%d) must be greater than %d", filesize, LabelGroupSize)
 	}
-	if space/filesize > MaxNumFiles {
+	if space/filesize > uint64(MaxNumFiles) {
 		return fmt.Errorf("number of files (%d) is greater than the supported max (%d)", space/filesize, MaxNumFiles)
 	}
 
