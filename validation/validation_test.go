@@ -32,70 +32,87 @@ var (
 	NewProver      = proving.NewProver
 )
 
+func TestMain(m *testing.M) {
+	flag.Parse()
+	res := m.Run()
+	os.Exit(res)
+}
+
 func TestValidate(t *testing.T) {
 	r := require.New(t)
-	defer cleanup()
 
-	proof, err := NewInitializer(cfg, logger).Initialize(id)
+	init := NewInitializer(cfg, logger)
+	proof, err := init.Initialize(id)
 	r.NoError(err)
 
 	err = NewValidator(cfg).Validate(proof)
 	r.Nil(err)
 
 	testGenerateProof(r, id, cfg)
+
+	err = init.Reset(id)
+	r.NoError(err)
 }
 
 func TestValidate2(t *testing.T) {
 	r := require.New(t)
-	defer cleanup()
 
 	newCfg := *cfg
 	newCfg.Difficulty = 6
 
-	proof, err := NewInitializer(&newCfg, logger).Initialize(id)
+	init := NewInitializer(&newCfg, logger)
+	proof, err := init.Initialize(id)
 	r.NoError(err)
 
 	err = NewValidator(&newCfg).Validate(proof)
 	r.Nil(err)
 
 	testGenerateProof(r, id, &newCfg)
+
+	err = init.Reset(id)
+	r.NoError(err)
 }
 
 func TestValidate3(t *testing.T) {
 	r := require.New(t)
-	defer cleanup()
 
 	newCfg := *cfg
 	newCfg.Difficulty = 7
 
-	proof, err := NewInitializer(&newCfg, logger).Initialize(id)
+	init := NewInitializer(&newCfg, logger)
+	proof, err := init.Initialize(id)
 	r.NoError(err)
 
 	err = NewValidator(&newCfg).Validate(proof)
 	r.Nil(err)
 
 	testGenerateProof(r, id, &newCfg)
+
+	err = init.Reset(id)
+	r.NoError(err)
 }
 
 func TestValidate4(t *testing.T) {
 	r := require.New(t)
-	defer cleanup()
 
 	newCfg := *cfg
 	newCfg.Difficulty = 8
 
-	proof, err := NewInitializer(&newCfg, logger).Initialize(id)
+	init := NewInitializer(&newCfg, logger)
+	proof, err := init.Initialize(id)
 	r.NoError(err)
 
 	err = NewValidator(&newCfg).Validate(proof)
 	r.Nil(err)
 
 	testGenerateProof(r, id, &newCfg)
+
+	err = init.Reset(id)
+	r.NoError(err)
 }
 
 func TestValidateBadDifficulty(t *testing.T) {
 	r := require.New(t)
-	defer cleanup()
 
 	newCfg := *cfg
 	newCfg.Difficulty = 4
@@ -114,49 +131,59 @@ func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
 
 func TestGenerateProofFailure(t *testing.T) {
 	r := require.New(t)
-	defer cleanup()
 
 	newCfg := *cfg
 	newCfg.Difficulty = 4
 
-	_, err := NewInitializer(cfg, logger).Initialize(id)
+	init := NewInitializer(cfg, logger)
+	_, err := init.Initialize(id)
 	r.NoError(err)
+
 	proof, err := NewProver(&newCfg, logger).GenerateProof(id, challenge)
 	r.EqualError(err, fmt.Sprintf("proof generation failed: difficulty must be between 5 and 8 (received %d)", newCfg.Difficulty))
 	r.Empty(proof)
+
+	err = init.Reset(id)
+	r.NoError(err)
 }
 
 func TestValidateFail(t *testing.T) {
 	r := require.New(t)
-	defer cleanup()
 
-	proof, err := NewInitializer(cfg, logger).Initialize(id)
+	init := NewInitializer(cfg, logger)
+	proof, err := init.Initialize(id)
 	r.NoError(err)
 
 	proof.Identity = append([]byte{0}, proof.Identity[1:]...)
 
 	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: label at index 91 should be 01101111, but found 00011101")
+
+	err = init.Reset(id)
+	r.NoError(err)
 }
 
 func TestValidateFail2(t *testing.T) {
 	r := require.New(t)
-	defer cleanup()
 
-	proof, err := NewInitializer(cfg, logger).Initialize(id)
+	init := NewInitializer(cfg, logger)
+	proof, err := init.Initialize(id)
 	r.NoError(err)
 
 	proof.Challenge = []byte{1}
 
 	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
+
+	err = init.Reset(id)
+	r.NoError(err)
 }
 
 func TestValidateFail3(t *testing.T) {
 	r := require.New(t)
-	defer cleanup()
 
-	proof, err := NewInitializer(cfg, logger).Initialize(id)
+	init := NewInitializer(cfg, logger)
+	proof, err := init.Initialize(id)
 	r.NoError(err)
 
 	proof.ProvenLeaves[0] = append([]byte{}, proof.ProvenLeaves[0]...)
@@ -164,26 +191,32 @@ func TestValidateFail3(t *testing.T) {
 
 	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
+
+	err = init.Reset(id)
+	r.NoError(err)
 }
 
 func TestValidateFail4(t *testing.T) {
 	r := require.New(t)
-	defer cleanup()
 
-	proof, err := NewInitializer(cfg, logger).Initialize(id)
+	init := NewInitializer(cfg, logger)
+	proof, err := init.Initialize(id)
 	r.NoError(err)
 
 	proof.ProvenLeaves = proof.ProvenLeaves[1:]
 
 	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: number of derived leaf indices (4) doesn't match number of included proven leaves (3)")
+
+	err = init.Reset(id)
+	r.NoError(err)
 }
 
 func TestValidateFail5(t *testing.T) {
 	r := require.New(t)
-	defer cleanup()
 
-	proof, err := NewInitializer(cfg, logger).Initialize(id)
+	init := NewInitializer(cfg, logger)
+	proof, err := init.Initialize(id)
 	r.NoError(err)
 
 	proof.ProofNodes[0] = append([]byte{}, proof.ProofNodes[0]...)
@@ -191,26 +224,32 @@ func TestValidateFail5(t *testing.T) {
 
 	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
+
+	err = init.Reset(id)
+	r.NoError(err)
 }
 
 func TestValidateFail6(t *testing.T) {
 	r := require.New(t)
-	defer cleanup()
 
-	proof, err := NewInitializer(cfg, logger).Initialize(id)
+	init := NewInitializer(cfg, logger)
+	proof, err := init.Initialize(id)
 	r.NoError(err)
 
 	proof.ProofNodes = proof.ProofNodes[1:]
 
 	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
+
+	err = init.Reset(id)
+	r.NoError(err)
 }
 
 func TestValidateFail7(t *testing.T) {
 	r := require.New(t)
-	defer cleanup()
 
-	proof, err := NewInitializer(cfg, logger).Initialize(id)
+	init := NewInitializer(cfg, logger)
+	proof, err := init.Initialize(id)
 	r.NoError(err)
 
 	proof.MerkleRoot = append([]byte{}, proof.MerkleRoot...)
@@ -218,20 +257,12 @@ func TestValidateFail7(t *testing.T) {
 
 	err = NewValidator(cfg).Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
+
+	err = init.Reset(id)
+	r.NoError(err)
 }
 
 func hexDecode(hexStr string) []byte {
 	node, _ := hex.DecodeString(hexStr)
 	return node
-}
-
-func TestMain(m *testing.M) {
-	flag.Parse()
-	res := m.Run()
-	cleanup()
-	os.Exit(res)
-}
-
-func cleanup() {
-	_ = os.RemoveAll(tempdir)
 }
