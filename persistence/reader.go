@@ -22,6 +22,15 @@ type (
 // If the initialization was split into multiple files, they will be grouped
 // into one unified reader.
 func NewLabelsReader(dir string) (LayerReadWriter, error) {
+	readers, err := GetReaders(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	return Merge(readers)
+}
+
+func GetReaders(dir string) ([]LayerReadWriter, error) {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("initialization directory not found: %v", err)
@@ -44,6 +53,10 @@ func NewLabelsReader(dir string) (LayerReadWriter, error) {
 		readers = append(readers, reader)
 	}
 
+	return readers, nil
+}
+
+func Merge(readers []LayerReadWriter) (LayerReadWriter, error) {
 	if len(readers) == 1 {
 		return readers[0], nil
 	} else {
