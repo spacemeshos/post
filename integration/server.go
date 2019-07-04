@@ -47,10 +47,10 @@ func (cfg *serverConfig) genArgs() []string {
 	args = append(args, fmt.Sprintf("--homedir=%v", cfg.baseDir))
 	args = append(args, fmt.Sprintf("--rpclisten=%v", cfg.rpcListen))
 
-	args = append(args, fmt.Sprintf("--space=%v", cfg.SpacePerUnit))
-	args = append(args, fmt.Sprintf("--difficulty=%v", cfg.Difficulty))
-	args = append(args, fmt.Sprintf("--labels=%v", cfg.NumProvenLabels))
-	args = append(args, fmt.Sprintf("--cachelayer=%v", cfg.LowestLayerToCacheDuringProofGeneration))
+	args = append(args, fmt.Sprintf("--post-space=%v", cfg.SpacePerUnit))
+	args = append(args, fmt.Sprintf("--post-difficulty=%v", cfg.Difficulty))
+	args = append(args, fmt.Sprintf("--post-labels=%v", cfg.NumProvenLabels))
+	args = append(args, fmt.Sprintf("--post-cachelayer=%v", cfg.LowestLayerToCacheDuringProofGeneration))
 
 	return args
 }

@@ -39,18 +39,18 @@ var (
 )
 
 type Config struct {
-	DataDir                   string `mapstructure:"datadir"`
-	LabelsLogRate             uint64 `mapstructure:"lograte"`
-	MaxWriteFilesParallelism  uint   `mapstructure:"parallel-files"`
-	MaxWriteInFileParallelism uint   `mapstructure:"parallel-infile"`
-	MaxReadFilesParallelism   uint   `mapstructure:"parallel-read"`
+	DataDir                   string `mapstructure:"post-datadir"`
+	LabelsLogRate             uint64 `mapstructure:"post-lograte"`
+	MaxWriteFilesParallelism  uint   `mapstructure:"post-parallel-files"`
+	MaxWriteInFileParallelism uint   `mapstructure:"post-parallel-infile"`
+	MaxReadFilesParallelism   uint   `mapstructure:"post-parallel-read"`
 
 	// Protocol params.
-	SpacePerUnit                            uint64 `mapstructure:"space"`
-	FileSize                                uint64 `mapstructure:"filesize"`
-	Difficulty                              uint   `mapstructure:"difficulty"`
-	NumProvenLabels                         uint   `mapstructure:"labels"`
-	LowestLayerToCacheDuringProofGeneration uint   `mapstructure:"cachelayer"`
+	SpacePerUnit                            uint64 `mapstructure:"post-space"`
+	FileSize                                uint64 `mapstructure:"post-filesize"`
+	Difficulty                              uint   `mapstructure:"post-difficulty"`
+	NumProvenLabels                         uint   `mapstructure:"post-labels"`
+	LowestLayerToCacheDuringProofGeneration uint   `mapstructure:"post-cachelayer"`
 }
 
 func DefaultConfig() *Config {

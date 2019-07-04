@@ -136,31 +136,31 @@ func setFlags(cmd *cobra.Command, cfg *Config) {
 
 	// POST config.
 
-	flags.Uint64Var(&cfg.PostCfg.SpacePerUnit, "space",
+	flags.Uint64Var(&cfg.PostCfg.SpacePerUnit, "post-space",
 		cfg.PostCfg.SpacePerUnit, "Space per unit, in bytes")
 
-	flags.Uint64Var(&cfg.PostCfg.FileSize, "filesize",
+	flags.Uint64Var(&cfg.PostCfg.FileSize, "post-filesize",
 		cfg.PostCfg.FileSize, "Space per file, in bytes")
 
-	flags.UintVar(&cfg.PostCfg.Difficulty, "difficulty",
+	flags.UintVar(&cfg.PostCfg.Difficulty, "post-difficulty",
 		cfg.PostCfg.Difficulty, "Computational cost of the initialization")
 
-	flags.UintVar(&cfg.PostCfg.NumProvenLabels, "labels",
+	flags.UintVar(&cfg.PostCfg.NumProvenLabels, "post-labels",
 		cfg.PostCfg.NumProvenLabels, "Number of labels to prove in non-interactive proof (security parameter)")
 
-	flags.UintVar(&cfg.PostCfg.LowestLayerToCacheDuringProofGeneration, "cachelayer",
+	flags.UintVar(&cfg.PostCfg.LowestLayerToCacheDuringProofGeneration, "post-cachelayer",
 		cfg.PostCfg.LowestLayerToCacheDuringProofGeneration, "Lowest layer to cache in-memory during proof generation (optimization parameter)")
 
-	flags.Uint64Var(&cfg.PostCfg.LabelsLogRate, "lograte",
+	flags.Uint64Var(&cfg.PostCfg.LabelsLogRate, "post-lograte",
 		cfg.PostCfg.LabelsLogRate, "Labels construction progress log rate")
 
-	flags.UintVar(&cfg.PostCfg.MaxWriteFilesParallelism, "parallel-files",
+	flags.UintVar(&cfg.PostCfg.MaxWriteFilesParallelism, "post-parallel-files",
 		cfg.PostCfg.MaxWriteFilesParallelism, "Max degree of files write parallelism")
 
-	flags.UintVar(&cfg.PostCfg.MaxWriteInFileParallelism, "parallel-infile",
+	flags.UintVar(&cfg.PostCfg.MaxWriteInFileParallelism, "post-parallel-infile",
 		cfg.PostCfg.MaxWriteInFileParallelism, "Max degree of cpu work parallelism per file write")
 
-	flags.UintVar(&cfg.PostCfg.MaxReadFilesParallelism, "parallel-read",
+	flags.UintVar(&cfg.PostCfg.MaxReadFilesParallelism, "post-parallel-read",
 		cfg.PostCfg.MaxReadFilesParallelism, "Max degree of files read parallelism")
 
 	err := viper.BindPFlags(flags)
