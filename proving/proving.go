@@ -21,6 +21,7 @@ var (
 
 type (
 	Config           = config.Config
+	Proof            = shared.Proof
 	Logger           = shared.Logger
 	Difficulty       = shared.Difficulty
 	Challenge        = shared.Challenge
