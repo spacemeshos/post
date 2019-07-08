@@ -6,6 +6,7 @@ import (
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/shared"
+	"github.com/spacemeshos/post/validation"
 	smlog "github.com/spacemeshos/smutil/log"
 	"log"
 )
@@ -50,8 +51,11 @@ func main() {
 		log.Fatalf("initialization failure: %v", err)
 	}
 
-	err = shared.PersistProof(cfg.DataDir, proof)
-	if err != nil {
+	if err := validation.NewValidator(cfg).Validate(proof); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := shared.PersistProof(cfg.DataDir, proof); err != nil {
 		log.Fatalf("persisting proof failure: %v", err)
 	}
 }
