@@ -5,18 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/shared"
 	"os"
 	"path/filepath"
 )
 
 const (
 	LabelGroupSize = config.LabelGroupSize
-
-	// OwnerReadWriteExec is a standard owner read / write / exec file permission.
-	OwnerReadWriteExec = 0700
-
-	// OwnerReadWrite is a standard owner read / write file permission.
-	OwnerReadWrite = 0600
 )
 
 var (
@@ -35,7 +30,7 @@ func NewLabelsWriter(id []byte, index int, dir string) (*Writer, error) {
 		return nil, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
 	}
 
-	err := os.MkdirAll(dir, OwnerReadWriteExec)
+	err := os.MkdirAll(dir, shared.OwnerReadWriteExec)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +40,7 @@ func NewLabelsWriter(id []byte, index int, dir string) (*Writer, error) {
 }
 
 func newWriter(filename string, itemSize uint64) (*Writer, error) {
-	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, OwnerReadWrite)
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, shared.OwnerReadWrite)
 	if err != nil {
 		return nil, err
 	}

@@ -1,4 +1,4 @@
-package proving
+package shared
 
 type Proof struct {
 	Identity     []byte

@@ -1,8 +1,11 @@
 package shared
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"github.com/nullstyle/go-xdr/xdr3"
 	"github.com/spacemeshos/post/config"
 	"io/ioutil"
 	"os"
@@ -81,6 +84,48 @@ func isInitialized(cfg *config.Config, id []byte) (bool, error) {
 	}
 
 	return numFiles == expectedNumFiles, nil
+}
+
+func PersistProof(datadir string, proof *Proof) error {
+	var w bytes.Buffer
+	_, err := xdr.Marshal(&w, &proof)
+	if err != nil {
+		return fmt.Errorf("serialization failure: %v", err)
+	}
+
+	dir := GetProofsDir(datadir, proof.Identity)
+	err = os.Mkdir(dir, OwnerReadWriteExec)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("dir creation failure: %v", err)
+	}
+
+	filename := GetProofFilename(datadir, proof.Identity, proof.Challenge)
+	err = ioutil.WriteFile(filename, w.Bytes(), OwnerReadWrite)
+	if err != nil {
+		return fmt.Errorf("write to disk failure: %v", err)
+	}
+
+	return nil
+}
+
+func FetchProof(datadir string, id []byte, challenge []byte) (*Proof, error) {
+	filename := GetProofFilename(datadir, id, challenge)
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, ErrProofNotExist
+		}
+
+		return nil, fmt.Errorf("read file failure: %v", err)
+	}
+
+	proof := &Proof{}
+	_, err = xdr.Unmarshal(bytes.NewReader(data), proof)
+	if err != nil {
+		return nil, err
+	}
+
+	return proof, nil
 }
 
 func Min(x, y int) int {
