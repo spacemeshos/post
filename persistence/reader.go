@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/spacemeshos/merkle-tree/cache"
+	"github.com/spacemeshos/post/shared"
 	"io"
 	"io/ioutil"
 	"os"
@@ -75,7 +76,7 @@ type Reader struct {
 }
 
 func newReader(name string, itemSize uint64) (*Reader, error) {
-	f, err := os.OpenFile(name, os.O_RDONLY, OwnerReadWrite)
+	f, err := os.OpenFile(name, os.O_RDONLY, shared.OwnerReadWrite)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file for labels reader: %v", err)
 	}
