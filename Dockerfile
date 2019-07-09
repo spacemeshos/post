@@ -21,11 +21,13 @@ COPY . .
 
 # And compile the project
 Run go build -o post .
+RUN cd cmd/init ; go build -o ./init; cd ..
 
 #In this last stage, we start from a fresh Alpine image, to reduce the image size and not ship the Go compiler in our production artifacts.
 FROM alpine AS spacemesh
 
 # Finally we copy the statically compiled Go binary.
 COPY --from=server_builder /go/src/github.com/spacemeshos/post /bin/post
+COPY --from=server_builder /go/src/github.com/spacemeshos/cmd/init/init /bin/init
 
 ENTRYPOINT ["/bin/post"]
