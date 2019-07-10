@@ -3,12 +3,16 @@ package main
 import (
 	"encoding/hex"
 	"flag"
+	"github.com/spacemeshos/ed25519"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/validation"
 	smlog "github.com/spacemeshos/smutil/log"
+	"io/ioutil"
 	"log"
+	"os"
+	"path/filepath"
 )
 
 var (
@@ -27,13 +31,19 @@ func init() {
 	flag.Parse()
 
 	if *idHex == "" {
-		log.Fatal("arg missing: id")
-	}
+		pub, priv, err := ed25519.GenerateKey(nil)
+		if err != nil {
+			log.Fatalf("generate key failure: %v", err)
+		}
 
-	var err error
-	id, err = hex.DecodeString(*idHex)
-	if err != nil {
-		log.Fatalf("id hex decode failure: %v", err)
+		id = pub
+		saveKey(priv)
+	} else {
+		var err error
+		id, err = hex.DecodeString(*idHex)
+		if err != nil {
+			log.Fatalf("id hex decode failure: %v", err)
+		}
 	}
 }
 
@@ -57,5 +67,18 @@ func main() {
 
 	if err := shared.PersistProof(cfg.DataDir, proof); err != nil {
 		log.Fatalf("persisting proof failure: %v", err)
+	}
+}
+
+func saveKey(key []byte) {
+	dir := shared.GetInitDir(cfg.DataDir, id)
+	err := os.Mkdir(dir, shared.OwnerReadWriteExec)
+	if err != nil && !os.IsExist(err) {
+		log.Fatalf("dir creation failure: %v", err)
+	}
+
+	err = ioutil.WriteFile(filepath.Join(dir, "key.bin"), key, shared.OwnerReadWrite)
+	if err != nil {
+		log.Fatalf("write to disk failure: %v", err)
 	}
 }
