@@ -38,6 +38,8 @@ func init() {
 
 		id = pub
 		saveKey(priv)
+
+		smlog.Info("generated id: %x", id)
 	} else {
 		var err error
 		id, err = hex.DecodeString(*idHex)
