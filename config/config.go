@@ -27,8 +27,8 @@ const (
 	DefaultMaxFilesParallelism                     = 1
 	DefaultMaxInFileParallelism                    = 6
 	DefaultMaxReadParallelism                      = 6
-	DefaultSpacePerUnit                            = 1 << 25 // 1MB. Temporary value.
-	DefaultFileSize                                = 1 << 25 // 1MB. Temporary value.
+	DefaultSpacePerUnit                            = 1 << 20 // 1MB. Temporary value.
+	DefaultFileSize                                = 1 << 20 // 1MB. Temporary value.
 	DefaultDifficulty                              = MinDifficulty
 	DefaultNumProvenLabels                         = 100 // The recommended setting to ensure proof safety.
 	DefaultLowestLayerToCacheDuringProofGeneration = 11
