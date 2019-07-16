@@ -50,15 +50,16 @@ func init() {
 }
 
 func main() {
-	init := initialization.NewInitializer(cfg, smlog.AppLog)
+	init := initialization.NewInitializer(cfg, id)
+	init.SetLogger(smlog.AppLog)
 
 	if reset {
-		if err := init.Reset(id); err != nil {
+		if err := init.Reset(); err != nil {
 			log.Fatalf("reset failure: %v", err)
 		}
 	}
 
-	proof, err := init.Initialize(id)
+	proof, err := init.Initialize()
 	if err != nil {
 		log.Fatalf("initialization failure: %v", err)
 	}

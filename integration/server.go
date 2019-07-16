@@ -6,6 +6,7 @@ import (
 	"github.com/spacemeshos/post/config"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -27,7 +28,8 @@ func newConfig(cfg *config.Config) (*serverConfig, error) {
 		return nil, err
 	}
 
-	postPath, err := postExecutablePath(baseDir)
+	postPath, err := postExecutablePath(filepath.Join(os.TempDir(), "post-build"))
+
 	if err != nil {
 		return nil, err
 	}
@@ -48,9 +50,18 @@ func (cfg *serverConfig) genArgs() []string {
 	args = append(args, fmt.Sprintf("--rpclisten=%v", cfg.rpcListen))
 
 	args = append(args, fmt.Sprintf("--post-space=%v", cfg.SpacePerUnit))
+	args = append(args, fmt.Sprintf("--post-filesize=%v", cfg.FileSize))
 	args = append(args, fmt.Sprintf("--post-difficulty=%v", cfg.Difficulty))
 	args = append(args, fmt.Sprintf("--post-labels=%v", cfg.NumProvenLabels))
 	args = append(args, fmt.Sprintf("--post-cachelayer=%v", cfg.LowestLayerToCacheDuringProofGeneration))
+
+	args = append(args, fmt.Sprintf("--post-parallel-files=%v", cfg.MaxWriteFilesParallelism))
+	args = append(args, fmt.Sprintf("--post-parallel-infile=%v", cfg.MaxWriteInFileParallelism))
+	args = append(args, fmt.Sprintf("--post-parallel-read=%v", cfg.MaxReadFilesParallelism))
+
+	// Disabling disk space availability checks because datadir is a temp dir,
+	// and so stats might not be reliable.
+	args = append(args, fmt.Sprintf("--post-disable-space-checks"))
 
 	return args
 }
@@ -90,6 +101,9 @@ func (s *server) start() error {
 	var errb bytes.Buffer
 	s.cmd.Stderr = &errb
 
+	var a bytes.Buffer
+	s.cmd.Stdout = &a
+
 	if err := s.cmd.Start(); err != nil {
 		return err
 	}
@@ -120,13 +134,15 @@ func (s *server) start() error {
 
 // shutdown terminates the running post server process, and cleans up
 // all files/directories created by it.
-func (s *server) shutdown() error {
+func (s *server) shutdown(cleanup bool) error {
 	if err := s.stop(); err != nil {
 		return err
 	}
 
-	if err := s.cleanup(); err != nil {
-		return err
+	if cleanup {
+		if err := s.cleanup(); err != nil {
+			return err
+		}
 	}
 
 	return nil

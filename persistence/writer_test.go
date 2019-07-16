@@ -22,7 +22,7 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 	labelsToWriter := make([]LabelGroup, 0)
 
 	for i, labelGroupGroup := range labelGroupGroupGroups {
-		writer, err := NewLabelsWriter(id, i, tempdir)
+		writer, err := NewLabelsWriter(tempdir, id, i)
 		req.NoError(err)
 
 		for _, labelGroup := range labelGroupGroup {
@@ -36,7 +36,7 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 		req.NoError(err)
 	}
 
-	reader, err := NewLabelsReader(tempdir)
+	reader, err := NewLabelsReader(tempdir, id)
 	req.NoError(err)
 
 	labelsFromReader := make([]LabelGroup, len(labelsToWriter))

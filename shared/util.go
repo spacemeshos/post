@@ -31,27 +31,15 @@ func GetProofFilename(datadir string, id []byte, challenge []byte) string {
 	return filepath.Join(GetProofsDir(datadir, id), c)
 }
 
-func VerifyInitialized(cfg *config.Config, id []byte) error {
+// TODO: use logic from initializer.State method, after resolving packages dependencies issue.
+func VerifyInitCompleted(cfg *config.Config, id []byte) error {
 	initialized, err := isInitialized(cfg, id)
 	if err != nil {
 		return err
 	}
 
 	if !initialized {
-		return ErrNotInitialized
-	}
-
-	return nil
-}
-
-func VerifyNotInitialized(cfg *config.Config, id []byte) error {
-	initialized, err := isInitialized(cfg, id)
-	if err != nil {
-		return err
-	}
-
-	if initialized {
-		return ErrAlreadyInitialized
+		return ErrInitNotCompleted
 	}
 
 	return nil

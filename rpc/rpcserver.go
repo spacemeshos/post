@@ -1,17 +1,20 @@
 package rpc
 
 import (
+	"encoding/hex"
+	"errors"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/rpc/api"
 	"github.com/spacemeshos/post/shared"
 	"golang.org/x/net/context"
+	"sync"
 )
 
 var (
-	VerifyInitialized    = shared.VerifyInitialized
-	VerifyNotInitialized = shared.VerifyNotInitialized
+	VerifyInitCompleted    = shared.VerifyInitCompleted
+	ErrAlreadyInitializing = errors.New("already initializing")
 )
 
 type (
@@ -24,8 +27,10 @@ type rpcServer struct {
 	cfg    *Config
 	logger Logger
 	signal *shared.Signal
-	i      *initialization.Initializer
-	p      *proving.Prover
+
+	initializing map[string]bool
+
+	sync.Mutex
 }
 
 // A compile time check to ensure that rpcServer fully implements PostServer.
@@ -34,16 +39,22 @@ var _ api.PostServer = (*rpcServer)(nil)
 // newRPCServer creates and returns a new instance of the rpcServer.
 func NewRPCServer(s *shared.Signal, cfg *Config, logger Logger) (*rpcServer, error) {
 	return &rpcServer{
-		cfg:    cfg,
-		logger: logger,
-		signal: s,
-		i:      initialization.NewInitializer(cfg, logger),
-		p:      proving.NewProver(cfg, logger),
+		cfg:          cfg,
+		logger:       logger,
+		signal:       s,
+		initializing: make(map[string]bool),
 	}, nil
 }
 
 func (r *rpcServer) Initialize(ctx context.Context, in *api.InitializeRequest) (*api.InitializeResponse, error) {
-	proof, err := r.i.Initialize(in.Id)
+	if err := r.addInitializing(in.Id); err != nil {
+		return nil, err
+	}
+	defer r.removeInitializing(in.Id)
+
+	init := initialization.NewInitializer(r.cfg, in.Id)
+	init.SetLogger(r.logger)
+	proof, err := init.Initialize()
 	if err != nil {
 		return nil, err
 	}
@@ -65,12 +76,23 @@ func (r *rpcServer) Initialize(ctx context.Context, in *api.InitializeRequest) (
 }
 
 func (r *rpcServer) InitializeAsync(ctx context.Context, in *api.InitializeAsyncRequest) (*api.InitializeAsyncResponse, error) {
-	if err := VerifyNotInitialized(r.cfg, in.Id); err != nil {
+	init := initialization.NewInitializer(r.cfg, in.Id)
+	init.SetLogger(r.logger)
+
+	if err := init.VerifyNotCompleted(); err != nil {
+		return nil, err
+	}
+
+	if err := r.addInitializing(in.Id); err != nil {
 		return nil, err
 	}
 
 	go func() {
-		proof, err := r.i.Initialize(in.Id)
+		defer r.removeInitializing(in.Id)
+
+		init := initialization.NewInitializer(r.cfg, in.Id)
+		init.SetLogger(r.logger)
+		proof, err := init.Initialize()
 		if err != nil {
 			r.logger.Error("initialization failure: %v", err)
 			return
@@ -87,7 +109,9 @@ func (r *rpcServer) InitializeAsync(ctx context.Context, in *api.InitializeAsync
 }
 
 func (r *rpcServer) Execute(ctx context.Context, in *api.ExecuteRequest) (*api.ExecuteResponse, error) {
-	proof, err := r.p.GenerateProof(in.Id, in.Challenge)
+	prover := proving.NewProver(r.cfg, in.Id)
+	prover.SetLogger(r.logger)
+	proof, err := prover.GenerateProof(in.Challenge)
 	if err != nil {
 		return nil, err
 	}
@@ -109,12 +133,14 @@ func (r *rpcServer) Execute(ctx context.Context, in *api.ExecuteRequest) (*api.E
 }
 
 func (r *rpcServer) ExecuteAsync(ctx context.Context, in *api.ExecuteAsyncRequest) (*api.ExecuteAsyncResponse, error) {
-	if err := VerifyInitialized(r.cfg, in.Id); err != nil {
+	if err := VerifyInitCompleted(r.cfg, in.Id); err != nil {
 		return nil, err
 	}
 
 	go func() {
-		proof, err := r.p.GenerateProof(in.Id, in.Challenge)
+		prover := proving.NewProver(r.cfg, in.Id)
+		prover.SetLogger(r.logger)
+		proof, err := prover.GenerateProof(in.Challenge)
 		if err != nil {
 			r.logger.Error("execution failure: %v", err)
 			return
@@ -131,7 +157,7 @@ func (r *rpcServer) ExecuteAsync(ctx context.Context, in *api.ExecuteAsyncReques
 }
 
 func (r *rpcServer) GetProof(ctx context.Context, in *api.GetProofRequest) (*api.GetProofResponse, error) {
-	if err := VerifyInitialized(r.cfg, in.Id); err != nil {
+	if err := VerifyInitCompleted(r.cfg, in.Id); err != nil {
 		return nil, err
 	}
 
@@ -152,12 +178,37 @@ func (r *rpcServer) GetProof(ctx context.Context, in *api.GetProofRequest) (*api
 }
 
 func (r *rpcServer) Reset(ctx context.Context, in *api.ResetRequest) (*api.ResetResponse, error) {
-	err := r.i.Reset(in.Id)
+	init := initialization.NewInitializer(r.cfg, in.Id)
+	init.SetLogger(r.logger)
+	err := init.Reset()
 	if err != nil {
 		return nil, err
 	}
 
 	return &api.ResetResponse{}, nil
+}
+
+func (r *rpcServer) GetState(ctx context.Context, in *api.GetStateRequest) (*api.GetStateResponse, error) {
+	r.Lock()
+	idHex := hex.EncodeToString(in.Id)
+	exists := r.initializing[idHex]
+	r.Unlock()
+
+	if exists {
+		return &api.GetStateResponse{State: api.GetStateResponse_Initializing}, nil
+	}
+
+	init := initialization.NewInitializer(r.cfg, in.Id)
+	init.SetLogger(r.logger)
+	state, requiredSpace, err := init.State()
+	if err != nil {
+		return nil, err
+	}
+
+	return &api.GetStateResponse{
+		State:         api.GetStateResponse_State(state - 1), // native state starts at 0, wire state at 1
+		RequiredSpace: requiredSpace,
+	}, nil
 }
 
 func (r *rpcServer) GetInfo(ctx context.Context, in *api.GetInfoRequest) (*api.GetInfoResponse, error) {
@@ -178,4 +229,24 @@ func (r *rpcServer) GetInfo(ctx context.Context, in *api.GetInfoRequest) (*api.G
 func (r *rpcServer) Shutdown(context.Context, *api.ShutdownRequest) (*api.ShutdownResponse, error) {
 	r.signal.RequestShutdown()
 	return &api.ShutdownResponse{}, nil
+}
+
+func (r *rpcServer) addInitializing(id []byte) error {
+	r.Lock()
+	defer r.Unlock()
+
+	idHex := hex.EncodeToString(id)
+	if r.initializing[idHex] {
+		return ErrAlreadyInitializing
+	}
+	r.initializing[idHex] = true
+	return nil
+}
+
+func (r *rpcServer) removeInitializing(id []byte) {
+	r.Lock()
+	defer r.Unlock()
+
+	idHex := hex.EncodeToString(id)
+	delete(r.initializing, idHex)
 }

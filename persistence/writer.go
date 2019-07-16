@@ -25,7 +25,8 @@ type Writer struct {
 	itemSize uint64
 }
 
-func NewLabelsWriter(id []byte, index int, dir string) (*Writer, error) {
+func NewLabelsWriter(datadir string, id []byte, index int) (*Writer, error) {
+	dir := shared.GetInitDir(datadir, id)
 	if len(id) > 64 {
 		return nil, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
 	}
@@ -40,7 +41,7 @@ func NewLabelsWriter(id []byte, index int, dir string) (*Writer, error) {
 }
 
 func newWriter(filename string, itemSize uint64) (*Writer, error) {
-	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, shared.OwnerReadWrite)
+	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, shared.OwnerReadWrite)
 	if err != nil {
 		return nil, err
 	}

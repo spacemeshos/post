@@ -9,6 +9,7 @@ import (
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/validation"
 	"github.com/stretchr/testify/require"
+	"sync"
 	"testing"
 	"time"
 )
@@ -23,15 +24,174 @@ type harnessTestCase struct {
 var testCases = []*harnessTestCase{
 	{name: "info", test: testInfo},
 	{name: "initialize", test: testInitialize},
+	{name: "initialize parallel", test: testInitializeParallel},
 }
 
-var cfg = config.DefaultConfig()
+var (
+	cfg = config.DefaultConfig()
+	id  = []byte("deadbeef")
+)
 
 func TestHarness(t *testing.T) {
 	assert := require.New(t)
 
+	cfg := *cfg
+	cfg.SpacePerUnit = 1 << 25
+	cfg.FileSize = 1 << 23
+
+	h := newHarness(assert, &cfg)
+	defer func() {
+		err := h.TearDown(true)
+		assert.NoError(err, "failed to tear down harness")
+	}()
+
+	for _, testCase := range testCases {
+		success := t.Run(testCase.name, func(t1 *testing.T) {
+			ctx, _ := context.WithTimeout(context.Background(), time.Duration(30*time.Second))
+			testCase.test(h, assert, ctx)
+		})
+
+		if !success {
+			break
+		}
+	}
+}
+
+func testInfo(h *integration.Harness, assert *require.Assertions, ctx context.Context) {
+	info, err := h.GetInfo(ctx, &api.GetInfoRequest{})
+	assert.NoError(err)
+	assert.Equal(info.Version, shared.Version())
+	assert.Equal(uint64(info.Config.SpacePerUnit), cfg.SpacePerUnit)
+	assert.Equal(uint(info.Config.Difficulty), cfg.Difficulty)
+	assert.Equal(uint(info.Config.Labels), cfg.NumProvenLabels)
+	assert.Equal(uint(info.Config.CacheLayer), cfg.LowestLayerToCacheDuringProofGeneration)
+}
+
+func testInitialize(h *integration.Harness, assert *require.Assertions, ctx context.Context) {
+	resInit, err := h.Initialize(ctx, &api.InitializeRequest{Id: id})
+	assert.NoError(err)
+
+	nativeProof := wireToNativeProof(resInit.Proof)
+	err = validation.NewValidator(cfg).Validate(nativeProof)
+	assert.NoError(err)
+
+	resProof, err := h.GetProof(ctx, &api.GetProofRequest{Id: id, Challenge: shared.ZeroChallenge})
+	assert.NoError(err)
+	assert.Equal(resProof.Proof, resInit.Proof)
+
+	_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
+	assert.EqualError(err, "rpc error: code = Unknown desc = already completed")
+
+	_, err = h.Reset(ctx, &api.ResetRequest{Id: id})
+	assert.NoError(err)
+
+	_, err = h.Reset(ctx, &api.ResetRequest{Id: id})
+	assert.EqualError(err, "rpc error: code = Unknown desc = not started")
+}
+
+func testInitializeParallel(h *integration.Harness, assert *require.Assertions, ctx context.Context) {
+	_, err := h.InitializeAsync(ctx, &api.InitializeAsyncRequest{Id: id})
+	assert.NoError(err)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_, err := h.Initialize(ctx, &api.InitializeRequest{Id: id})
+		assert.EqualError(err, "rpc error: code = Unknown desc = already initializing")
+
+		_, err = h.InitializeAsync(ctx, &api.InitializeAsyncRequest{Id: id})
+		assert.EqualError(err, "rpc error: code = Unknown desc = already initializing")
+	}()
+	wg.Wait()
+}
+
+func TestHarness_CrashRecovery(t *testing.T) {
+	assert := require.New(t)
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(30*time.Second))
+
+	cfg := *cfg
+	cfg.SpacePerUnit = 1 << 26
+	cfg.FileSize = 1 << 24 // 4 files.
+	cfg.MaxWriteFilesParallelism = 2
+	cfg.MaxWriteInFileParallelism = 2
+
+	h := newHarness(assert, &cfg)
+
+	resState, err := h.GetState(ctx, &api.GetStateRequest{Id: id})
+	assert.NoError(err)
+	assert.Equal("NotStarted", resState.State.String())
+	assert.Equal(cfg.SpacePerUnit, resState.RequiredSpace)
+
+	// Initialize for short time, so completion won't be reached.
+	_, err = h.InitializeAsync(ctx, &api.InitializeAsyncRequest{Id: id})
+	assert.NoError(err)
+	time.Sleep(1 * time.Second)
+
+	resState, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
+	assert.NoError(err)
+	assert.Equal("Initializing", resState.State.String())
+	assert.Equal(uint64(0), resState.RequiredSpace)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		// Kill the post server, stopping the initialization process ungracefully.
+		err := h.TearDown(false)
+		assert.NoError(err, "failed to crash post server")
+
+		// Launch another server, with different init-critical config.
+		diffCfg := cfg
+		diffCfg.FileSize = cfg.FileSize << 1
+		h := newHarness(assert, &diffCfg)
+
+		// Verify that initialization recovery is not allowed.
+		_, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
+		assert.EqualError(err, "rpc error: code = Unknown desc = config mismatch")
+		_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
+		assert.EqualError(err, "rpc error: code = Unknown desc = config mismatch")
+		err = h.TearDown(false)
+		assert.NoError(err, "failed to tear down harness")
+
+		// Launch another server, with the same config.
+		h = newHarness(assert, &cfg)
+		defer func() {
+			err = h.TearDown(true)
+			assert.NoError(err, "failed to tear down harness")
+		}()
+
+		// Verify the initialization process state.
+		resState, err := h.GetState(ctx, &api.GetStateRequest{Id: id})
+		assert.NoError(err)
+		assert.Equal("Crashed", resState.State.String())
+		assert.True(resState.RequiredSpace < cfg.SpacePerUnit)
+		assert.True(resState.RequiredSpace > 0)
+
+		// Complete the initialization process.
+		resInit, err := h.Initialize(ctx, &api.InitializeRequest{Id: id})
+		assert.NoError(err)
+
+		nativeProof := wireToNativeProof(resInit.Proof)
+		err = validation.NewValidator(&cfg).Validate(nativeProof)
+		assert.NoError(err)
+
+		_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
+		assert.EqualError(err, "rpc error: code = Unknown desc = already completed")
+
+		resState, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
+		assert.NoError(err)
+		assert.Equal("Completed", resState.State.String())
+		assert.Equal(uint64(0), resState.RequiredSpace)
+	}()
+	wg.Wait()
+}
+
+func newHarness(assert *require.Assertions, cfg *config.Config) *integration.Harness {
 	h, err := integration.NewHarness(cfg)
 	assert.NoError(err)
+	assert.NotNil(h)
 
 	go func() {
 		for {
@@ -45,72 +205,15 @@ func TestHarness(t *testing.T) {
 		}
 	}()
 
-	defer func() {
-		err := h.TearDown()
-		assert.NoError(err, "failed to tear down harness")
-		t.Logf("harness teared down")
-	}()
-
-	assert.NoError(err)
-	assert.NotNil(h)
-	t.Logf("harness launched")
-
-	for _, testCase := range testCases {
-		success := t.Run(testCase.name, func(t1 *testing.T) {
-			ctx, _ := context.WithTimeout(context.Background(), time.Duration(5*time.Second))
-			testCase.test(h, assert, ctx)
-		})
-
-		if !success {
-			break
-		}
-	}
+	return h
 }
 
-func testInitialize(h *integration.Harness, assert *require.Assertions, ctx context.Context) {
-	info, err := h.GetInfo(ctx, &api.GetInfoRequest{})
-	assert.NoError(err)
-	assert.Nil(info.State)
-
-	id := []byte("deadbeef")
-	initProof, err := h.Initialize(ctx, &api.InitializeRequest{Id: id})
-	assert.NoError(err)
-
-	nativeProof := &proving.Proof{
-		Identity:     initProof.Proof.Id,
-		Challenge:    shared.Challenge(initProof.Proof.Challenge),
-		MerkleRoot:   initProof.Proof.MerkleRoot,
-		ProvenLeaves: initProof.Proof.ProvenLeaves,
-		ProofNodes:   initProof.Proof.ProofNodes,
+func wireToNativeProof(proof *api.Proof) *proving.Proof {
+	return &proving.Proof{
+		Identity:     proof.Id,
+		Challenge:    shared.Challenge(proof.Challenge),
+		MerkleRoot:   proof.MerkleRoot,
+		ProvenLeaves: proof.ProvenLeaves,
+		ProofNodes:   proof.ProofNodes,
 	}
-
-	err = validation.NewValidator(cfg).Validate(nativeProof)
-	assert.NoError(err)
-
-	proof, err := h.GetProof(ctx, &api.GetProofRequest{Id: id, Challenge: shared.ZeroChallenge})
-	assert.NoError(err)
-	assert.Equal(proof.Proof, initProof.Proof)
-
-	info, err = h.GetInfo(ctx, &api.GetInfoRequest{})
-	assert.NoError(err)
-	//assert.Equal(info.State.Id, id)
-	//assert.Equal(len(info.State.ProvenChallenges), 1)
-	//assert.Equal(info.State.ProvenChallenges[0], hex.EncodeToString(shared.ZeroChallenge))
-
-	_, err = h.Reset(ctx, &api.ResetRequest{Id: id})
-	assert.NoError(err)
-
-	info, err = h.GetInfo(ctx, &api.GetInfoRequest{})
-	assert.NoError(err)
-	assert.Nil(info.State)
-}
-
-func testInfo(h *integration.Harness, assert *require.Assertions, ctx context.Context) {
-	info, err := h.GetInfo(ctx, &api.GetInfoRequest{})
-	assert.NoError(err)
-	assert.Equal(info.Version, shared.Version())
-	assert.Equal(uint64(info.Config.SpacePerUnit), cfg.SpacePerUnit)
-	assert.Equal(uint(info.Config.Difficulty), cfg.Difficulty)
-	assert.Equal(uint(info.Config.Labels), cfg.NumProvenLabels)
-	assert.Equal(uint(info.Config.CacheLayer), cfg.LowestLayerToCacheDuringProofGeneration)
 }
