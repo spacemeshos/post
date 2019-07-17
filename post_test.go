@@ -9,7 +9,6 @@ import (
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/validation"
 	"github.com/stretchr/testify/require"
-	"sync"
 	"testing"
 	"time"
 )
@@ -18,7 +17,7 @@ import (
 // of the Harness to exercise functionality.
 type harnessTestCase struct {
 	name string
-	test func(h *integration.Harness, assert *require.Assertions, ctx context.Context)
+	test func(h *integration.Harness, assert *require.Assertions, ctx context.Context, cfg *config.Config)
 }
 
 var testCases = []*harnessTestCase{
@@ -48,7 +47,7 @@ func TestHarness(t *testing.T) {
 	for _, testCase := range testCases {
 		success := t.Run(testCase.name, func(t1 *testing.T) {
 			ctx, _ := context.WithTimeout(context.Background(), time.Duration(30*time.Second))
-			testCase.test(h, assert, ctx)
+			testCase.test(h, assert, ctx, &cfg)
 		})
 
 		if !success {
@@ -57,7 +56,7 @@ func TestHarness(t *testing.T) {
 	}
 }
 
-func testInfo(h *integration.Harness, assert *require.Assertions, ctx context.Context) {
+func testInfo(h *integration.Harness, assert *require.Assertions, ctx context.Context, cfg *config.Config) {
 	info, err := h.GetInfo(ctx, &api.GetInfoRequest{})
 	assert.NoError(err)
 	assert.Equal(info.Version, shared.Version())
@@ -67,7 +66,7 @@ func testInfo(h *integration.Harness, assert *require.Assertions, ctx context.Co
 	assert.Equal(uint(info.Config.CacheLayer), cfg.LowestLayerToCacheDuringProofGeneration)
 }
 
-func testInitialize(h *integration.Harness, assert *require.Assertions, ctx context.Context) {
+func testInitialize(h *integration.Harness, assert *require.Assertions, ctx context.Context, cfg *config.Config) {
 	resInit, err := h.Initialize(ctx, &api.InitializeRequest{Id: id})
 	assert.NoError(err)
 
@@ -89,21 +88,15 @@ func testInitialize(h *integration.Harness, assert *require.Assertions, ctx cont
 	assert.EqualError(err, "rpc error: code = Unknown desc = not started")
 }
 
-func testInitializeParallel(h *integration.Harness, assert *require.Assertions, ctx context.Context) {
+func testInitializeParallel(h *integration.Harness, assert *require.Assertions, ctx context.Context, cfg *config.Config) {
 	_, err := h.InitializeAsync(ctx, &api.InitializeAsyncRequest{Id: id})
 	assert.NoError(err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		_, err := h.Initialize(ctx, &api.InitializeRequest{Id: id})
-		assert.EqualError(err, "rpc error: code = Unknown desc = already initializing")
+	_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
+	assert.EqualError(err, "rpc error: code = Unknown desc = already initializing")
 
-		_, err = h.InitializeAsync(ctx, &api.InitializeAsyncRequest{Id: id})
-		assert.EqualError(err, "rpc error: code = Unknown desc = already initializing")
-	}()
-	wg.Wait()
+	_, err = h.InitializeAsync(ctx, &api.InitializeAsyncRequest{Id: id})
+	assert.EqualError(err, "rpc error: code = Unknown desc = already initializing")
 }
 
 func TestHarness_CrashRecovery(t *testing.T) {
@@ -118,74 +111,70 @@ func TestHarness_CrashRecovery(t *testing.T) {
 
 	h := newHarness(assert, &cfg)
 
+	// Verify the initialization state.
 	resState, err := h.GetState(ctx, &api.GetStateRequest{Id: id})
 	assert.NoError(err)
 	assert.Equal("NotStarted", resState.State.String())
 	assert.Equal(cfg.SpacePerUnit, resState.RequiredSpace)
 
-	// Initialize for short time, so completion won't be reached.
+	// Start initializing, and wait a short time, so completion won't be reached.
 	_, err = h.InitializeAsync(ctx, &api.InitializeAsyncRequest{Id: id})
 	assert.NoError(err)
 	time.Sleep(1 * time.Second)
 
+	// Verify the initialization state.
 	resState, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
 	assert.NoError(err)
 	assert.Equal("Initializing", resState.State.String())
 	assert.Equal(uint64(0), resState.RequiredSpace)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	// Kill the post server, stopping the initialization process ungracefully.
+	err = h.TearDown(false)
+	assert.NoError(err, "failed to crash post server")
 
-		// Kill the post server, stopping the initialization process ungracefully.
-		err := h.TearDown(false)
-		assert.NoError(err, "failed to crash post server")
+	// Launch another server, with different init-critical config.
+	diffCfg := cfg
+	diffCfg.FileSize = cfg.FileSize << 1
+	h = newHarness(assert, &diffCfg)
 
-		// Launch another server, with different init-critical config.
-		diffCfg := cfg
-		diffCfg.FileSize = cfg.FileSize << 1
-		h := newHarness(assert, &diffCfg)
+	// Verify that initialization recovery is not allowed.
+	_, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
+	assert.EqualError(err, "rpc error: code = Unknown desc = config mismatch")
+	_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
+	assert.EqualError(err, "rpc error: code = Unknown desc = config mismatch")
+	err = h.TearDown(false)
+	assert.NoError(err, "failed to tear down harness")
 
-		// Verify that initialization recovery is not allowed.
-		_, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
-		assert.EqualError(err, "rpc error: code = Unknown desc = config mismatch")
-		_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
-		assert.EqualError(err, "rpc error: code = Unknown desc = config mismatch")
-		err = h.TearDown(false)
+	// Launch another server, with the same config.
+	h = newHarness(assert, &cfg)
+	defer func() {
+		err = h.TearDown(true)
 		assert.NoError(err, "failed to tear down harness")
-
-		// Launch another server, with the same config.
-		h = newHarness(assert, &cfg)
-		defer func() {
-			err = h.TearDown(true)
-			assert.NoError(err, "failed to tear down harness")
-		}()
-
-		// Verify the initialization process state.
-		resState, err := h.GetState(ctx, &api.GetStateRequest{Id: id})
-		assert.NoError(err)
-		assert.Equal("Crashed", resState.State.String())
-		assert.True(resState.RequiredSpace < cfg.SpacePerUnit)
-		assert.True(resState.RequiredSpace > 0)
-
-		// Complete the initialization process.
-		resInit, err := h.Initialize(ctx, &api.InitializeRequest{Id: id})
-		assert.NoError(err)
-
-		nativeProof := wireToNativeProof(resInit.Proof)
-		err = validation.NewValidator(&cfg).Validate(nativeProof)
-		assert.NoError(err)
-
-		_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
-		assert.EqualError(err, "rpc error: code = Unknown desc = already completed")
-
-		resState, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
-		assert.NoError(err)
-		assert.Equal("Completed", resState.State.String())
-		assert.Equal(uint64(0), resState.RequiredSpace)
 	}()
-	wg.Wait()
+
+	// Verify the initialization state.
+	resState, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
+	assert.NoError(err)
+	assert.Equal("Crashed", resState.State.String())
+	assert.True(resState.RequiredSpace < cfg.SpacePerUnit)
+	assert.True(resState.RequiredSpace > 0)
+
+	// Complete the initialization procedure.
+	resInit, err := h.Initialize(ctx, &api.InitializeRequest{Id: id})
+	assert.NoError(err)
+
+	nativeProof := wireToNativeProof(resInit.Proof)
+	err = validation.NewValidator(&cfg).Validate(nativeProof)
+	assert.NoError(err)
+
+	// Verify the initialization state.
+	_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
+	assert.EqualError(err, "rpc error: code = Unknown desc = already completed")
+
+	resState, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
+	assert.NoError(err)
+	assert.Equal("Completed", resState.State.String())
+	assert.Equal(uint64(0), resState.RequiredSpace)
 }
 
 func newHarness(assert *require.Assertions, cfg *config.Config) *integration.Harness {
