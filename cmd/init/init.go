@@ -74,7 +74,7 @@ func main() {
 
 func saveKey(key []byte) {
 	dir := shared.GetInitDir(cfg.DataDir, id)
-	err := os.Mkdir(dir, shared.OwnerReadWriteExec)
+	err := os.MkdirAll(dir, shared.OwnerReadWriteExec)
 	if err != nil && !os.IsExist(err) {
 		log.Fatalf("dir creation failure: %v", err)
 	}

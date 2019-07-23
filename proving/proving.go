@@ -62,8 +62,7 @@ func (p *Prover) generateProof(id []byte, challenge Challenge) (*Proof, error) {
 	proof.Challenge = challenge
 	proof.Identity = id
 
-	dir := shared.GetInitDir(p.cfg.DataDir, id)
-	readers, err := persistence.GetReaders(dir)
+	readers, err := persistence.GetReaders(p.cfg.DataDir, id)
 	if err != nil {
 		return nil, err
 	}
