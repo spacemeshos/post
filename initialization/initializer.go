@@ -86,7 +86,9 @@ func (init *Initializer) SetLogger(logger Logger) {
 	init.logger = logger
 }
 
-// Initialize takes an id (public key), space (in bytes), numProvenLabels and difficulty.
+// Initialize perform the initialization procedure and returns a proof of the
+// initialized data with an empty challenge. The data and the proof are applied
+// to the configuration of the Initializer instance: id, space, numProvenLabels and difficulty.
 // Difficulty determines the number of bits per label that are stored. Each leaf in the tree is 32 bytes = 256 bits.
 // The number of bits per label is 256 / LabelsPerGroup. LabelsPerGroup = 1 << difficulty.
 // Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
@@ -331,28 +333,37 @@ func (init *Initializer) initFile(fileIndex int, labelGroupsPerFile uint64, infi
 	workersChans := make([]chan [][]byte, numWorkers)
 	errChan := make(chan error, 0)
 	finishedChan := make(chan struct{}, 0)
-	batchSize := 100
+
+	batchSize := 100 // CPU workers send data to IO worker in batches, to reduce channel ops overhead.
 	chanBufferSize := 100
 
-	// CPU workers.
+	// Start CPU workers.
 	fileOffset := uint64(fileIndex) * labelGroupsPerFile
 	for i := 0; i < numWorkers; i++ {
 		i := i
 		workersChans[i] = make(chan [][]byte, chanBufferSize)
 		workerOffset := i
-		go func() {
-			// Calculate labels in groups and write them to channel in batches.
-			position := uint64(workerOffset*batchSize) + existingWidth
-			batch := make([][]byte, batchSize)
-			batchPosition := uint64(0)
 
+		// Calculate labels in groups and write them to channel in batches.
+		go func() {
+			position := uint64(workerOffset*batchSize) + existingWidth // the starting point of this specific worker.
+			batchPosition := uint64(0)                                 // the starting point of the current batch.
+			batch := make([][]byte, batchSize)
+
+			// Continue as long as the combined position didn't reach the file capacity.
 			for batchPosition+position < labelGroupsPerFile {
+				// Calculate the label group of the combined position and the global offset for this file.
 				batch[batchPosition] = CalcLabelGroup(init.id, batchPosition+position+fileOffset, Difficulty(init.cfg.Difficulty))
+
+				// If batch was filled, send it over the channel, and instantiate a new empty batch.
+				// In addition, adjust position to the next location for this worker, after its own and all other workers batches.
 				if batchPosition == uint64(batchSize-1) {
 					workersChans[i] <- batch
 					batch = make([][]byte, batchSize)
-					position += uint64(numWorkers * batchSize)
 					batchPosition = 0
+
+					position += uint64(numWorkers * batchSize)
+
 					continue
 				}
 
@@ -362,13 +373,15 @@ func (init *Initializer) initFile(fileIndex int, labelGroupsPerFile uint64, infi
 		}()
 	}
 
-	// IO worker.
+	// Start IO worker.
 	go func() {
 	batchesLoop:
 		for i := 0; ; i++ {
 			// Consume the next batch from the next worker.
 			batch := <-workersChans[i%numWorkers]
 			for j, lg := range batch {
+
+				// The first empty label group indicates an unfilled batch which indicates the end of work.
 				if lg == nil {
 					break batchesLoop
 				}

@@ -13,7 +13,7 @@ const (
 	// In bytes. 1 peta-byte of storage.
 	// This would protect against number of labels uint64 overflow as well,
 	// since the number of labels per byte can be 8 at most (3 extra bit shifts).
-	MaxSpace = 1 << 50 // 1099511627777
+	MaxSpace = 1 << 50
 
 	MaxNumFiles = math.MaxUint8 // 255
 
