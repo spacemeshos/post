@@ -5,7 +5,8 @@ import (
 )
 
 var (
-	ErrNotInitialized     = errors.New("not initialized")
-	ErrAlreadyInitialized = errors.New("already initialized")
-	ErrProofNotExist      = errors.New("proof doesn't exist")
+	ErrInitNotStarted   = errors.New("not started")
+	ErrInitCompleted    = errors.New("already completed")
+	ErrInitNotCompleted = errors.New("not completed")
+	ErrProofNotExist    = errors.New("proof doesn't exist")
 )

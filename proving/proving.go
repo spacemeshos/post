@@ -15,10 +15,6 @@ const (
 	LabelGroupSize = config.LabelGroupSize
 )
 
-var (
-	VerifyInitialized = shared.VerifyInitialized
-)
-
 type (
 	Config           = config.Config
 	Proof            = shared.Proof
@@ -33,14 +29,20 @@ type (
 
 type Prover struct {
 	cfg    *Config
+	id     []byte
 	logger Logger
 }
 
-func NewProver(cfg *Config, logger Logger) *Prover { return &Prover{cfg, logger} }
+func NewProver(cfg *Config, id []byte) *Prover {
+	return &Prover{cfg, id, shared.DisabledLogger{}}
+}
 
-func (p *Prover) GenerateProof(id []byte, challenge Challenge) (proof *Proof,
-	err error) {
-	proof, err = p.generateProof(id, challenge)
+func (p *Prover) SetLogger(logger Logger) {
+	p.logger = logger
+}
+
+func (p *Prover) GenerateProof(challenge Challenge) (proof *Proof, err error) {
+	proof, err = p.generateProof(challenge)
 	if err != nil {
 		err = fmt.Errorf("proof generation failed: %v", err)
 		p.logger.Error(err.Error())
@@ -48,8 +50,8 @@ func (p *Prover) GenerateProof(id []byte, challenge Challenge) (proof *Proof,
 	return proof, err
 }
 
-func (p *Prover) generateProof(id []byte, challenge Challenge) (*Proof, error) {
-	if err := VerifyInitialized(p.cfg, id); err != nil {
+func (p *Prover) generateProof(challenge Challenge) (*Proof, error) {
+	if err := shared.VerifyInitCompleted(p.cfg, p.id); err != nil {
 		return nil, err
 	}
 
@@ -60,9 +62,9 @@ func (p *Prover) generateProof(id []byte, challenge Challenge) (*Proof, error) {
 
 	proof := new(Proof)
 	proof.Challenge = challenge
-	proof.Identity = id
+	proof.Identity = p.id
 
-	readers, err := persistence.GetReaders(p.cfg.DataDir, id)
+	readers, err := persistence.GetReaders(p.cfg.DataDir, p.id)
 	if err != nil {
 		return nil, err
 	}
@@ -126,6 +128,9 @@ func (p *Prover) generateMTree(reader LayerReadWriter, challenge Challenge) (*MT
 
 	cacheWriter.SetLayer(0, reader)
 	cacheReader, err := cacheWriter.GetReader()
+	if err != nil {
+		return nil, err
+	}
 
 	return &MTreeOutput{
 		Reader: cacheReader,

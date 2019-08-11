@@ -94,12 +94,12 @@ func main() {
 		log.Printf("test %v/%v starting...", i+1, len(cases))
 		tStart := time.Now()
 
-		init := initialization.NewInitializer(&cfg, shared.DisabledLogger{})
-		prover := proving.NewProver(&cfg, shared.DisabledLogger{})
+		init := initialization.NewInitializer(&cfg, id)
+		prover := proving.NewProver(&cfg, id)
 		validator := validation.NewValidator(&cfg)
 
 		t := time.Now()
-		proof, err := init.Initialize(id)
+		proof, err := init.Initialize()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -113,7 +113,7 @@ func main() {
 		eInitV := time.Since(t)
 
 		t = time.Now()
-		proof, err = prover.GenerateProof(id, challenge)
+		proof, err = prover.GenerateProof(challenge)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -126,7 +126,7 @@ func main() {
 		}
 		eExecV := time.Since(t)
 
-		err = init.Reset(id)
+		err = init.Reset()
 		if err != nil {
 			log.Fatal(err)
 		}

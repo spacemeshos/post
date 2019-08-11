@@ -163,6 +163,9 @@ func setFlags(cmd *cobra.Command, cfg *Config) {
 	flags.UintVar(&cfg.PostCfg.MaxReadFilesParallelism, "post-parallel-read",
 		cfg.PostCfg.MaxReadFilesParallelism, "Max degree of files read parallelism")
 
+	flags.BoolVar(&cfg.PostCfg.DisableSpaceAvailabilityChecks, "post-disable-space-checks",
+		false, "Whether to disable disk space availability checks done in the initialization phase")
+
 	err := viper.BindPFlags(flags)
 	if err != nil {
 		panic(err)

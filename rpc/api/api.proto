@@ -46,6 +46,13 @@ service Post {
         };
     }
 
+    rpc GetState (GetStateRequest) returns (GetStateResponse) {
+        option (google.api.http) = {
+            get: "/v1/state/{id}"
+        };
+    }
+
+
     rpc GetInfo (GetInfoRequest) returns (GetInfoResponse) {
         option (google.api.http) = {
             get: "/v1/info"
@@ -105,6 +112,21 @@ message ResetRequest {
 }
 
 message ResetResponse {
+}
+
+message GetStateRequest {
+    bytes id = 1 [json_name = "id"];
+}
+
+message GetStateResponse {
+    enum State {
+        NotStarted = 0;
+        Completed = 1;
+        Crashed = 2;
+        Initializing = 3;
+    }
+    State state = 1 [json_name = "state"];
+    uint64 requiredSpace = 2 [json_name = "required_space"];
 }
 
 message GetInfoRequest {

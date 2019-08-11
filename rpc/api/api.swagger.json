@@ -208,6 +208,31 @@
           "Post"
         ]
       }
+    },
+    "/v1/state/{id}": {
+      "get": {
+        "operationId": "GetState",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/apiGetStateResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "format": "byte"
+          }
+        ],
+        "tags": [
+          "Post"
+        ]
+      }
     }
   },
   "definitions": {
@@ -293,6 +318,28 @@
           "$ref": "#/definitions/apiProof"
         }
       }
+    },
+    "apiGetStateResponse": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/apiGetStateResponseState"
+        },
+        "requiredSpace": {
+          "type": "string",
+          "format": "uint64"
+        }
+      }
+    },
+    "apiGetStateResponseState": {
+      "type": "string",
+      "enum": [
+        "NotStarted",
+        "Completed",
+        "Crashed",
+        "Initializing"
+      ],
+      "default": "NotStarted"
     },
     "apiInitializeAsyncRequest": {
       "type": "object",

@@ -2,6 +2,7 @@ package shared
 
 import (
 	"fmt"
+	"github.com/ricochet2200/go-disk-usage/du"
 )
 
 // ValidateSpace validates whether the given space amount is valid.
@@ -41,4 +42,9 @@ func NumFiles(space uint64, filesize uint64) (int, error) {
 // NumLabelGroups returns the number of label groups of a given space amount.
 func NumLabelGroups(space uint64) uint64 {
 	return uint64(space) / LabelGroupSize
+}
+
+func AvailableSpace(path string) uint64 {
+	usage := du.NewDiskUsage(path)
+	return usage.Available()
 }

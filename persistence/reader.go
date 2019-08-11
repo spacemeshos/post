@@ -45,7 +45,7 @@ func GetReaders(datadir string, id []byte) ([]LayerReadWriter, error) {
 
 	readers := make([]LayerReadWriter, 0)
 	for _, file := range files {
-		if file.IsDir() || !strings.HasPrefix(file.Name(), fmt.Sprintf("%x", id)) {
+		if !shared.IsInitFile(id, file) {
 			continue
 		}
 		reader, err := newReader(filepath.Join(dir, file.Name()), LabelGroupSize)

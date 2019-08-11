@@ -40,7 +40,7 @@ func NewHarness(cfg *config.Config) (*Harness, error) {
 	// If failed, shutdown the server.
 	conn, err := connectClient(serverCfg.rpcListen)
 	if err != nil {
-		_ = server.shutdown()
+		_ = server.shutdown(true)
 		return nil, err
 	}
 
@@ -55,8 +55,8 @@ func NewHarness(cfg *config.Config) (*Harness, error) {
 // TearDown stops the harness running instance.
 // The created process is killed, and the temporary
 // directories are removed.
-func (h *Harness) TearDown() error {
-	if err := h.server.shutdown(); err != nil {
+func (h *Harness) TearDown(cleanup bool) error {
+	if err := h.server.shutdown(cleanup); err != nil {
 		return err
 	}
 

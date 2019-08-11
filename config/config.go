@@ -13,7 +13,7 @@ const (
 	// In bytes. 1 peta-byte of storage.
 	// This would protect against number of labels uint64 overflow as well,
 	// since the number of labels per byte can be 8 at most (3 extra bit shifts).
-	MaxSpace = 1 << 40 // 1099511627777
+	MaxSpace = 1 << 50
 
 	MaxNumFiles = math.MaxUint8 // 255
 
@@ -39,11 +39,12 @@ var (
 )
 
 type Config struct {
-	DataDir                   string `mapstructure:"post-datadir"`
-	LabelsLogRate             uint64 `mapstructure:"post-lograte"`
-	MaxWriteFilesParallelism  uint   `mapstructure:"post-parallel-files"`
-	MaxWriteInFileParallelism uint   `mapstructure:"post-parallel-infile"`
-	MaxReadFilesParallelism   uint   `mapstructure:"post-parallel-read"`
+	DataDir                        string `mapstructure:"post-datadir"`
+	LabelsLogRate                  uint64 `mapstructure:"post-lograte"`
+	MaxWriteFilesParallelism       uint   `mapstructure:"post-parallel-files"`
+	MaxWriteInFileParallelism      uint   `mapstructure:"post-parallel-infile"`
+	MaxReadFilesParallelism        uint   `mapstructure:"post-parallel-read"`
+	DisableSpaceAvailabilityChecks bool   `mapstructure:"post-disable-space-checks"`
 
 	// Protocol params.
 	SpacePerUnit                            uint64 `mapstructure:"post-space"`
@@ -65,5 +66,6 @@ func DefaultConfig() *Config {
 		Difficulty:                              DefaultDifficulty,
 		NumProvenLabels:                         DefaultNumProvenLabels,
 		LowestLayerToCacheDuringProofGeneration: DefaultLowestLayerToCacheDuringProofGeneration,
+		DisableSpaceAvailabilityChecks:          true, // TODO: permanently remove the checks if they are not reliable.
 	}
 }

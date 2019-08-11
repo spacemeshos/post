@@ -24,8 +24,7 @@ var (
 	maxFilesParallelism  = uint(1)
 	maxInfileParallelism = uint(1)
 
-	logger = shared.DisabledLogger{}
-	cfg    *Config
+	cfg *Config
 )
 
 func TestMain(m *testing.M) {
@@ -52,12 +51,12 @@ func TestMain(m *testing.M) {
 	os.Exit(res)
 }
 
-func TestInitialize(t *testing.T) {
+func TestInitializer(t *testing.T) {
 	r := require.New(t)
 
-	init := NewInitializer(cfg, logger)
-	proof, err := init.Initialize(id)
-	defer cleanup(init, id)
+	init := NewInitializer(cfg, id)
+	proof, err := init.Initialize()
+	defer cleanup(init)
 	r.NoError(err)
 
 	expectedMerkleRoot := hexDecode("2292f95c87626f5a281fa811ba825ffce79442f8999e1ddc8e8c9bbac15e3fcb")
@@ -84,62 +83,62 @@ func TestInitialize(t *testing.T) {
 	r.EqualValues(expectedProofNodes, nodes(proof.ProofNodes))
 }
 
-func TestInitializeErrors(t *testing.T) {
+func TestInitializerErrors(t *testing.T) {
 	r := require.New(t)
 
 	newCfg := *cfg
 	newCfg.Difficulty = 4
-	init := NewInitializer(&newCfg, logger)
-	proof, err := init.Initialize(id)
+	init := NewInitializer(&newCfg, id)
+	proof, err := init.Initialize()
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 4)")
 	r.Nil(proof)
 
 	newCfg = *cfg
 	newCfg.Difficulty = 9
-	init = NewInitializer(&newCfg, logger)
-	proof, err = init.Initialize(id)
+	init = NewInitializer(&newCfg, id)
+	proof, err = init.Initialize()
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 9)")
 	r.Nil(proof)
 
 	newCfg = *cfg
 	newCfg.SpacePerUnit = MaxSpace + 1
-	init = NewInitializer(&newCfg, logger)
-	proof, err = init.Initialize(id)
+	init = NewInitializer(&newCfg, id)
+	proof, err = init.Initialize()
 	r.EqualError(err, fmt.Sprintf("space (%d) is greater than the supported max (%d)", MaxSpace+1, MaxSpace))
 	r.Nil(proof)
 }
 
-func TestInitializeMultipleFiles(t *testing.T) {
+func TestInitializerMultipleFiles(t *testing.T) {
 	r := require.New(t)
 
-	cfg := cfg
+	cfg := *cfg
 	cfg.SpacePerUnit = 1 << 15
 	cfg.FileSize = 1 << 15
 
-	init := NewInitializer(cfg, logger)
-	initProof, err := init.Initialize(id)
+	init := NewInitializer(&cfg, id)
+	initProof, err := init.Initialize()
 	r.NoError(err)
 
-	execProof, err := proving.NewProver(cfg, logger).GenerateProof(id, challenge)
+	execProof, err := proving.NewProver(&cfg, id).GenerateProof(challenge)
 	r.NoError(err)
 
-	cleanup(init, id)
+	cleanup(init)
 
 	for numFiles := uint64(2); numFiles <= 16; numFiles <<= 1 {
-		newCfg := *cfg
+		newCfg := cfg
 		newCfg.FileSize = cfg.SpacePerUnit / numFiles
 		newCfg.MaxWriteFilesParallelism = uint(numFiles)
 		newCfg.MaxWriteInFileParallelism = uint(numFiles)
 		newCfg.MaxReadFilesParallelism = uint(numFiles)
 
-		init := NewInitializer(&newCfg, logger)
-		multiFilesInitProof, err := init.Initialize(id)
+		init := NewInitializer(&newCfg, id)
+		multiFilesInitProof, err := init.Initialize()
 		r.NoError(err)
 
-		multiFilesExecProof, err := proving.NewProver(&newCfg, logger).GenerateProof(id, challenge)
+		multiFilesExecProof, err := proving.NewProver(&newCfg, id).GenerateProof(challenge)
 		r.NoError(err)
 
-		cleanup(init, id)
+		cleanup(init)
 
 		r.Equal(initProof.MerkleRoot, multiFilesInitProof.MerkleRoot)
 		r.EqualValues(initProof.ProvenLeaves, multiFilesInitProof.ProvenLeaves)
@@ -151,33 +150,89 @@ func TestInitializeMultipleFiles(t *testing.T) {
 	}
 }
 
-func TestInitializerCalcParallelism(t *testing.T) {
+func TestInitializer_CalcParallelism(t *testing.T) {
 	r := require.New(t)
 
-	files, infile := NewInitializer(&Config{}, logger).
+	files, infile := NewInitializer(&Config{}, nil).
 		calcParallelism(0)
 	r.Equal(files, 1)
 	r.Equal(infile, 1)
 
-	files, infile = NewInitializer(&Config{MaxWriteFilesParallelism: 2, MaxWriteInFileParallelism: 1}, logger).
+	files, infile = NewInitializer(&Config{MaxWriteFilesParallelism: 2, MaxWriteInFileParallelism: 1}, nil).
 		calcParallelism(2)
 	r.Equal(files, 2)
 	r.Equal(infile, 1)
 
-	files, infile = NewInitializer(&Config{MaxWriteFilesParallelism: 2, MaxWriteInFileParallelism: 3}, logger).
+	files, infile = NewInitializer(&Config{MaxWriteFilesParallelism: 2, MaxWriteInFileParallelism: 3}, nil).
 		calcParallelism(5)
 	r.Equal(files, 1)
 	r.Equal(infile, 3)
 
-	files, infile = NewInitializer(&Config{MaxWriteFilesParallelism: 2, MaxWriteInFileParallelism: 3}, logger).
+	files, infile = NewInitializer(&Config{MaxWriteFilesParallelism: 2, MaxWriteInFileParallelism: 3}, nil).
 		calcParallelism(7)
 	r.Equal(files, 2)
 	r.Equal(infile, 3)
 
-	files, infile = NewInitializer(&Config{MaxWriteFilesParallelism: 2, MaxWriteInFileParallelism: 100}, logger).
+	files, infile = NewInitializer(&Config{MaxWriteFilesParallelism: 2, MaxWriteInFileParallelism: 100}, nil).
 		calcParallelism(6)
 	r.Equal(files, 1)
 	r.Equal(infile, 6)
+}
+
+func TestInitializer_State(t *testing.T) {
+	r := require.New(t)
+
+	cfg := *cfg
+	cfg.SpacePerUnit = 1 << 15
+	cfg.FileSize = 1 << 15
+
+	init := NewInitializer(&cfg, id)
+
+	state, requiredSpace, err := init.State()
+	r.Equal(StateNotStarted, state)
+	r.Equal(cfg.SpacePerUnit, requiredSpace)
+	r.NoError(err)
+
+	_, err = init.Initialize()
+	r.NoError(err)
+
+	state, requiredSpace, err = init.State()
+	r.Equal(StateCompleted, state)
+	r.Equal(uint64(0), requiredSpace)
+	r.NoError(err)
+
+	_, err = init.Initialize()
+	r.Equal(err, shared.ErrInitCompleted)
+
+	// Initialize using a new instance.
+
+	init = NewInitializer(&cfg, id)
+
+	state, requiredSpace, err = init.State()
+	r.Equal(StateCompleted, state)
+	r.Equal(uint64(0), requiredSpace)
+	r.NoError(err)
+
+	_, err = init.Initialize()
+	r.Equal(err, shared.ErrInitCompleted)
+
+	// Initialize using a new instance with a different config.
+
+	cfg.SpacePerUnit = 1 << 14
+	cfg.FileSize = 1 << 14
+
+	init = NewInitializer(&cfg, id)
+
+	state, requiredSpace, err = init.State()
+	r.Equal(StateCompleted, state)
+	r.Equal(uint64(0), requiredSpace)
+	r.NoError(err)
+
+	_, err = init.Initialize()
+	r.Equal(err, shared.ErrInitCompleted)
+
+	err = init.Reset()
+	r.NoError(err)
 }
 
 func hexDecode(hexStr string) []byte {
@@ -202,9 +257,9 @@ func BenchmarkInitialize30(b *testing.B) {
 	newCfg.SpacePerUnit = space
 	newCfg.FileSize = space
 
-	init := NewInitializer(&newCfg, logger)
-	proof, err := init.Initialize(id)
-	cleanup(init, id)
+	init := NewInitializer(&newCfg, id)
+	proof, err := init.Initialize()
+	cleanup(init)
 	require.NoError(b, err)
 
 	expectedMerkleRoot, _ := hex.DecodeString("42dd3ed26e6f30f8098ec0b5093147551b32573ef9ed6670076248b4fd0fac30")
@@ -230,14 +285,15 @@ func BenchmarkInitialize30(b *testing.B) {
 
 func BenchmarkInitializeGeneric(b *testing.B) {
 	// Use cli flags (TestMain) to utilize this test.
-	init := NewInitializer(cfg, log.AppLog)
-	_, err := init.Initialize(id)
-	cleanup(init, id)
+	init := NewInitializer(cfg, id)
+	init.SetLogger(log.AppLog)
+	_, err := init.Initialize()
+	cleanup(init)
 	require.NoError(b, err)
 }
 
-func cleanup(init *Initializer, id []byte) {
-	err := init.Reset(id)
+func cleanup(init *Initializer) {
+	err := init.Reset()
 	if err != nil {
 		panic(err)
 	}

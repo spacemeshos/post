@@ -3,7 +3,6 @@ package persistence
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"github.com/spacemeshos/post/shared"
 	"github.com/stretchr/testify/require"
 	"io"
 	"io/ioutil"
@@ -23,8 +22,7 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 	labelsToWriter := make([]LabelGroup, 0)
 
 	for i, labelGroupGroup := range labelGroupGroupGroups {
-		dir := shared.GetInitDir(tempdir, id)
-		writer, err := NewLabelsWriter(id, i, dir)
+		writer, err := NewLabelsWriter(tempdir, id, i)
 		req.NoError(err)
 
 		for _, labelGroup := range labelGroupGroup {
