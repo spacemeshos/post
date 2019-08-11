@@ -19,7 +19,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 )
 
 const (
@@ -178,12 +177,24 @@ func (init *Initializer) Reset() error {
 		return err
 	}
 
-	err := os.RemoveAll(init.dir)
+	files, err := ioutil.ReadDir(init.dir)
 	if err != nil {
-		return fmt.Errorf("failed to delete directory (%v)", init.dir)
+		return err
 	}
 
-	init.logger.Info("id %v reset, directory %v deleted", hex.EncodeToString(init.id), init.dir)
+	for _, file := range files {
+		if init.isInitFile(file) || file.Name() == metadataFileName {
+			path := filepath.Join(init.dir, file.Name())
+			if err := os.Remove(path); err != nil {
+				return fmt.Errorf("failed to delete file (%v): %v", path, err)
+			}
+		}
+	}
+
+	// Remove the dir if it's empty.
+	_ = os.Remove(init.dir)
+
+	init.logger.Info("id %v reset, directory %v files deleted", hex.EncodeToString(init.id), init.dir)
 
 	return nil
 }
@@ -474,7 +485,7 @@ func (init *Initializer) State() (state, uint64, error) {
 
 	initFiles := make([]os.FileInfo, 0)
 	for _, file := range files {
-		if !file.IsDir() && strings.HasPrefix(file.Name(), fmt.Sprintf("%x", init.id)) {
+		if init.isInitFile(file) {
 			initFiles = append(initFiles, file)
 		}
 	}
@@ -550,6 +561,10 @@ func (init *Initializer) LoadMetadata() (*metadata, error) {
 	}
 
 	return metadata, nil
+}
+
+func (init *Initializer) isInitFile(file os.FileInfo) bool {
+	return shared.IsInitFile(init.id, file)
 }
 
 func configMatch(cfg1 *config.Config, cfg2 *config.Config) bool {

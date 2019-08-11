@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func GetInitDir(datadir string, id []byte) string {
@@ -29,6 +30,14 @@ func GetProofFilename(datadir string, id []byte, challenge []byte) string {
 	}
 
 	return filepath.Join(GetProofsDir(datadir, id), c)
+}
+
+func InitFileName(id []byte, index int) string {
+	return fmt.Sprintf("%x-%d", id, index)
+}
+
+func IsInitFile(id []byte, file os.FileInfo) bool {
+	return !file.IsDir() && strings.HasPrefix(file.Name(), fmt.Sprintf("%x", id))
 }
 
 // TODO: use logic from initializer.State method, after resolving packages dependencies issue.

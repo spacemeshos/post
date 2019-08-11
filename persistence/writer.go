@@ -36,7 +36,7 @@ func NewLabelsWriter(datadir string, id []byte, index int) (*Writer, error) {
 		return nil, err
 	}
 
-	filename := filepath.Join(dir, fmt.Sprintf("%x-%d", id, index))
+	filename := filepath.Join(dir, shared.InitFileName(id, index))
 	return newWriter(filename, LabelGroupSize)
 }
 
