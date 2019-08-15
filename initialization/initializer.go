@@ -11,7 +11,6 @@ import (
 	"github.com/spacemeshos/merkle-tree/cache"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/persistence"
-	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/smutil/log"
 	"io"
@@ -23,13 +22,13 @@ import (
 
 const (
 	LabelGroupSize = config.LabelGroupSize
-	MaxSpace       = config.MaxSpace
 )
 
 type (
 	Config           = config.Config
-	Logger           = shared.Logger
+	Proof            = shared.Proof
 	Difficulty       = shared.Difficulty
+	Logger           = shared.Logger
 	MTreeOutput      = shared.MTreeOutput
 	MTreeOutputEntry = shared.MTreeOutputEntry
 	CacheReader      = cache.CacheReader
@@ -43,11 +42,21 @@ var (
 
 type state int
 
+var states = []string{
+	"NOT_STARTED",
+	"COMPLETED",
+	"CRASHED",
+}
+
 const (
 	StateNotStarted state = 1 + iota
 	StateCompleted
 	StateCrashed
 )
+
+func (s state) String() string {
+	return states[s-1]
+}
 
 var (
 	ErrStateMetadataFileMissing = errors.New("metadata file missing")
@@ -91,7 +100,7 @@ func (init *Initializer) SetLogger(logger Logger) {
 // Difficulty determines the number of bits per label that are stored. Each leaf in the tree is 32 bytes = 256 bits.
 // The number of bits per label is 256 / LabelsPerGroup. LabelsPerGroup = 1 << difficulty.
 // Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
-func (init *Initializer) Initialize() (*proving.Proof, error) {
+func (init *Initializer) Initialize() (*Proof, error) {
 	if err := ValidateSpace(init.cfg.SpacePerUnit); err != nil {
 		return nil, err
 	}
@@ -146,7 +155,7 @@ func (init *Initializer) Initialize() (*proving.Proof, error) {
 		return nil, err
 	}
 
-	provenLeafIndices := proving.CalcProvenLeafIndices(output.Root, width<<difficulty, uint8(init.cfg.NumProvenLabels), difficulty)
+	provenLeafIndices := shared.CalcProvenLeafIndices(output.Root, width<<difficulty, uint8(init.cfg.NumProvenLabels), difficulty)
 	_, provenLeaves, proofNodes, err := merkle.GenerateProof(provenLeafIndices, output.Reader)
 	if err != nil {
 		return nil, err
@@ -161,7 +170,7 @@ func (init *Initializer) Initialize() (*proving.Proof, error) {
 		return nil, err
 	}
 
-	proof := &proving.Proof{
+	proof := &Proof{
 		Challenge:    shared.ZeroChallenge,
 		Identity:     init.id,
 		MerkleRoot:   output.Root,
@@ -221,6 +230,19 @@ func (init *Initializer) VerifyNotCompleted() error {
 	if state == StateCompleted {
 		return shared.ErrInitCompleted
 
+	}
+
+	return nil
+}
+
+func (init *Initializer) VerifyCompleted() error {
+	state, _, err := init.State()
+	if err != nil {
+		return fmt.Errorf("initialization state error: %v", err)
+	}
+
+	if state != StateCompleted {
+		return fmt.Errorf("initialization not completed, state: %v, dir: %v", state.String(), init.dir)
 	}
 
 	return nil

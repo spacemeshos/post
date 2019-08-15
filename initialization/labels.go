@@ -2,11 +2,10 @@ package initialization
 
 import (
 	"encoding/binary"
-	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/sha256-simd"
 )
 
-func CalcLabelGroup(identity []byte, groupPosition uint64, difficulty proving.Difficulty) []byte {
+func CalcLabelGroup(identity []byte, groupPosition uint64, difficulty Difficulty) []byte {
 	labelGroup := make([]byte, LabelGroupSize)
 	labelsPerGroup := difficulty.LabelsPerGroup()
 	offset := groupPosition * labelsPerGroup
@@ -21,7 +20,7 @@ func CalcLabelGroup(identity []byte, groupPosition uint64, difficulty proving.Di
 	return labelGroup
 }
 
-func CalcLabel(identity []byte, position uint64, difficulty proving.Difficulty) byte {
+func CalcLabel(identity []byte, position uint64, difficulty Difficulty) byte {
 	preimage := make([]byte, len(identity)+binary.Size(position))
 	copy(preimage, identity)
 	binary.LittleEndian.PutUint64(preimage[len(identity):], position)

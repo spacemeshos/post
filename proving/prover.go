@@ -5,6 +5,7 @@ import (
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/merkle-tree/cache"
 	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
 	"io"
@@ -51,7 +52,8 @@ func (p *Prover) GenerateProof(challenge Challenge) (proof *Proof, err error) {
 }
 
 func (p *Prover) generateProof(challenge Challenge) (*Proof, error) {
-	if err := shared.VerifyInitCompleted(p.cfg, p.id); err != nil {
+	err := initialization.NewInitializer(p.cfg, p.id).VerifyCompleted()
+	if err != nil {
 		return nil, err
 	}
 
@@ -87,7 +89,7 @@ func (p *Prover) generateProof(challenge Challenge) (*Proof, error) {
 		return nil, err
 	}
 
-	provenLeafIndices := CalcProvenLeafIndices(
+	provenLeafIndices := shared.CalcProvenLeafIndices(
 		proof.MerkleRoot, width<<difficulty, uint8(p.cfg.NumProvenLabels), difficulty)
 
 	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, output.Reader)

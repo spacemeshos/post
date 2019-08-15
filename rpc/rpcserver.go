@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	VerifyInitCompleted    = shared.VerifyInitCompleted
 	ErrAlreadyInitializing = errors.New("already initializing")
 )
 
@@ -133,7 +132,8 @@ func (r *rpcServer) Execute(ctx context.Context, in *api.ExecuteRequest) (*api.E
 }
 
 func (r *rpcServer) ExecuteAsync(ctx context.Context, in *api.ExecuteAsyncRequest) (*api.ExecuteAsyncResponse, error) {
-	if err := VerifyInitCompleted(r.cfg, in.Id); err != nil {
+	err := initialization.NewInitializer(r.cfg, in.Id).VerifyCompleted()
+	if err != nil {
 		return nil, err
 	}
 
@@ -157,10 +157,6 @@ func (r *rpcServer) ExecuteAsync(ctx context.Context, in *api.ExecuteAsyncReques
 }
 
 func (r *rpcServer) GetProof(ctx context.Context, in *api.GetProofRequest) (*api.GetProofResponse, error) {
-	if err := VerifyInitCompleted(r.cfg, in.Id); err != nil {
-		return nil, err
-	}
-
 	proof, err := shared.FetchProof(r.cfg.DataDir, in.Id, in.Challenge)
 	if err != nil {
 		return nil, err

@@ -48,9 +48,9 @@ func (v *Validator) Validate(proof *proving.Proof) error {
 }
 
 func validate(proof proving.Proof, numLabelGroups uint64, numProvenLabels uint8, difficulty proving.Difficulty) error {
-	labelIndices := proving.DrawProvenLabelIndices(proof.MerkleRoot, numLabelGroups*difficulty.LabelsPerGroup(),
+	labelIndices := shared.DrawProvenLabelIndices(proof.MerkleRoot, numLabelGroups*difficulty.LabelsPerGroup(),
 		numProvenLabels)
-	leafIndices := proving.ConvertLabelIndicesToLeafIndices(labelIndices, difficulty)
+	leafIndices := shared.ConvertLabelIndicesToLeafIndices(labelIndices, difficulty)
 	// The number of proven leaves could be less than the number of proven labels since more than one label could be in
 	// the same leaf. That's why we can only validate the number of proven leaves after drawing the proven labels and
 	// determining which leaf each one falls in.
@@ -79,7 +79,7 @@ func getLabelAtIndex(l byte, indexInByte uint64, difficulty proving.Difficulty) 
 	return l >> (labelsToClear * difficulty.LabelBits()) & difficulty.LabelMask()
 }
 
-func validatePow(identity []byte, provenLeaves [][]byte, labelIndices proving.Set, difficulty proving.Difficulty) error {
+func validatePow(identity []byte, provenLeaves [][]byte, labelIndices shared.Set, difficulty proving.Difficulty) error {
 	var currentLeafIndex uint64 = math.MaxUint64
 	var currentLeaf []byte
 	for labelIndexList := labelIndices.AsSortedSlice(); len(labelIndexList) > 0; labelIndexList = labelIndexList[1:] {
