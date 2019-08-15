@@ -1,13 +1,13 @@
 package initialization
 
 import (
-	"github.com/spacemeshos/post/proving"
+	"encoding/hex"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 func TestCalcLabelGroupWholeByte(t *testing.T) {
-	const difficulty = proving.Difficulty(5)
+	const difficulty = Difficulty(5)
 	id := []byte{0, 0, 0, 0}
 
 	labels := make([]byte, 32)
@@ -21,7 +21,7 @@ func TestCalcLabelGroupWholeByte(t *testing.T) {
 }
 
 func TestCalcLabelGroupWholeByteWithOffset(t *testing.T) {
-	const difficulty = proving.Difficulty(5)
+	const difficulty = Difficulty(5)
 	id := []byte{0, 0, 0, 0}
 
 	labels := make([]byte, 32)
@@ -35,7 +35,7 @@ func TestCalcLabelGroupWholeByteWithOffset(t *testing.T) {
 }
 
 func TestCalcLabelGroupHalfByte(t *testing.T) {
-	const difficulty = proving.Difficulty(6)
+	const difficulty = Difficulty(6)
 	id := []byte{0, 0, 0, 0}
 
 	labelGroup := CalcLabelGroup(id, 0, difficulty)
@@ -60,7 +60,7 @@ func TestCalcLabelGroupHalfByte(t *testing.T) {
 }
 
 func TestCalcLabelGroupHalfByteWithOffset(t *testing.T) {
-	const difficulty = proving.Difficulty(6)
+	const difficulty = Difficulty(6)
 	id := []byte{0, 0, 0, 0}
 
 	labelGroup := CalcLabelGroup(id, 1, difficulty)
@@ -85,7 +85,7 @@ func TestCalcLabelGroupHalfByteWithOffset(t *testing.T) {
 }
 
 func TestCalcLabelGroupQuarterByte(t *testing.T) {
-	const difficulty = proving.Difficulty(7)
+	const difficulty = Difficulty(7)
 	id := []byte{0, 0, 0, 0}
 
 	labelGroup := CalcLabelGroup(id, 0, difficulty)
@@ -107,4 +107,9 @@ func TestCalcLabelGroupQuarterByte(t *testing.T) {
 	//}
 	//
 	//fmt.Println(hex.EncodeToString(labelGroup))
+}
+
+func hexDecode(hexStr string) []byte {
+	node, _ := hex.DecodeString(hexStr)
+	return node
 }

@@ -3,10 +3,8 @@ package shared
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"github.com/nullstyle/go-xdr/xdr3"
-	"github.com/spacemeshos/post/config"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -38,49 +36,6 @@ func InitFileName(id []byte, index int) string {
 
 func IsInitFile(id []byte, file os.FileInfo) bool {
 	return !file.IsDir() && strings.HasPrefix(file.Name(), fmt.Sprintf("%x", id))
-}
-
-// TODO: use logic from initializer.State method, after resolving packages dependencies issue.
-func VerifyInitCompleted(cfg *config.Config, id []byte) error {
-	initialized, err := isInitialized(cfg, id)
-	if err != nil {
-		return err
-	}
-
-	if !initialized {
-		return ErrInitNotCompleted
-	}
-
-	return nil
-}
-
-func isInitialized(cfg *config.Config, id []byte) (bool, error) {
-	if id == nil {
-		return false, errors.New("id is missing")
-	}
-
-	dir := GetInitDir(cfg.DataDir, id)
-	files, err := ioutil.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	var numFiles int
-	for _, file := range files {
-		if !file.IsDir() && uint64(file.Size()) == cfg.FileSize {
-			numFiles++
-		}
-	}
-
-	expectedNumFiles, err := NumFiles(cfg.SpacePerUnit, cfg.FileSize)
-	if err != nil {
-		return false, err
-	}
-
-	return numFiles == expectedNumFiles, nil
 }
 
 func PersistProof(datadir string, proof *Proof) error {
