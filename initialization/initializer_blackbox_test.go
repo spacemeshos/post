@@ -206,21 +206,26 @@ func TestInitializer_State(t *testing.T) {
 	_, err = init.Initialize()
 	r.Equal(err, shared.ErrInitCompleted)
 
-	// Initialize using a new instance with a different config.
+	// Use a new instance with a different config.
 
-	cfg.SpacePerUnit = 1 << 14
-	cfg.FileSize = 1 << 14
+	newCfg := cfg
+	newCfg.SpacePerUnit = 1 << 14
+	newCfg.FileSize = 1 << 14
 
-	init = NewInitializer(&cfg, id)
+	init = NewInitializer(&newCfg, id)
 
-	state, requiredSpace, err = init.State()
-	r.Equal(StateCompleted, state)
-	r.Equal(uint64(0), requiredSpace)
-	r.NoError(err)
+	_, _, err = init.State()
+	r.Equal(err, initialization.ErrStateConfigMismatch)
 
 	_, err = init.Initialize()
-	r.Equal(err, shared.ErrInitCompleted)
+	r.Equal(err, initialization.ErrStateConfigMismatch)
 
+	err = init.Reset()
+	r.Equal(err, initialization.ErrStateConfigMismatch)
+
+	// Reset with the correct config.
+
+	init = NewInitializer(&cfg, id)
 	err = init.Reset()
 	r.NoError(err)
 }

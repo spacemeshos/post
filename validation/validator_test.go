@@ -132,14 +132,14 @@ func TestGenerateProofFailure(t *testing.T) {
 	r := require.New(t)
 
 	newCfg := *cfg
-	newCfg.Difficulty = 4
+	newCfg.Difficulty = 6
 
 	init := NewInitializer(cfg, id)
 	_, err := init.Initialize()
 	r.NoError(err)
 
 	proof, err := NewProver(&newCfg, id).GenerateProof(challenge)
-	r.EqualError(err, fmt.Sprintf("proof generation failed: difficulty must be between 5 and 8 (received %d)", newCfg.Difficulty))
+	r.EqualError(err, "proof generation failed: initialization state error: config mismatch")
 	r.Empty(proof)
 
 	err = init.Reset()

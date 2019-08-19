@@ -520,14 +520,14 @@ func (init *Initializer) State() (state, uint64, error) {
 		return 0, 0, err
 	}
 
+	if !configMatch(&metadata.Cfg, init.cfg) {
+		return 0, 0, ErrStateConfigMismatch
+	}
+
 	switch metadata.State {
 	case MetadataStateCompleted:
 		return StateCompleted, 0, nil
 	case MetadataStateStarted:
-		if !configMatch(&metadata.Cfg, init.cfg) {
-			return 0, 0, ErrStateConfigMismatch
-		}
-
 		for _, file := range initFiles {
 			if requiredSpace < uint64(file.Size()) {
 				return 0, 0, ErrStateInconsistent
