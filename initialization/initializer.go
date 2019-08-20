@@ -101,30 +101,8 @@ func (init *Initializer) SetLogger(logger Logger) {
 // The number of bits per label is 256 / LabelsPerGroup. LabelsPerGroup = 1 << difficulty.
 // Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
 func (init *Initializer) Initialize() (*Proof, error) {
-	if err := ValidateSpace(init.cfg.SpacePerUnit); err != nil {
+	if err := init.VerifyInitAllowed(); err != nil {
 		return nil, err
-	}
-
-	difficulty := Difficulty(init.cfg.Difficulty)
-	if err := difficulty.Validate(); err != nil {
-		return nil, err
-	}
-
-	state, requiredSpace, err := init.State()
-	if err != nil {
-		return nil, err
-	}
-
-	if state == StateCompleted {
-		return nil, shared.ErrInitCompleted
-	}
-
-	if !init.cfg.DisableSpaceAvailabilityChecks {
-		availableSpace := shared.AvailableSpace(init.cfg.DataDir)
-		if requiredSpace > availableSpace {
-			return nil, fmt.Errorf("not enough disk space. required: %v, available: %v",
-				bytefmt.ByteSize(requiredSpace), bytefmt.ByteSize(availableSpace))
-		}
 	}
 
 	if err := init.SaveMetadata(MetadataStateStarted); err != nil {
@@ -155,6 +133,7 @@ func (init *Initializer) Initialize() (*Proof, error) {
 		return nil, err
 	}
 
+	difficulty := Difficulty(init.cfg.Difficulty)
 	provenLeafIndices := shared.CalcProvenLeafIndices(output.Root, width<<difficulty, uint8(init.cfg.NumProvenLabels), difficulty)
 	_, provenLeaves, proofNodes, err := merkle.GenerateProof(provenLeafIndices, output.Reader)
 	if err != nil {
@@ -243,6 +222,36 @@ func (init *Initializer) VerifyCompleted() error {
 
 	if state != StateCompleted {
 		return fmt.Errorf("initialization not completed, state: %v, dir: %v", state.String(), init.dir)
+	}
+
+	return nil
+}
+
+func (init *Initializer) VerifyInitAllowed() error {
+	if err := ValidateSpace(init.cfg.SpacePerUnit); err != nil {
+		return err
+	}
+
+	difficulty := Difficulty(init.cfg.Difficulty)
+	if err := difficulty.Validate(); err != nil {
+		return err
+	}
+
+	state, requiredSpace, err := init.State()
+	if err != nil {
+		return err
+	}
+
+	if state == StateCompleted {
+		return shared.ErrInitCompleted
+	}
+
+	if !init.cfg.DisableSpaceAvailabilityChecks {
+		availableSpace := shared.AvailableSpace(init.cfg.DataDir)
+		if requiredSpace > availableSpace {
+			return fmt.Errorf("not enough disk space. required: %v, available: %v",
+				bytefmt.ByteSize(requiredSpace), bytefmt.ByteSize(availableSpace))
+		}
 	}
 
 	return nil
