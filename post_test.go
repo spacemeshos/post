@@ -36,7 +36,7 @@ func TestHarness(t *testing.T) {
 
 	cfg := *cfg
 	cfg.SpacePerUnit = 1 << 25
-	cfg.FileSize = 1 << 23
+	cfg.NumFiles = 4
 
 	h := newHarness(assert, &cfg)
 	defer func() {
@@ -105,7 +105,7 @@ func TestHarness_CrashRecovery(t *testing.T) {
 
 	cfg := *cfg
 	cfg.SpacePerUnit = 1 << 26
-	cfg.FileSize = 1 << 24 // 4 files.
+	cfg.NumFiles = 4
 	cfg.MaxWriteFilesParallelism = 2
 	cfg.MaxWriteInFileParallelism = 2
 
@@ -134,7 +134,7 @@ func TestHarness_CrashRecovery(t *testing.T) {
 
 	// Launch another server, with different init-critical config.
 	diffCfg := cfg
-	diffCfg.FileSize = cfg.FileSize << 1
+	diffCfg.NumFiles = cfg.NumFiles << 1
 	h = newHarness(assert, &diffCfg)
 
 	// Verify that initialization recovery is not allowed.

@@ -35,9 +35,9 @@ type (
 )
 
 var (
-	ValidateSpace  = shared.ValidateSpace
-	NumFiles       = shared.NumFiles
-	NumLabelGroups = shared.NumLabelGroups
+	ValidateSpace    = shared.ValidateSpace
+	ValidateNumFiles = shared.ValidateNumFiles
+	NumLabelGroups   = shared.NumLabelGroups
 )
 
 type state int
@@ -109,13 +109,10 @@ func (init *Initializer) Initialize() (*Proof, error) {
 		return nil, err
 	}
 
-	numFiles, err := NumFiles(init.cfg.SpacePerUnit, init.cfg.FileSize)
-	if err != nil {
-		return nil, err
-	}
-	labelGroupsPerFile := NumLabelGroups(init.cfg.FileSize)
+	fileSize := init.cfg.SpacePerUnit / uint64(init.cfg.NumFiles)
+	labelGroupsPerFile := NumLabelGroups(fileSize)
 
-	outputs, err := init.initFiles(numFiles, labelGroupsPerFile)
+	outputs, err := init.initFiles(init.cfg.NumFiles, labelGroupsPerFile)
 	if err != nil {
 		return nil, err
 	}
@@ -229,6 +226,10 @@ func (init *Initializer) VerifyCompleted() error {
 
 func (init *Initializer) VerifyInitAllowed() error {
 	if err := ValidateSpace(init.cfg.SpacePerUnit); err != nil {
+		return err
+	}
+
+	if err := ValidateNumFiles(init.cfg.SpacePerUnit, uint64(init.cfg.NumFiles)); err != nil {
 		return err
 	}
 
@@ -600,7 +601,7 @@ func (init *Initializer) isInitFile(file os.FileInfo) bool {
 
 func configMatch(cfg1 *config.Config, cfg2 *config.Config) bool {
 	return cfg1.SpacePerUnit == cfg2.SpacePerUnit &&
-		cfg1.FileSize == cfg2.FileSize &&
+		cfg1.NumFiles == cfg2.NumFiles &&
 		cfg1.Difficulty == cfg2.Difficulty &&
 		cfg1.NumProvenLabels == cfg2.NumProvenLabels
 }

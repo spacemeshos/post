@@ -20,7 +20,7 @@ var (
 	challenge  = hexDecode("this is a challenge")
 	cfg        = &Config{
 		SpacePerUnit:                            16 * shared.LabelGroupSize,
-		FileSize:                                16 * shared.LabelGroupSize,
+		NumFiles:                                1,
 		Difficulty:                              5,
 		NumProvenLabels:                         4,
 		LowestLayerToCacheDuringProofGeneration: 0,

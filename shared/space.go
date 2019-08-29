@@ -5,10 +5,13 @@ import (
 	"github.com/ricochet2200/go-disk-usage/du"
 )
 
-// ValidateSpace validates whether the given space amount is valid.
+// ValidateSpace indicates whether a given space amount is valid.
 func ValidateSpace(space uint64) error {
 	if space > MaxSpace {
 		return fmt.Errorf("space (%d) is greater than the supported max (%d)", space, MaxSpace)
+	}
+	if !IsPowerOfTwo(space) {
+		return fmt.Errorf("space (%d) must be a power of 2", space)
 	}
 	if space%LabelGroupSize != 0 {
 		return fmt.Errorf("space (%d) must be a multiple of %d", space, LabelGroupSize)
@@ -17,29 +20,25 @@ func ValidateSpace(space uint64) error {
 	return nil
 }
 
-func ValidateFileSize(space uint64, filesize uint64) error {
-	if space%filesize != 0 {
-		return fmt.Errorf("space (%d) must be a multiple of filesize (%d)", space, filesize)
+// ValidateSpace indicates whether a given space and numFiles are valid, assuming the space param validity.
+func ValidateNumFiles(space uint64, numFiles uint64) error {
+	if !IsPowerOfTwo(numFiles) {
+		return fmt.Errorf("number of files (%d) must be a power of 2", numFiles)
 	}
-	if filesize < LabelGroupSize {
-		return fmt.Errorf("filesize (%d) must be greater than %d", filesize, LabelGroupSize)
+
+	if numFiles > uint64(MaxNumFiles) {
+		return fmt.Errorf("number of files (%d) is greater than the supported max (%d)", numFiles, MaxNumFiles)
 	}
-	if space/filesize > uint64(MaxNumFiles) {
-		return fmt.Errorf("number of files (%d) is greater than the supported max (%d)", space/filesize, MaxNumFiles)
+
+	fileSize := space / numFiles
+	if fileSize < LabelGroupSize {
+		return fmt.Errorf("file size (%d) must be greater than %d", fileSize, LabelGroupSize)
 	}
 
 	return nil
 }
 
-func NumFiles(space uint64, filesize uint64) (int, error) {
-	if err := ValidateFileSize(space, filesize); err != nil {
-		return 0, err
-	}
-
-	return int(space / filesize), nil
-}
-
-// NumLabelGroups returns the number of label groups of a given space amount.
+// NumLabelGroups returns the number of label groups of a given space param, assuming its validity.
 func NumLabelGroups(space uint64) uint64 {
 	return uint64(space) / LabelGroupSize
 }
