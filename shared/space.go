@@ -5,7 +5,7 @@ import (
 	"github.com/ricochet2200/go-disk-usage/du"
 )
 
-// ValidateSpace indicates whether a given space amount is valid.
+// ValidateSpace indicates whether a given space param is valid.
 func ValidateSpace(space uint64) error {
 	if space > MaxSpace {
 		return fmt.Errorf("space (%d) is greater than the supported max (%d)", space, MaxSpace)
@@ -20,7 +20,7 @@ func ValidateSpace(space uint64) error {
 	return nil
 }
 
-// ValidateSpace indicates whether a given space and numFiles are valid, assuming the space param validity.
+// ValidateSpace indicates whether a given space and numFiles params are valid, assuming space validity.
 func ValidateNumFiles(space uint64, numFiles uint64) error {
 	if !IsPowerOfTwo(numFiles) {
 		return fmt.Errorf("number of files (%d) must be a power of 2", numFiles)
