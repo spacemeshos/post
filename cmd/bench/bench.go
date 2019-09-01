@@ -93,9 +93,18 @@ func main() {
 		log.Printf("test %v/%v starting...", i+1, len(cases))
 		tStart := time.Now()
 
-		init := initialization.NewInitializer(&cfg, id)
-		prover := proving.NewProver(&cfg, id)
-		validator := validation.NewValidator(&cfg)
+		init, err := initialization.NewInitializer(&cfg, id)
+		if err != nil {
+			log.Fatal(err)
+		}
+		prover, err := proving.NewProver(&cfg, id)
+		if err != nil {
+			log.Fatal(err)
+		}
+		validator, err := validation.NewValidator(&cfg)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		t := time.Now()
 		proof, err := init.Initialize()

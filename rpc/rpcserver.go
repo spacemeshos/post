@@ -3,6 +3,7 @@ package rpc
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/proving"
@@ -37,6 +38,10 @@ var _ api.PostServer = (*rpcServer)(nil)
 
 // newRPCServer creates and returns a new instance of the rpcServer.
 func NewRPCServer(s *shared.Signal, cfg *Config, logger Logger) (*rpcServer, error) {
+	if err := shared.ValidateConfig(cfg); err != nil {
+		return nil, fmt.Errorf("invalid config: %v", err)
+	}
+
 	return &rpcServer{
 		cfg:          cfg,
 		logger:       logger,
@@ -51,7 +56,11 @@ func (r *rpcServer) Initialize(ctx context.Context, in *api.InitializeRequest) (
 	}
 	defer r.removeInitializing(in.Id)
 
-	init := initialization.NewInitializer(r.cfg, in.Id)
+	init, err := initialization.NewInitializer(r.cfg, in.Id)
+	if err != nil {
+		return nil, err
+	}
+
 	init.SetLogger(r.logger)
 	proof, err := init.Initialize()
 	if err != nil {
@@ -75,9 +84,10 @@ func (r *rpcServer) Initialize(ctx context.Context, in *api.InitializeRequest) (
 }
 
 func (r *rpcServer) InitializeAsync(ctx context.Context, in *api.InitializeAsyncRequest) (*api.InitializeAsyncResponse, error) {
-	init := initialization.NewInitializer(r.cfg, in.Id)
-	init.SetLogger(r.logger)
-
+	init, err := initialization.NewInitializer(r.cfg, in.Id)
+	if err != nil {
+		return nil, err
+	}
 	if err := init.VerifyNotCompleted(); err != nil {
 		return nil, err
 	}
@@ -89,7 +99,7 @@ func (r *rpcServer) InitializeAsync(ctx context.Context, in *api.InitializeAsync
 	go func() {
 		defer r.removeInitializing(in.Id)
 
-		init := initialization.NewInitializer(r.cfg, in.Id)
+		init, _ := initialization.NewInitializer(r.cfg, in.Id)
 		init.SetLogger(r.logger)
 		proof, err := init.Initialize()
 		if err != nil {
@@ -108,7 +118,10 @@ func (r *rpcServer) InitializeAsync(ctx context.Context, in *api.InitializeAsync
 }
 
 func (r *rpcServer) Execute(ctx context.Context, in *api.ExecuteRequest) (*api.ExecuteResponse, error) {
-	prover := proving.NewProver(r.cfg, in.Id)
+	prover, err := proving.NewProver(r.cfg, in.Id)
+	if err != nil {
+		return nil, err
+	}
 	prover.SetLogger(r.logger)
 	proof, err := prover.GenerateProof(in.Challenge)
 	if err != nil {
@@ -132,13 +145,16 @@ func (r *rpcServer) Execute(ctx context.Context, in *api.ExecuteRequest) (*api.E
 }
 
 func (r *rpcServer) ExecuteAsync(ctx context.Context, in *api.ExecuteAsyncRequest) (*api.ExecuteAsyncResponse, error) {
-	err := initialization.NewInitializer(r.cfg, in.Id).VerifyCompleted()
+	init, err := initialization.NewInitializer(r.cfg, in.Id)
 	if err != nil {
+		return nil, err
+	}
+	if err := init.VerifyCompleted(); err != nil {
 		return nil, err
 	}
 
 	go func() {
-		prover := proving.NewProver(r.cfg, in.Id)
+		prover, _ := proving.NewProver(r.cfg, in.Id)
 		prover.SetLogger(r.logger)
 		proof, err := prover.GenerateProof(in.Challenge)
 		if err != nil {
@@ -174,9 +190,12 @@ func (r *rpcServer) GetProof(ctx context.Context, in *api.GetProofRequest) (*api
 }
 
 func (r *rpcServer) Reset(ctx context.Context, in *api.ResetRequest) (*api.ResetResponse, error) {
-	init := initialization.NewInitializer(r.cfg, in.Id)
+	init, err := initialization.NewInitializer(r.cfg, in.Id)
+	if err != nil {
+		return nil, err
+	}
 	init.SetLogger(r.logger)
-	err := init.Reset()
+	err = init.Reset()
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +213,10 @@ func (r *rpcServer) GetState(ctx context.Context, in *api.GetStateRequest) (*api
 		return &api.GetStateResponse{State: api.GetStateResponse_Initializing}, nil
 	}
 
-	init := initialization.NewInitializer(r.cfg, in.Id)
+	init, err := initialization.NewInitializer(r.cfg, in.Id)
+	if err != nil {
+		return nil, err
+	}
 	init.SetLogger(r.logger)
 	state, requiredSpace, err := init.State()
 	if err != nil {

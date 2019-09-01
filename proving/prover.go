@@ -34,8 +34,12 @@ type Prover struct {
 	logger Logger
 }
 
-func NewProver(cfg *Config, id []byte) *Prover {
-	return &Prover{cfg, id, shared.DisabledLogger{}}
+func NewProver(cfg *Config, id []byte) (*Prover, error) {
+	if err := shared.ValidateConfig(cfg); err != nil {
+		return nil, err
+	}
+
+	return &Prover{cfg, id, shared.DisabledLogger{}}, nil
 }
 
 func (p *Prover) SetLogger(logger Logger) {
@@ -52,8 +56,11 @@ func (p *Prover) GenerateProof(challenge Challenge) (proof *Proof, err error) {
 }
 
 func (p *Prover) generateProof(challenge Challenge) (*Proof, error) {
-	err := initialization.NewInitializer(p.cfg, p.id).VerifyCompleted()
+	init, err := initialization.NewInitializer(p.cfg, p.id)
 	if err != nil {
+		return nil, err
+	}
+	if err := init.VerifyCompleted(); err != nil {
 		return nil, err
 	}
 

@@ -18,7 +18,7 @@ type (
 )
 
 var (
-	ValidateSpace  = shared.ValidateSpace
+	ValidateConfig = shared.ValidateConfig
 	NumLabelGroups = shared.NumLabelGroups
 )
 
@@ -26,21 +26,19 @@ type Validator struct {
 	cfg *Config
 }
 
-func NewValidator(cfg *Config) *Validator { return &Validator{cfg} }
+func NewValidator(cfg *Config) (*Validator, error) {
+	if err := ValidateConfig(cfg); err != nil {
+		return nil, err
+	}
+
+	return &Validator{cfg}, nil
+}
 
 // Validate ensures the validity of the given proof. It returns nil if the proof is valid or an error describing the
 // failure, otherwise.
 func (v *Validator) Validate(proof *proving.Proof) error {
-	if err := ValidateSpace(v.cfg.SpacePerUnit); err != nil {
-		return err
-	}
-	difficulty := Difficulty(v.cfg.Difficulty)
-	if err := difficulty.Validate(); err != nil {
-		return err
-	}
-
 	numLabelGroups := NumLabelGroups(v.cfg.SpacePerUnit)
-	err := validate(*proof, numLabelGroups, uint8(v.cfg.NumProvenLabels), difficulty)
+	err := validate(*proof, numLabelGroups, uint8(v.cfg.NumProvenLabels), Difficulty(v.cfg.Difficulty))
 	if err != nil {
 		return fmt.Errorf("validation failed: %v", err)
 	}

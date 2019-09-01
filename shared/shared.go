@@ -18,3 +18,20 @@ var (
 	// OwnerReadWrite is a standard owner read / write file permission.
 	OwnerReadWrite = os.FileMode(0600)
 )
+
+func ValidateConfig(cfg *config.Config) error {
+	if err := ValidateSpace(cfg.SpacePerUnit); err != nil {
+		return err
+	}
+
+	if err := ValidateNumFiles(cfg.SpacePerUnit, uint64(cfg.NumFiles)); err != nil {
+		return err
+	}
+
+	difficulty := Difficulty(cfg.Difficulty)
+	if err := difficulty.Validate(); err != nil {
+		return err
+	}
+
+	return nil
+}
