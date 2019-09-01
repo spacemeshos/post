@@ -139,8 +139,8 @@ func setFlags(cmd *cobra.Command, cfg *Config) {
 	flags.Uint64Var(&cfg.PostCfg.SpacePerUnit, "post-space",
 		cfg.PostCfg.SpacePerUnit, "Space per unit, in bytes")
 
-	flags.Uint64Var(&cfg.PostCfg.FileSize, "post-filesize",
-		cfg.PostCfg.FileSize, "Space per file, in bytes")
+	flags.IntVar(&cfg.PostCfg.NumFiles, "post-numfiles",
+		cfg.PostCfg.NumFiles, "Number of files")
 
 	flags.UintVar(&cfg.PostCfg.Difficulty, "post-difficulty",
 		cfg.PostCfg.Difficulty, "Computational cost of the initialization")

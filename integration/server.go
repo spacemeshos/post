@@ -50,7 +50,7 @@ func (cfg *serverConfig) genArgs() []string {
 	args = append(args, fmt.Sprintf("--rpclisten=%v", cfg.rpcListen))
 
 	args = append(args, fmt.Sprintf("--post-space=%v", cfg.SpacePerUnit))
-	args = append(args, fmt.Sprintf("--post-filesize=%v", cfg.FileSize))
+	args = append(args, fmt.Sprintf("--post-numfiles=%v", cfg.NumFiles))
 	args = append(args, fmt.Sprintf("--post-difficulty=%v", cfg.Difficulty))
 	args = append(args, fmt.Sprintf("--post-labels=%v", cfg.NumProvenLabels))
 	args = append(args, fmt.Sprintf("--post-cachelayer=%v", cfg.LowestLayerToCacheDuringProofGeneration))

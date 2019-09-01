@@ -3,7 +3,6 @@ package config
 import (
 	"github.com/spacemeshos/merkle-tree"
 	"github.com/spacemeshos/smutil"
-	"math"
 	"path/filepath"
 )
 
@@ -15,7 +14,7 @@ const (
 	// since the number of labels per byte can be 8 at most (3 extra bit shifts).
 	MaxSpace = 1 << 50
 
-	MaxNumFiles = math.MaxUint8 // 255
+	MaxNumFiles = 256
 
 	MinDifficulty = 5 // 1 byte per label
 	MaxDifficulty = 8 // 1 bit per label
@@ -28,7 +27,7 @@ const (
 	DefaultMaxInFileParallelism                    = 6
 	DefaultMaxReadParallelism                      = 6
 	DefaultSpacePerUnit                            = 1 << 20 // 1MB. Temporary value.
-	DefaultFileSize                                = 1 << 20 // 1MB. Temporary value.
+	DefaultNumFiles                                = 1
 	DefaultDifficulty                              = MinDifficulty
 	DefaultNumProvenLabels                         = 100 // The recommended setting to ensure proof safety.
 	DefaultLowestLayerToCacheDuringProofGeneration = 11
@@ -48,7 +47,7 @@ type Config struct {
 
 	// Protocol params.
 	SpacePerUnit                            uint64 `mapstructure:"post-space"`
-	FileSize                                uint64 `mapstructure:"post-filesize"`
+	NumFiles                                int    `mapstructure:"post-numfiles"`
 	Difficulty                              uint   `mapstructure:"post-difficulty"`
 	NumProvenLabels                         uint   `mapstructure:"post-labels"`
 	LowestLayerToCacheDuringProofGeneration uint   `mapstructure:"post-cachelayer"`
@@ -62,7 +61,7 @@ func DefaultConfig() *Config {
 		MaxWriteInFileParallelism:               DefaultMaxInFileParallelism,
 		MaxReadFilesParallelism:                 DefaultMaxReadParallelism,
 		SpacePerUnit:                            DefaultSpacePerUnit,
-		FileSize:                                DefaultFileSize,
+		NumFiles:                                DefaultNumFiles,
 		Difficulty:                              DefaultDifficulty,
 		NumProvenLabels:                         DefaultNumProvenLabels,
 		LowestLayerToCacheDuringProofGeneration: DefaultLowestLayerToCacheDuringProofGeneration,

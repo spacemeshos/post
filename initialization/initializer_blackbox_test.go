@@ -39,7 +39,7 @@ var (
 	challenge            = hexDecode("this is a challenge")
 	datadir, _           = ioutil.TempDir("", "post-test")
 	space                = uint64(16 * LabelGroupSize)
-	filesize             = uint64(16 * LabelGroupSize)
+	numFiles             = 1
 	maxFilesParallelism  = uint(1)
 	maxInfileParallelism = uint(1)
 
@@ -49,14 +49,14 @@ var (
 func TestMain(m *testing.M) {
 	flag.StringVar(&datadir, "datadir", datadir, "")
 	flag.Uint64Var(&space, "space", space, "")
-	flag.Uint64Var(&filesize, "filesize", filesize, "")
+	flag.IntVar(&numFiles, "numfiles", numFiles, "")
 	flag.UintVar(&maxFilesParallelism, "parallel-files", maxFilesParallelism, "")
 	flag.UintVar(&maxInfileParallelism, "parallel-infile", maxInfileParallelism, "")
 	flag.Parse()
 
 	cfg = &Config{
 		SpacePerUnit:                            space,
-		FileSize:                                filesize,
+		NumFiles:                                numFiles,
 		Difficulty:                              5,
 		NumProvenLabels:                         4,
 		LowestLayerToCacheDuringProofGeneration: 0,
@@ -132,7 +132,7 @@ func TestInitializerMultipleFiles(t *testing.T) {
 
 	cfg := *cfg
 	cfg.SpacePerUnit = 1 << 15
-	cfg.FileSize = 1 << 15
+	cfg.NumFiles = 1
 
 	init := NewInitializer(&cfg, id)
 	initProof, err := init.Initialize()
@@ -143,9 +143,9 @@ func TestInitializerMultipleFiles(t *testing.T) {
 
 	cleanup(init)
 
-	for numFiles := uint64(2); numFiles <= 16; numFiles <<= 1 {
+	for numFiles := 2; numFiles <= 16; numFiles <<= 1 {
 		newCfg := cfg
-		newCfg.FileSize = cfg.SpacePerUnit / numFiles
+		newCfg.NumFiles = numFiles
 		newCfg.MaxWriteFilesParallelism = uint(numFiles)
 		newCfg.MaxWriteInFileParallelism = uint(numFiles)
 		newCfg.MaxReadFilesParallelism = uint(numFiles)
@@ -174,7 +174,7 @@ func TestInitializer_State(t *testing.T) {
 
 	cfg := *cfg
 	cfg.SpacePerUnit = 1 << 15
-	cfg.FileSize = 1 << 15
+	cfg.NumFiles = 1
 
 	init := NewInitializer(&cfg, id)
 
@@ -210,7 +210,7 @@ func TestInitializer_State(t *testing.T) {
 
 	newCfg := cfg
 	newCfg.SpacePerUnit = 1 << 14
-	newCfg.FileSize = 1 << 14
+	newCfg.NumFiles = 1
 
 	init = NewInitializer(&newCfg, id)
 
@@ -250,7 +250,7 @@ func BenchmarkInitialize30(b *testing.B) {
 
 	newCfg := *cfg
 	newCfg.SpacePerUnit = space
-	newCfg.FileSize = space
+	newCfg.NumFiles = 1
 
 	init := NewInitializer(&newCfg, id)
 	proof, err := init.Initialize()

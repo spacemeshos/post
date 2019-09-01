@@ -93,3 +93,8 @@ func Max(x, y int) int {
 	}
 	return y
 }
+
+func IsPowerOfTwo(x uint64) bool {
+	return x != 0 &&
+		x&(x-1) == 0
+}
