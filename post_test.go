@@ -71,7 +71,8 @@ func testInitialize(h *integration.Harness, assert *require.Assertions, ctx cont
 	assert.NoError(err)
 
 	nativeProof := wireToNativeProof(resInit.Proof)
-	err = validation.NewValidator(cfg).Validate(nativeProof)
+	v, err := validation.NewValidator(cfg)
+	err = v.Validate(nativeProof)
 	assert.NoError(err)
 
 	resProof, err := h.GetProof(ctx, &api.GetProofRequest{Id: id, Challenge: shared.ZeroChallenge})
@@ -164,7 +165,8 @@ func TestHarness_CrashRecovery(t *testing.T) {
 	assert.NoError(err)
 
 	nativeProof := wireToNativeProof(resInit.Proof)
-	err = validation.NewValidator(&cfg).Validate(nativeProof)
+	v, err := validation.NewValidator(&cfg)
+	err = v.Validate(nativeProof)
 	assert.NoError(err)
 
 	// Verify the initialization state.

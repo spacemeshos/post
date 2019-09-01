@@ -40,11 +40,14 @@ func TestMain(m *testing.M) {
 func TestValidate(t *testing.T) {
 	r := require.New(t)
 
-	init := NewInitializer(cfg, id)
+	init, err := NewInitializer(cfg, id)
+	r.NoError(err)
 	proof, err := init.Initialize()
 	r.NoError(err)
 
-	err = NewValidator(cfg).Validate(proof)
+	v, err := NewValidator(cfg)
+	r.NoError(err)
+	err = v.Validate(proof)
 	r.Nil(err)
 
 	testGenerateProof(r, id, cfg)
@@ -59,11 +62,14 @@ func TestValidate2(t *testing.T) {
 	newCfg := *cfg
 	newCfg.Difficulty = 6
 
-	init := NewInitializer(&newCfg, id)
+	init, err := NewInitializer(&newCfg, id)
+	r.NoError(err)
 	proof, err := init.Initialize()
 	r.NoError(err)
 
-	err = NewValidator(&newCfg).Validate(proof)
+	v, err := NewValidator(&newCfg)
+	r.NoError(err)
+	err = v.Validate(proof)
 	r.Nil(err)
 
 	testGenerateProof(r, id, &newCfg)
@@ -78,11 +84,14 @@ func TestValidate3(t *testing.T) {
 	newCfg := *cfg
 	newCfg.Difficulty = 7
 
-	init := NewInitializer(&newCfg, id)
+	init, err := NewInitializer(&newCfg, id)
+	r.NoError(err)
 	proof, err := init.Initialize()
 	r.NoError(err)
 
-	err = NewValidator(&newCfg).Validate(proof)
+	v, err := NewValidator(&newCfg)
+	r.NoError(err)
+	err = v.Validate(proof)
 	r.Nil(err)
 
 	testGenerateProof(r, id, &newCfg)
@@ -97,11 +106,14 @@ func TestValidate4(t *testing.T) {
 	newCfg := *cfg
 	newCfg.Difficulty = 8
 
-	init := NewInitializer(&newCfg, id)
+	init, err := NewInitializer(&newCfg, id)
+	r.NoError(err)
 	proof, err := init.Initialize()
 	r.NoError(err)
 
-	err = NewValidator(&newCfg).Validate(proof)
+	v, err := NewValidator(&newCfg)
+	r.NoError(err)
+	err = v.Validate(proof)
 	r.Nil(err)
 
 	testGenerateProof(r, id, &newCfg)
@@ -116,15 +128,20 @@ func TestValidateBadDifficulty(t *testing.T) {
 	newCfg := *cfg
 	newCfg.Difficulty = 4
 
-	err := NewValidator(&newCfg).Validate(new(proving.Proof))
+	v, err := NewValidator(&newCfg)
+	r.Nil(v)
 	r.EqualError(err, fmt.Sprintf("difficulty must be between 5 and 8 (received %d)", newCfg.Difficulty))
 }
 
 func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
-	proof, err := NewProver(cfg, id).GenerateProof(id)
+	p, err := NewProver(cfg, id)
+	r.NoError(err)
+	proof, err := p.GenerateProof(id)
 	r.NoError(err)
 
-	err = NewValidator(cfg).Validate(proof)
+	v, err := NewValidator(cfg)
+	r.NoError(err)
+	err = v.Validate(proof)
 	r.Nil(err)
 }
 
@@ -134,11 +151,14 @@ func TestGenerateProofFailure(t *testing.T) {
 	newCfg := *cfg
 	newCfg.Difficulty = 6
 
-	init := NewInitializer(cfg, id)
-	_, err := init.Initialize()
+	init, err := NewInitializer(cfg, id)
+	r.NoError(err)
+	_, err = init.Initialize()
 	r.NoError(err)
 
-	proof, err := NewProver(&newCfg, id).GenerateProof(challenge)
+	p, err := NewProver(&newCfg, id)
+	r.NoError(err)
+	proof, err := p.GenerateProof(challenge)
 	r.EqualError(err, "proof generation failed: initialization state error: config mismatch")
 	r.Empty(proof)
 
@@ -149,13 +169,16 @@ func TestGenerateProofFailure(t *testing.T) {
 func TestValidateFail(t *testing.T) {
 	r := require.New(t)
 
-	init := NewInitializer(cfg, id)
+	init, err := NewInitializer(cfg, id)
+	r.NoError(err)
 	proof, err := init.Initialize()
 	r.NoError(err)
 
 	proof.Identity = append([]byte{0}, proof.Identity[1:]...)
 
-	err = NewValidator(cfg).Validate(proof)
+	v, err := NewValidator(cfg)
+	r.NoError(err)
+	err = v.Validate(proof)
 	r.EqualError(err, "validation failed: label at index 91 should be 01101111, but found 00011101")
 
 	err = init.Reset()
@@ -165,13 +188,16 @@ func TestValidateFail(t *testing.T) {
 func TestValidateFail2(t *testing.T) {
 	r := require.New(t)
 
-	init := NewInitializer(cfg, id)
+	init, err := NewInitializer(cfg, id)
+	r.NoError(err)
 	proof, err := init.Initialize()
 	r.NoError(err)
 
 	proof.Challenge = []byte{1}
 
-	err = NewValidator(cfg).Validate(proof)
+	v, err := NewValidator(cfg)
+	r.NoError(err)
+	err = v.Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 
 	err = init.Reset()
@@ -181,14 +207,17 @@ func TestValidateFail2(t *testing.T) {
 func TestValidateFail3(t *testing.T) {
 	r := require.New(t)
 
-	init := NewInitializer(cfg, id)
+	init, err := NewInitializer(cfg, id)
+	r.NoError(err)
 	proof, err := init.Initialize()
 	r.NoError(err)
 
 	proof.ProvenLeaves[0] = append([]byte{}, proof.ProvenLeaves[0]...)
 	proof.ProvenLeaves[0][0] += 1
 
-	err = NewValidator(cfg).Validate(proof)
+	v, err := NewValidator(cfg)
+	r.NoError(err)
+	err = v.Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 
 	err = init.Reset()
@@ -198,13 +227,16 @@ func TestValidateFail3(t *testing.T) {
 func TestValidateFail4(t *testing.T) {
 	r := require.New(t)
 
-	init := NewInitializer(cfg, id)
+	init, err := NewInitializer(cfg, id)
+	r.NoError(err)
 	proof, err := init.Initialize()
 	r.NoError(err)
 
 	proof.ProvenLeaves = proof.ProvenLeaves[1:]
 
-	err = NewValidator(cfg).Validate(proof)
+	v, err := NewValidator(cfg)
+	r.NoError(err)
+	err = v.Validate(proof)
 	r.EqualError(err, "validation failed: number of derived leaf indices (4) doesn't match number of included proven leaves (3)")
 
 	err = init.Reset()
@@ -214,14 +246,17 @@ func TestValidateFail4(t *testing.T) {
 func TestValidateFail5(t *testing.T) {
 	r := require.New(t)
 
-	init := NewInitializer(cfg, id)
+	init, err := NewInitializer(cfg, id)
+	r.NoError(err)
 	proof, err := init.Initialize()
 	r.NoError(err)
 
 	proof.ProofNodes[0] = append([]byte{}, proof.ProofNodes[0]...)
 	proof.ProofNodes[0][0] += 1
 
-	err = NewValidator(cfg).Validate(proof)
+	v, err := NewValidator(cfg)
+	r.NoError(err)
+	err = v.Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 
 	err = init.Reset()
@@ -231,13 +266,16 @@ func TestValidateFail5(t *testing.T) {
 func TestValidateFail6(t *testing.T) {
 	r := require.New(t)
 
-	init := NewInitializer(cfg, id)
+	init, err := NewInitializer(cfg, id)
+	r.NoError(err)
 	proof, err := init.Initialize()
 	r.NoError(err)
 
 	proof.ProofNodes = proof.ProofNodes[1:]
 
-	err = NewValidator(cfg).Validate(proof)
+	v, err := NewValidator(cfg)
+	r.NoError(err)
+	err = v.Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 
 	err = init.Reset()
@@ -247,14 +285,17 @@ func TestValidateFail6(t *testing.T) {
 func TestValidateFail7(t *testing.T) {
 	r := require.New(t)
 
-	init := NewInitializer(cfg, id)
+	init, err := NewInitializer(cfg, id)
+	r.NoError(err)
 	proof, err := init.Initialize()
 	r.NoError(err)
 
 	proof.MerkleRoot = append([]byte{}, proof.MerkleRoot...)
 	proof.MerkleRoot[0] += 1
 
-	err = NewValidator(cfg).Validate(proof)
+	v, err := NewValidator(cfg)
+	r.NoError(err)
+	err = v.Validate(proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 
 	err = init.Reset()

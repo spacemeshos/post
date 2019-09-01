@@ -50,7 +50,10 @@ func init() {
 }
 
 func main() {
-	init := initialization.NewInitializer(cfg, id)
+	init, err := initialization.NewInitializer(cfg, id)
+	if err != nil {
+		log.Fatal(err)
+	}
 	init.SetLogger(smlog.AppLog)
 
 	if reset {
@@ -64,7 +67,8 @@ func main() {
 		log.Fatalf("initialization failure: %v", err)
 	}
 
-	if err := validation.NewValidator(cfg).Validate(proof); err != nil {
+	v, _ := validation.NewValidator(cfg)
+	if err := v.Validate(proof); err != nil {
 		log.Fatal(err)
 	}
 

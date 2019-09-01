@@ -73,7 +73,8 @@ func TestMain(m *testing.M) {
 func TestInitializer(t *testing.T) {
 	r := require.New(t)
 
-	init := NewInitializer(cfg, id)
+	init, err := NewInitializer(cfg, id)
+	r.NoError(err)
 	proof, err := init.Initialize()
 	defer cleanup(init)
 	r.NoError(err)
@@ -107,24 +108,21 @@ func TestInitializerErrors(t *testing.T) {
 
 	newCfg := *cfg
 	newCfg.Difficulty = 4
-	init := NewInitializer(&newCfg, id)
-	proof, err := init.Initialize()
+	init, err := NewInitializer(&newCfg, id)
+	r.Nil(init)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 4)")
-	r.Nil(proof)
 
 	newCfg = *cfg
 	newCfg.Difficulty = 9
-	init = NewInitializer(&newCfg, id)
-	proof, err = init.Initialize()
+	init, err = NewInitializer(&newCfg, id)
+	r.Nil(init)
 	r.EqualError(err, "difficulty must be between 5 and 8 (received 9)")
-	r.Nil(proof)
 
 	newCfg = *cfg
 	newCfg.SpacePerUnit = MaxSpace + 1
-	init = NewInitializer(&newCfg, id)
-	proof, err = init.Initialize()
+	init, err = NewInitializer(&newCfg, id)
+	r.Nil(init)
 	r.EqualError(err, fmt.Sprintf("space (%d) is greater than the supported max (%d)", MaxSpace+1, MaxSpace))
-	r.Nil(proof)
 }
 
 func TestInitializerMultipleFiles(t *testing.T) {
@@ -134,11 +132,14 @@ func TestInitializerMultipleFiles(t *testing.T) {
 	cfg.SpacePerUnit = 1 << 15
 	cfg.NumFiles = 1
 
-	init := NewInitializer(&cfg, id)
+	init, err := NewInitializer(&cfg, id)
+	r.NoError(err)
 	initProof, err := init.Initialize()
 	r.NoError(err)
 
-	execProof, err := proving.NewProver(&cfg, id).GenerateProof(challenge)
+	p, err := proving.NewProver(&cfg, id)
+	r.NoError(err)
+	execProof, err := p.GenerateProof(challenge)
 	r.NoError(err)
 
 	cleanup(init)
@@ -150,11 +151,14 @@ func TestInitializerMultipleFiles(t *testing.T) {
 		newCfg.MaxWriteInFileParallelism = uint(numFiles)
 		newCfg.MaxReadFilesParallelism = uint(numFiles)
 
-		init := NewInitializer(&newCfg, id)
+		init, err := NewInitializer(&newCfg, id)
+		r.NoError(err)
 		multiFilesInitProof, err := init.Initialize()
 		r.NoError(err)
 
-		multiFilesExecProof, err := proving.NewProver(&newCfg, id).GenerateProof(challenge)
+		p, err := proving.NewProver(&newCfg, id)
+		r.NoError(err)
+		multiFilesExecProof, err := p.GenerateProof(challenge)
 		r.NoError(err)
 
 		cleanup(init)
@@ -176,7 +180,8 @@ func TestInitializer_State(t *testing.T) {
 	cfg.SpacePerUnit = 1 << 15
 	cfg.NumFiles = 1
 
-	init := NewInitializer(&cfg, id)
+	init, err := NewInitializer(&cfg, id)
+	r.NoError(err)
 
 	state, requiredSpace, err := init.State()
 	r.Equal(StateNotStarted, state)
@@ -196,7 +201,8 @@ func TestInitializer_State(t *testing.T) {
 
 	// Initialize using a new instance.
 
-	init = NewInitializer(&cfg, id)
+	init, err = NewInitializer(&cfg, id)
+	r.NoError(err)
 
 	state, requiredSpace, err = init.State()
 	r.Equal(StateCompleted, state)
@@ -212,7 +218,8 @@ func TestInitializer_State(t *testing.T) {
 	newCfg.SpacePerUnit = 1 << 14
 	newCfg.NumFiles = 1
 
-	init = NewInitializer(&newCfg, id)
+	init, err = NewInitializer(&newCfg, id)
+	r.NoError(err)
 
 	_, _, err = init.State()
 	r.Equal(err, initialization.ErrStateConfigMismatch)
@@ -225,7 +232,8 @@ func TestInitializer_State(t *testing.T) {
 
 	// Reset with the correct config.
 
-	init = NewInitializer(&cfg, id)
+	init, err = NewInitializer(&cfg, id)
+	r.NoError(err)
 	err = init.Reset()
 	r.NoError(err)
 }
@@ -252,7 +260,8 @@ func BenchmarkInitialize30(b *testing.B) {
 	newCfg.SpacePerUnit = space
 	newCfg.NumFiles = 1
 
-	init := NewInitializer(&newCfg, id)
+	init, err := NewInitializer(&newCfg, id)
+	require.NoError(b, err)
 	proof, err := init.Initialize()
 	cleanup(init)
 	require.NoError(b, err)
@@ -280,9 +289,10 @@ func BenchmarkInitialize30(b *testing.B) {
 
 func BenchmarkInitializeGeneric(b *testing.B) {
 	// Use cli flags (TestMain) to utilize this test.
-	init := NewInitializer(cfg, id)
+	init, err := NewInitializer(cfg, id)
+	require.NoError(b, err)
 	init.SetLogger(log.AppLog)
-	_, err := init.Initialize()
+	_, err = init.Initialize()
 	cleanup(init)
 	require.NoError(b, err)
 }

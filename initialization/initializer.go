@@ -35,9 +35,8 @@ type (
 )
 
 var (
-	ValidateSpace    = shared.ValidateSpace
-	ValidateNumFiles = shared.ValidateNumFiles
-	NumLabelGroups   = shared.NumLabelGroups
+	ValidateConfig = shared.ValidateConfig
+	NumLabelGroups = shared.NumLabelGroups
 )
 
 type state int
@@ -85,9 +84,13 @@ type Initializer struct {
 	logger Logger
 }
 
-func NewInitializer(cfg *Config, id []byte) *Initializer {
+func NewInitializer(cfg *Config, id []byte) (*Initializer, error) {
+	if err := ValidateConfig(cfg); err != nil {
+		return nil, err
+	}
+
 	dir := shared.GetInitDir(cfg.DataDir, id)
-	return &Initializer{cfg, id, dir, shared.DisabledLogger{}}
+	return &Initializer{cfg, id, dir, shared.DisabledLogger{}}, nil
 }
 
 func (init *Initializer) SetLogger(logger Logger) {
@@ -225,19 +228,6 @@ func (init *Initializer) VerifyCompleted() error {
 }
 
 func (init *Initializer) VerifyInitAllowed() error {
-	if err := ValidateSpace(init.cfg.SpacePerUnit); err != nil {
-		return err
-	}
-
-	if err := ValidateNumFiles(init.cfg.SpacePerUnit, uint64(init.cfg.NumFiles)); err != nil {
-		return err
-	}
-
-	difficulty := Difficulty(init.cfg.Difficulty)
-	if err := difficulty.Validate(); err != nil {
-		return err
-	}
-
 	state, requiredSpace, err := init.State()
 	if err != nil {
 		return err
