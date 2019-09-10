@@ -64,6 +64,10 @@ func main() {
 
 	proof, err := init.Initialize()
 	if err != nil {
+		if err == shared.ErrInitCompleted {
+			log.Print(err)
+			return
+		}
 		log.Fatalf("initialization failure: %v", err)
 	}
 
