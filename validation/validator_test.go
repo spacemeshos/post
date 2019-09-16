@@ -47,7 +47,7 @@ func TestValidate(t *testing.T) {
 
 	v, err := NewValidator(cfg)
 	r.NoError(err)
-	err = v.Validate(proof)
+	err = v.Validate(id, proof)
 	r.Nil(err)
 
 	testGenerateProof(r, id, cfg)
@@ -69,7 +69,7 @@ func TestValidate2(t *testing.T) {
 
 	v, err := NewValidator(&newCfg)
 	r.NoError(err)
-	err = v.Validate(proof)
+	err = v.Validate(id, proof)
 	r.Nil(err)
 
 	testGenerateProof(r, id, &newCfg)
@@ -91,7 +91,7 @@ func TestValidate3(t *testing.T) {
 
 	v, err := NewValidator(&newCfg)
 	r.NoError(err)
-	err = v.Validate(proof)
+	err = v.Validate(id, proof)
 	r.Nil(err)
 
 	testGenerateProof(r, id, &newCfg)
@@ -113,7 +113,7 @@ func TestValidate4(t *testing.T) {
 
 	v, err := NewValidator(&newCfg)
 	r.NoError(err)
-	err = v.Validate(proof)
+	err = v.Validate(id, proof)
 	r.Nil(err)
 
 	testGenerateProof(r, id, &newCfg)
@@ -141,7 +141,7 @@ func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
 
 	v, err := NewValidator(cfg)
 	r.NoError(err)
-	err = v.Validate(proof)
+	err = v.Validate(id, proof)
 	r.Nil(err)
 }
 
@@ -174,11 +174,11 @@ func TestValidateFail(t *testing.T) {
 	proof, err := init.Initialize()
 	r.NoError(err)
 
-	proof.Identity = append([]byte{0}, proof.Identity[1:]...)
+	Identity := append([]byte{0}, id[1:]...)
 
 	v, err := NewValidator(cfg)
 	r.NoError(err)
-	err = v.Validate(proof)
+	err = v.Validate(Identity, proof)
 	r.EqualError(err, "validation failed: label at index 91 should be 01101111, but found 00011101")
 
 	err = init.Reset()
@@ -197,7 +197,7 @@ func TestValidateFail2(t *testing.T) {
 
 	v, err := NewValidator(cfg)
 	r.NoError(err)
-	err = v.Validate(proof)
+	err = v.Validate(id, proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 
 	err = init.Reset()
@@ -217,7 +217,7 @@ func TestValidateFail3(t *testing.T) {
 
 	v, err := NewValidator(cfg)
 	r.NoError(err)
-	err = v.Validate(proof)
+	err = v.Validate(id, proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 
 	err = init.Reset()
@@ -236,7 +236,7 @@ func TestValidateFail4(t *testing.T) {
 
 	v, err := NewValidator(cfg)
 	r.NoError(err)
-	err = v.Validate(proof)
+	err = v.Validate(id, proof)
 	r.EqualError(err, "validation failed: number of derived leaf indices (4) doesn't match number of included proven leaves (3)")
 
 	err = init.Reset()
@@ -256,7 +256,7 @@ func TestValidateFail5(t *testing.T) {
 
 	v, err := NewValidator(cfg)
 	r.NoError(err)
-	err = v.Validate(proof)
+	err = v.Validate(id, proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 
 	err = init.Reset()
@@ -275,7 +275,7 @@ func TestValidateFail6(t *testing.T) {
 
 	v, err := NewValidator(cfg)
 	r.NoError(err)
-	err = v.Validate(proof)
+	err = v.Validate(id, proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 
 	err = init.Reset()
@@ -295,7 +295,7 @@ func TestValidateFail7(t *testing.T) {
 
 	v, err := NewValidator(cfg)
 	r.NoError(err)
-	err = v.Validate(proof)
+	err = v.Validate(id, proof)
 	r.EqualError(err, "validation failed: merkle root mismatch")
 
 	err = init.Reset()

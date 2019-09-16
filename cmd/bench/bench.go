@@ -114,7 +114,7 @@ func main() {
 		eInit := time.Since(t)
 
 		t = time.Now()
-		err = validator.Validate(proof)
+		err = validator.Validate(nil, proof)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -128,7 +128,7 @@ func main() {
 		eExec := time.Since(t)
 
 		t = time.Now()
-		err = validator.Validate(proof)
+		err = validator.Validate(nil, proof)
 		if err != nil {
 			log.Fatal(err)
 		}

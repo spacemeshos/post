@@ -72,11 +72,11 @@ func main() {
 	}
 
 	v, _ := validation.NewValidator(cfg)
-	if err := v.Validate(proof); err != nil {
+	if err := v.Validate(nil, proof); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := shared.PersistProof(cfg.DataDir, proof); err != nil {
+	if err := shared.PersistProof(cfg.DataDir, id, proof); err != nil {
 		log.Fatalf("persisting proof failure: %v", err)
 	}
 }
