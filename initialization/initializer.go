@@ -151,6 +151,7 @@ func (init *Initializer) Initialize() (*Proof, error) {
 
 	proof := &Proof{
 		Challenge:    shared.ZeroChallenge,
+		Identity:     init.id,
 		MerkleRoot:   output.Root,
 		ProvenLeaves: provenLeaves,
 		ProofNodes:   proofNodes,

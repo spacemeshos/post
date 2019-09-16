@@ -36,16 +36,16 @@ func NewValidator(cfg *Config) (*Validator, error) {
 
 // Validate ensures the validity of the given proof. It returns nil if the proof is valid or an error describing the
 // failure, otherwise.
-func (v *Validator) Validate(identity []byte, proof *proving.Proof) error {
+func (v *Validator) Validate(proof *proving.Proof) error {
 	numLabelGroups := NumLabelGroups(v.cfg.SpacePerUnit)
-	err := validate(identity, *proof, numLabelGroups, uint8(v.cfg.NumProvenLabels), Difficulty(v.cfg.Difficulty))
+	err := validate(*proof, numLabelGroups, uint8(v.cfg.NumProvenLabels), Difficulty(v.cfg.Difficulty))
 	if err != nil {
 		return fmt.Errorf("validation failed: %v", err)
 	}
 	return nil
 }
 
-func validate(identity []byte, proof proving.Proof, numLabelGroups uint64, numProvenLabels uint8, difficulty proving.Difficulty) error {
+func validate(proof proving.Proof, numLabelGroups uint64, numProvenLabels uint8, difficulty proving.Difficulty) error {
 	labelIndices := shared.DrawProvenLabelIndices(proof.MerkleRoot, numLabelGroups*difficulty.LabelsPerGroup(),
 		numProvenLabels)
 	leafIndices := shared.ConvertLabelIndicesToLeafIndices(labelIndices, difficulty)
@@ -69,7 +69,7 @@ func validate(identity []byte, proof proving.Proof, numLabelGroups uint64, numPr
 	if !valid {
 		return errors.New("merkle root mismatch")
 	}
-	return validatePow(identity, proof.ProvenLeaves, labelIndices, difficulty)
+	return validatePow(proof.Identity, proof.ProvenLeaves, labelIndices, difficulty)
 }
 
 func getLabelAtIndex(l byte, indexInByte uint64, difficulty proving.Difficulty) byte {

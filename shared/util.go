@@ -38,20 +38,20 @@ func IsInitFile(id []byte, file os.FileInfo) bool {
 	return !file.IsDir() && strings.HasPrefix(file.Name(), fmt.Sprintf("%x", id))
 }
 
-func PersistProof(datadir string, id []byte, proof *Proof) error {
+func PersistProof(datadir string, proof *Proof) error {
 	var w bytes.Buffer
 	_, err := xdr.Marshal(&w, &proof)
 	if err != nil {
 		return fmt.Errorf("serialization failure: %v", err)
 	}
 
-	dir := GetProofsDir(datadir, id)
+	dir := GetProofsDir(datadir, proof.Identity)
 	err = os.Mkdir(dir, OwnerReadWriteExec)
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("dir creation failure: %v", err)
 	}
 
-	filename := GetProofFilename(datadir, id, proof.Challenge)
+	filename := GetProofFilename(datadir, proof.Identity, proof.Challenge)
 	err = ioutil.WriteFile(filename, w.Bytes(), OwnerReadWrite)
 	if err != nil {
 		return fmt.Errorf("write to disk failure: %v", err)
