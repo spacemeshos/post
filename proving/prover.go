@@ -71,7 +71,6 @@ func (p *Prover) generateProof(challenge Challenge) (*Proof, error) {
 
 	proof := new(Proof)
 	proof.Challenge = challenge
-	//proof.Identity = p.id
 
 	readers, err := persistence.GetReaders(p.cfg.DataDir, p.id)
 	if err != nil {

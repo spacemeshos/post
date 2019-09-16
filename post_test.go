@@ -203,7 +203,6 @@ func newHarness(assert *require.Assertions, cfg *config.Config) *integration.Har
 
 func wireToNativeProof(proof *api.Proof) *proving.Proof {
 	return &proving.Proof{
-		//Identity:     proof.Id,
 		Challenge:    shared.Challenge(proof.Challenge),
 		MerkleRoot:   proof.MerkleRoot,
 		ProvenLeaves: proof.ProvenLeaves,

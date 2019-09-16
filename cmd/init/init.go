@@ -72,7 +72,7 @@ func main() {
 	}
 
 	v, _ := validation.NewValidator(cfg)
-	if err := v.Validate(nil, proof); err != nil {
+	if err := v.Validate(id, proof); err != nil {
 		log.Fatal(err)
 	}
 

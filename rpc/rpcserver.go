@@ -73,7 +73,6 @@ func (r *rpcServer) Initialize(ctx context.Context, in *api.InitializeRequest) (
 	}
 
 	out := &api.InitializeResponse{Proof: &api.Proof{
-		//Id:           proof.Identity,
 		Challenge:    proof.Challenge,
 		MerkleRoot:   proof.MerkleRoot,
 		ProvenLeaves: proof.ProvenLeaves,
