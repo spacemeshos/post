@@ -174,11 +174,11 @@ func TestValidateFail(t *testing.T) {
 	proof, err := init.Initialize()
 	r.NoError(err)
 
-	Identity := append([]byte{0}, id[1:]...)
+	wrongIdentity := append([]byte{0}, id[1:]...)
 
 	v, err := NewValidator(cfg)
 	r.NoError(err)
-	err = v.Validate(Identity, proof)
+	err = v.Validate(wrongIdentity, proof)
 	r.EqualError(err, "validation failed: label at index 91 should be 01101111, but found 00011101")
 
 	err = init.Reset()

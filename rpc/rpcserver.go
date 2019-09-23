@@ -133,7 +133,6 @@ func (r *rpcServer) Execute(ctx context.Context, in *api.ExecuteRequest) (*api.E
 	}
 
 	out := &api.ExecuteResponse{Proof: &api.Proof{
-		//Id:           proof.Identity,
 		Challenge:    proof.Challenge,
 		MerkleRoot:   proof.MerkleRoot,
 		ProvenLeaves: proof.ProvenLeaves,
@@ -178,7 +177,6 @@ func (r *rpcServer) GetProof(ctx context.Context, in *api.GetProofRequest) (*api
 	}
 
 	out := &api.GetProofResponse{Proof: &api.Proof{
-		//Id:           proof.Identity,
 		Challenge:    proof.Challenge,
 		MerkleRoot:   proof.MerkleRoot,
 		ProvenLeaves: proof.ProvenLeaves,
