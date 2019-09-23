@@ -67,13 +67,12 @@ func (r *rpcServer) Initialize(ctx context.Context, in *api.InitializeRequest) (
 		return nil, err
 	}
 
-	err = shared.PersistProof(r.cfg.DataDir, proof)
+	err = shared.PersistProof(r.cfg.DataDir, in.Id, proof)
 	if err != nil {
 		return nil, err
 	}
 
 	out := &api.InitializeResponse{Proof: &api.Proof{
-		Id:           proof.Identity,
 		Challenge:    proof.Challenge,
 		MerkleRoot:   proof.MerkleRoot,
 		ProvenLeaves: proof.ProvenLeaves,
@@ -107,7 +106,7 @@ func (r *rpcServer) InitializeAsync(ctx context.Context, in *api.InitializeAsync
 			return
 		}
 
-		err = shared.PersistProof(r.cfg.DataDir, proof)
+		err = shared.PersistProof(r.cfg.DataDir, in.Id, proof)
 		if err != nil {
 			r.logger.Error("proof persisting failure: %v", err)
 			return
@@ -128,13 +127,12 @@ func (r *rpcServer) Execute(ctx context.Context, in *api.ExecuteRequest) (*api.E
 		return nil, err
 	}
 
-	err = shared.PersistProof(r.cfg.DataDir, proof)
+	err = shared.PersistProof(r.cfg.DataDir, in.Id, proof)
 	if err != nil {
 		return nil, err
 	}
 
 	out := &api.ExecuteResponse{Proof: &api.Proof{
-		Id:           proof.Identity,
 		Challenge:    proof.Challenge,
 		MerkleRoot:   proof.MerkleRoot,
 		ProvenLeaves: proof.ProvenLeaves,
@@ -162,7 +160,7 @@ func (r *rpcServer) ExecuteAsync(ctx context.Context, in *api.ExecuteAsyncReques
 			return
 		}
 
-		err = shared.PersistProof(r.cfg.DataDir, proof)
+		err = shared.PersistProof(r.cfg.DataDir, in.Id, proof)
 		if err != nil {
 			r.logger.Error("proof persisting failure: %v", err)
 			return
@@ -179,7 +177,6 @@ func (r *rpcServer) GetProof(ctx context.Context, in *api.GetProofRequest) (*api
 	}
 
 	out := &api.GetProofResponse{Proof: &api.Proof{
-		Id:           proof.Identity,
 		Challenge:    proof.Challenge,
 		MerkleRoot:   proof.MerkleRoot,
 		ProvenLeaves: proof.ProvenLeaves,

@@ -145,11 +145,10 @@ message ShutdownResponse {
 }
 
 message Proof {
-    bytes id = 1 [json_name = "id"];
-    bytes challenge = 2 [json_name = "challenge"];
-    bytes merkleRoot = 3 [json_name = "merkle_root"];
-    repeated bytes provenLeaves = 4 [json_name = "proven_leaves"];
-    repeated bytes proofNodes = 5 [json_name = "proof_nodes"];
+    bytes challenge = 1 [json_name = "challenge"];
+    bytes merkleRoot = 2 [json_name = "merkle_root"];
+    repeated bytes provenLeaves = 3 [json_name = "proven_leaves"];
+    repeated bytes proofNodes = 4o [json_name = "proof_nodes"];
 }
 
 message Config {
