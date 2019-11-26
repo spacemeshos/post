@@ -591,6 +591,5 @@ func (init *Initializer) isInitFile(file os.FileInfo) bool {
 func configMatch(cfg1 *config.Config, cfg2 *config.Config) bool {
 	return cfg1.SpacePerUnit == cfg2.SpacePerUnit &&
 		cfg1.NumFiles == cfg2.NumFiles &&
-		cfg1.Difficulty == cfg2.Difficulty &&
-		cfg1.NumProvenLabels == cfg2.NumProvenLabels
+		cfg1.Difficulty == cfg2.Difficulty
 }
