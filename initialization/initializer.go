@@ -303,7 +303,7 @@ func (init *Initializer) initFile(fileIndex int, labelGroupsPerFile uint64, infi
 	// Initialize the labels merkle tree with the execution-phase zero challenge.
 	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(init.cfg.LowestLayerToCacheDuringProofGeneration), cache.MakeSliceReadWriterFactory())
 	tree, err := merkle.NewTreeBuilder().
-		WithHashFunc(shared.ZeroChallenge.GetSha256Parent).
+		WithHashFunc(shared.ZeroChallenge.GenerateGetParentFunc()).
 		WithCacheWriter(cacheWriter).
 		Build()
 	if err != nil {
