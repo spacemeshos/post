@@ -61,7 +61,7 @@ func validate(identity []byte, proof proving.Proof, numLabelGroups uint64, numPr
 		proof.ProvenLeaves,
 		proof.ProofNodes,
 		proof.MerkleRoot,
-		proof.Challenge.GetSha256Parent,
+		proof.Challenge.GenerateGetParentFunc(),
 	)
 	if err != nil {
 		return err

@@ -115,7 +115,7 @@ func (p *Prover) generateMTree(reader LayerReadWriter, challenge Challenge) (*MT
 	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(p.cfg.LowestLayerToCacheDuringProofGeneration),
 		cache.MakeSliceReadWriterFactory())
 
-	tree, err := merkle.NewTreeBuilder().WithHashFunc(challenge.GetSha256Parent).WithCacheWriter(cacheWriter).Build()
+	tree, err := merkle.NewTreeBuilder().WithHashFunc(challenge.GenerateGetParentFunc()).WithCacheWriter(cacheWriter).Build()
 	if err != nil {
 		return nil, err
 	}
