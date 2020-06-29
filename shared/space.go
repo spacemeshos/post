@@ -2,7 +2,7 @@ package shared
 
 import (
 	"fmt"
-	"github.com/ricochet2200/go-disk-usage/du"
+	"github.com/tzdybal/go-disk-usage/du"
 )
 
 // ValidateSpace indicates whether a given space param is valid.
