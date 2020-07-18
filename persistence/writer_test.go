@@ -14,15 +14,16 @@ var (
 	tempdir, _ = ioutil.TempDir("", "post-test")
 )
 
-type LabelGroup []byte
+type Label []byte
 
 func TestLabelsReaderAndWriter(t *testing.T) {
 	req := require.New(t)
 	id, labelGroupGroupGroups := generateIdAndLabels()
-	labelsToWriter := make([]LabelGroup, 0)
+	labelsToWriter := make([]Label, 0)
+	size := uint(32)
 
 	for i, labelGroupGroup := range labelGroupGroupGroups {
-		writer, err := NewLabelsWriter(tempdir, id, i)
+		writer, err := NewLabelsWriter(tempdir, id, i, size)
 		req.NoError(err)
 
 		for _, labelGroup := range labelGroupGroup {
@@ -36,10 +37,10 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 		req.NoError(err)
 	}
 
-	reader, err := NewLabelsReader(tempdir, id)
+	reader, err := NewLabelsReader(tempdir, id, size)
 	req.NoError(err)
 
-	labelsFromReader := make([]LabelGroup, len(labelsToWriter))
+	labelsFromReader := make([]Label, len(labelsToWriter))
 	for i := range labelsFromReader {
 		labelsFromReader[i], err = reader.ReadNext()
 		req.NoError(err)
@@ -51,32 +52,32 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 	req.EqualValues(labelsToWriter, labelsFromReader)
 }
 
-func generateIdAndLabels() ([]byte, [][]LabelGroup) {
+func generateIdAndLabels() ([]byte, [][]Label) {
 	id, _ := hex.DecodeString("deadbeef")
-	labels := [][]LabelGroup{
+	labels := [][]Label{
 		{
-			NewLabelGroup(0),
-			NewLabelGroup(1),
-			NewLabelGroup(2),
-			NewLabelGroup(3),
+			NewLabel(0),
+			NewLabel(1),
+			NewLabel(2),
+			NewLabel(3),
 		},
 		{
-			NewLabelGroup(4),
-			NewLabelGroup(5),
-			NewLabelGroup(6),
-			NewLabelGroup(7),
+			NewLabel(4),
+			NewLabel(5),
+			NewLabel(6),
+			NewLabel(7),
 		},
 		{
-			NewLabelGroup(8),
-			NewLabelGroup(9),
-			NewLabelGroup(10),
-			NewLabelGroup(11),
+			NewLabel(8),
+			NewLabel(9),
+			NewLabel(10),
+			NewLabel(11),
 		},
 		{
-			NewLabelGroup(12),
-			NewLabelGroup(13),
-			NewLabelGroup(14),
-			NewLabelGroup(15),
+			NewLabel(12),
+			NewLabel(13),
+			NewLabel(14),
+			NewLabel(15),
 		},
 	}
 	return id, labels
@@ -93,8 +94,8 @@ func cleanup() {
 	_ = os.RemoveAll(tempdir)
 }
 
-func NewLabelGroup(cnt uint64) []byte {
-	b := make([]byte, LabelGroupSize)
+func NewLabel(cnt uint64) []byte {
+	b := make([]byte, 32)
 	binary.LittleEndian.PutUint64(b, cnt)
 	return b
 }

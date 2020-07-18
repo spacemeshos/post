@@ -70,9 +70,7 @@ message InitializeRequest {
      bytes id = 1 [json_name = "id"];
 }
 
-message InitializeResponse {
-    Proof proof = 1 [json_name = "proof"];
-}
+message InitializeResponse {}
 
 message InitializeAsyncRequest {
     bytes id = 1 [json_name = "id"];
@@ -145,18 +143,16 @@ message ShutdownResponse {
 }
 
 message Proof {
-    bytes challenge = 1 [json_name = "challenge"];
-    bytes merkleRoot = 2 [json_name = "merkle_root"];
-    repeated bytes provenLeaves = 3 [json_name = "proven_leaves"];
-    repeated bytes proofNodes = 4o [json_name = "proof_nodes"];
+    bytes data = 1 [json_name = "data"];
 }
 
 message Config {
     string datadir = 1 [json_name = "datadir"];
-    int64 spacePerUnit = 2 [json_name = "space_per_unit"];
-    int32 difficulty = 3 [json_name = "difficulty"];
-    int32 labels = 4 [json_name = "labels"];
-    int32 cacheLayer = 5 [json_name = "cache_layer"];
+    uint64 numLabels = 2 [json_name = "num_labels"];
+    uint32 label_size = 3 [json_name = "label_size"];
+    uint32 k1 = 4 [json_name = "k1"];
+    uint32 k2 = 5 [json_name = "k2"];
+    uint32 numFiles = 6 [json_name = "num_files"];
 }
 
 message State {

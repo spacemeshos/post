@@ -3,13 +3,10 @@ package initialization_test
 import (
 	"encoding/hex"
 	"flag"
-	"fmt"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
-	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/smutil/log"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"math"
@@ -18,7 +15,6 @@ import (
 )
 
 const (
-	LabelGroupSize  = config.LabelGroupSize
 	MaxSpace        = config.MaxSpace
 	StateNotStarted = initialization.StateNotStarted
 	StateCompleted  = initialization.StateCompleted
@@ -35,36 +31,21 @@ var (
 
 // Test vars.
 var (
-	id                   = hexDecode("deadbeef")
-	challenge            = hexDecode("this is a challenge")
-	datadir, _           = ioutil.TempDir("", "post-test")
-	space                = uint64(16 * LabelGroupSize)
-	numFiles             = 1
-	maxFilesParallelism  = uint(1)
-	maxInfileParallelism = uint(1)
-
-	cfg *Config
+	challenge = shared.ZeroChallenge
+	id        = hexDecode("deadbeef")
+	cfg       *Config
 )
 
 func TestMain(m *testing.M) {
-	flag.StringVar(&datadir, "datadir", datadir, "")
-	flag.Uint64Var(&space, "space", space, "")
-	flag.IntVar(&numFiles, "numfiles", numFiles, "")
-	flag.UintVar(&maxFilesParallelism, "parallel-files", maxFilesParallelism, "")
-	flag.UintVar(&maxInfileParallelism, "parallel-infile", maxInfileParallelism, "")
-	flag.Parse()
+	cfg = config.DefaultConfig()
+	cfg.DataDir, _ = ioutil.TempDir("", "post-test")
+	cfg.LabelsLogRate = uint64(math.MaxUint64)
 
-	cfg = &Config{
-		SpacePerUnit:                            space,
-		NumFiles:                                numFiles,
-		Difficulty:                              5,
-		NumProvenLabels:                         4,
-		LowestLayerToCacheDuringProofGeneration: 0,
-		DataDir:                                 datadir,
-		MaxWriteFilesParallelism:                maxFilesParallelism,
-		MaxWriteInFileParallelism:               maxInfileParallelism,
-		LabelsLogRate:                           uint64(math.MaxUint64),
-	}
+	flag.StringVar(&cfg.DataDir, "datadir", cfg.DataDir, "")
+	flag.Uint64Var(&cfg.NumLabels, "numlabels", cfg.NumLabels, "")
+	flag.UintVar(&cfg.LabelSize, "labelsize", cfg.LabelSize, "")
+	flag.UintVar(&cfg.NumFiles, "numfiles", cfg.NumFiles, "")
+	flag.Parse()
 
 	res := m.Run()
 	os.Exit(res)
@@ -75,76 +56,49 @@ func TestInitializer(t *testing.T) {
 
 	init, err := NewInitializer(cfg, id)
 	r.NoError(err)
-	proof, err := init.Initialize()
+	err = init.Initialize()
 	defer cleanup(init)
 	r.NoError(err)
-
-	expectedMerkleRoot := hexDecode("2292f95c87626f5a281fa811ba825ffce79442f8999e1ddc8e8c9bbac15e3fcb")
-	r.Equal(expectedMerkleRoot, proof.MerkleRoot)
-
-	expectedProvenLeaves := nodes{
-		hexDecode("1507851a83f1b8644dbbc09c4cb66d28397ed7f5cecce3d5dbce4b6f0b7cd5b3"),
-		hexDecode("04e98f15e487573d38609f0cb50e4d66107d2aef126dd52f4833f24200e099ff"),
-		hexDecode("f0e25e059be7c13a2af257568f7ea386ccbf9f175b7af3c978e3376c48ba20ff"),
-		hexDecode("d876529601cf04b6acc7ee1ac2b33f052e58d0dce58859e3a4a6a029ded70ee0"),
-	}
-
-	r.EqualValues(expectedProvenLeaves, nodes(proof.ProvenLeaves))
-
-	expectedProofNodes := nodes{
-		hexDecode("94686b27f3ef2ab9415f95aeafba42da6f4036872dffcc5475e9749980e8e4b3"),
-		hexDecode("750ba998411ef4d1357fead36c2b080c53bef7fa8a9bd3ff02cae1aef08fce7d"),
-		hexDecode("9847d3adad39f5c2a8c2f9e7d8d3001caf6b65c9a544e537c55f630949d6c440"),
-		hexDecode("6695ccdf6ff22dc17c7cdd3217b7d49405824266d35bda1eeae610335a2247bd"),
-		hexDecode("8bed2cae59accd2c817c4d82a11c610d5590d96e98607cbc1bc4c7040d9ade8b"),
-		hexDecode("09db8e0d03b3786a4cd05dd1dce42d7d6dfbfabd63575734b531ab80c05ff41d"),
-	}
-
-	r.EqualValues(expectedProofNodes, nodes(proof.ProofNodes))
 }
 
-func TestInitializerErrors(t *testing.T) {
-	r := require.New(t)
-
-	newCfg := *cfg
-	newCfg.Difficulty = 4
-	init, err := NewInitializer(&newCfg, id)
-	r.Nil(init)
-	r.EqualError(err, "difficulty must be between 5 and 8 (received 4)")
-
-	newCfg = *cfg
-	newCfg.Difficulty = 9
-	init, err = NewInitializer(&newCfg, id)
-	r.Nil(init)
-	r.EqualError(err, "difficulty must be between 5 and 8 (received 9)")
-
-	newCfg = *cfg
-	newCfg.SpacePerUnit = MaxSpace + 1
-	init, err = NewInitializer(&newCfg, id)
-	r.Nil(init)
-	r.EqualError(err, fmt.Sprintf("space (%d) is greater than the supported max (%d)", MaxSpace+1, MaxSpace))
-}
+//
+//func TestInitializerErrors(t *testing.T) {
+//	r := require.New(t)
+//
+//	newCfg := *cfg
+//	newCfg.Difficulty = 4
+//	init, err := NewInitializer(&newCfg, id)
+//	r.Nil(init)
+//	r.EqualError(err, "difficulty must be between 5 and 8 (received 4)")
+//
+//	newCfg = *cfg
+//	newCfg.Difficulty = 9
+//	init, err = NewInitializer(&newCfg, id)
+//	r.Nil(init)
+//	r.EqualError(err, "difficulty must be between 5 and 8 (received 9)")
+//
+//	newCfg = *cfg
+//	newCfg.SpacePerUnit = MaxSpace + 1
+//	init, err = NewInitializer(&newCfg, id)
+//	r.Nil(init)
+//	r.EqualError(err, fmt.Sprintf("numLabels (%d) is greater than the supported max (%d)", MaxSpace+1, MaxSpace))
+//}
 
 func TestInitializerMultipleFiles(t *testing.T) {
 	r := require.New(t)
 
 	cfg := *cfg
-	cfg.SpacePerUnit = 1 << 15
+	cfg.NumLabels = 1 << 15
 	cfg.NumFiles = 1
 
 	init, err := NewInitializer(&cfg, id)
 	r.NoError(err)
-	initProof, err := init.Initialize()
-	r.NoError(err)
-
-	p, err := proving.NewProver(&cfg, id)
-	r.NoError(err)
-	execProof, err := p.GenerateProof(challenge)
+	err = init.Initialize()
 	r.NoError(err)
 
 	cleanup(init)
 
-	for numFiles := 2; numFiles <= 16; numFiles <<= 1 {
+	for numFiles := uint(2); numFiles <= 16; numFiles <<= 1 {
 		newCfg := cfg
 		newCfg.NumFiles = numFiles
 		newCfg.MaxWriteFilesParallelism = uint(numFiles)
@@ -153,23 +107,20 @@ func TestInitializerMultipleFiles(t *testing.T) {
 
 		init, err := NewInitializer(&newCfg, id)
 		r.NoError(err)
-		multiFilesInitProof, err := init.Initialize()
-		r.NoError(err)
-
-		p, err := proving.NewProver(&newCfg, id)
-		r.NoError(err)
-		multiFilesExecProof, err := p.GenerateProof(challenge)
+		err = init.Initialize()
 		r.NoError(err)
 
 		cleanup(init)
 
-		r.Equal(initProof.MerkleRoot, multiFilesInitProof.MerkleRoot)
-		r.EqualValues(initProof.ProvenLeaves, multiFilesInitProof.ProvenLeaves)
-		r.EqualValues(initProof.ProofNodes, multiFilesInitProof.ProofNodes)
+		// TODO(moshababo): compare the init data. the proofs are random, so there's no point to compare.
 
-		r.Equal(execProof.MerkleRoot, multiFilesExecProof.MerkleRoot)
-		r.EqualValues(execProof.ProvenLeaves, multiFilesExecProof.ProvenLeaves)
-		r.EqualValues(execProof.ProofNodes, multiFilesExecProof.ProofNodes)
+		//r.Equal(initProof.MerkleRoot, multiFilesInitProof.MerkleRoot)
+		//r.EqualValues(initProof.ProvenLeaves, multiFilesInitProof.ProvenLeaves)
+		//r.EqualValues(initProof.ProofNodes, multiFilesInitProof.ProofNodes)
+		//
+		//r.Equal(execProof.MerkleRoot, multiFilesExecProof.MerkleRoot)
+		//r.EqualValues(execProof.ProvenLeaves, multiFilesExecProof.ProvenLeaves)
+		//r.EqualValues(execProof.ProofNodes, multiFilesExecProof.ProofNodes)
 	}
 }
 
@@ -177,7 +128,7 @@ func TestInitializer_State(t *testing.T) {
 	r := require.New(t)
 
 	cfg := *cfg
-	cfg.SpacePerUnit = 1 << 15
+	cfg.NumLabels = 1 << 15
 	cfg.NumFiles = 1
 
 	init, err := NewInitializer(&cfg, id)
@@ -185,10 +136,10 @@ func TestInitializer_State(t *testing.T) {
 
 	state, requiredSpace, err := init.State()
 	r.Equal(StateNotStarted, state)
-	r.Equal(cfg.SpacePerUnit, requiredSpace)
+	r.Equal(cfg.Space(), requiredSpace)
 	r.NoError(err)
 
-	_, err = init.Initialize()
+	err = init.Initialize()
 	r.NoError(err)
 
 	state, requiredSpace, err = init.State()
@@ -196,7 +147,7 @@ func TestInitializer_State(t *testing.T) {
 	r.Equal(uint64(0), requiredSpace)
 	r.NoError(err)
 
-	_, err = init.Initialize()
+	err = init.Initialize()
 	r.Equal(err, shared.ErrInitCompleted)
 
 	// Initialize using a new instance.
@@ -209,13 +160,13 @@ func TestInitializer_State(t *testing.T) {
 	r.Equal(uint64(0), requiredSpace)
 	r.NoError(err)
 
-	_, err = init.Initialize()
+	err = init.Initialize()
 	r.Equal(err, shared.ErrInitCompleted)
 
 	// Use a new instance with a different config.
 
 	newCfg := cfg
-	newCfg.SpacePerUnit = 1 << 14
+	newCfg.NumLabels = 1 << 14
 	newCfg.NumFiles = 1
 
 	init, err = NewInitializer(&newCfg, id)
@@ -224,7 +175,7 @@ func TestInitializer_State(t *testing.T) {
 	_, _, err = init.State()
 	r.Equal(err, initialization.ErrStateConfigMismatch)
 
-	_, err = init.Initialize()
+	err = init.Initialize()
 	r.Equal(err, initialization.ErrStateConfigMismatch)
 
 	err = init.Reset()
@@ -243,31 +194,20 @@ func hexDecode(hexStr string) []byte {
 	return node
 }
 
-type nodes [][]byte
-
-func (n nodes) String() string {
-	s := ""
-	for _, v := range n {
-		s += "\n" + hex.EncodeToString(v[:]) + " "
-	}
-	return s
-}
-
 func BenchmarkInitialize30(b *testing.B) {
-	space := uint64(1) << 30 // 1 GB.
-
 	newCfg := *cfg
-	newCfg.SpacePerUnit = space
 	newCfg.NumFiles = 1
+	// 1 GB.
+	newCfg.NumLabels = 1 << 27
+	newCfg.LabelSize = 8
 
 	init, err := NewInitializer(&newCfg, id)
 	require.NoError(b, err)
-	proof, err := init.Initialize()
+	err = init.Initialize()
 	cleanup(init)
 	require.NoError(b, err)
 
-	expectedMerkleRoot, _ := hex.DecodeString("42dd3ed26e6f30f8098ec0b5093147551b32573ef9ed6670076248b4fd0fac30")
-	assert.Equal(b, expectedMerkleRoot, proof.MerkleRoot)
+	// TODO(moshababo): print new version
 	/*
 		2019-04-30T11:49:10.271+0300    INFO    Spacemesh       creating directory: "/Users/moshababo/.spacemesh-data/post-data/deadbeef"
 		2019-04-30T11:49:45.168+0300    INFO    Spacemesh       found 5000000 labels
@@ -292,7 +232,7 @@ func BenchmarkInitializeGeneric(b *testing.B) {
 	init, err := NewInitializer(cfg, id)
 	require.NoError(b, err)
 	init.SetLogger(log.AppLog)
-	_, err = init.Initialize()
+	err = init.Initialize()
 	cleanup(init)
 	require.NoError(b, err)
 }

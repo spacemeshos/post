@@ -136,20 +136,20 @@ func setFlags(cmd *cobra.Command, cfg *Config) {
 
 	// POST config.
 
-	flags.Uint64Var(&cfg.PostCfg.SpacePerUnit, "post-space",
-		cfg.PostCfg.SpacePerUnit, "Space per unit, in bytes")
+	flags.Uint64Var(&cfg.PostCfg.NumLabels, "post-numlabels",
+		cfg.PostCfg.NumLabels, "") // TODO: add desc
 
-	flags.IntVar(&cfg.PostCfg.NumFiles, "post-numfiles",
+	flags.UintVar(&cfg.PostCfg.LabelSize, "post-labelsize",
+		cfg.PostCfg.LabelSize, "") // TODO: add desc
+
+	flags.UintVar(&cfg.PostCfg.K1, "post-k1",
+		cfg.PostCfg.K1, "") // TODO: add desc
+
+	flags.UintVar(&cfg.PostCfg.K2, "post-k2",
+		cfg.PostCfg.K2, "") // TODO: add desc
+
+	flags.UintVar(&cfg.PostCfg.NumFiles, "post-numfiles",
 		cfg.PostCfg.NumFiles, "Number of files")
-
-	flags.UintVar(&cfg.PostCfg.Difficulty, "post-difficulty",
-		cfg.PostCfg.Difficulty, "Computational cost of the initialization")
-
-	flags.UintVar(&cfg.PostCfg.NumProvenLabels, "post-labels",
-		cfg.PostCfg.NumProvenLabels, "Number of labels to prove in non-interactive proof (security parameter)")
-
-	flags.UintVar(&cfg.PostCfg.LowestLayerToCacheDuringProofGeneration, "post-cachelayer",
-		cfg.PostCfg.LowestLayerToCacheDuringProofGeneration, "Lowest layer to cache in-memory during proof generation (optimization parameter)")
 
 	flags.Uint64Var(&cfg.PostCfg.LabelsLogRate, "post-lograte",
 		cfg.PostCfg.LabelsLogRate, "Labels construction progress log rate")

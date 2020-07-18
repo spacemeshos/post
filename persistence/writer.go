@@ -4,14 +4,9 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/shared"
 	"os"
 	"path/filepath"
-)
-
-const (
-	LabelGroupSize = config.LabelGroupSize
 )
 
 var (
@@ -25,7 +20,7 @@ type Writer struct {
 	itemSize uint64
 }
 
-func NewLabelsWriter(datadir string, id []byte, index int) (*Writer, error) {
+func NewLabelsWriter(datadir string, id []byte, index int, size uint) (*Writer, error) {
 	dir := shared.GetInitDir(datadir, id)
 	if len(id) > 64 {
 		return nil, fmt.Errorf("id cannot be longer than 64 bytes (got %d bytes)", len(id))
@@ -37,7 +32,7 @@ func NewLabelsWriter(datadir string, id []byte, index int) (*Writer, error) {
 	}
 
 	filename := filepath.Join(dir, shared.InitFileName(id, index))
-	return newWriter(filename, LabelGroupSize)
+	return newWriter(filename, uint64(size))
 }
 
 func newWriter(filename string, itemSize uint64) (*Writer, error) {

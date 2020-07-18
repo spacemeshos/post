@@ -242,21 +242,25 @@
         "datadir": {
           "type": "string"
         },
-        "spacePerUnit": {
+        "numLabels": {
           "type": "string",
+          "format": "uint64"
+        },
+        "label_size": {
+          "type": "integer",
           "format": "int64"
         },
-        "difficulty": {
+        "k1": {
           "type": "integer",
-          "format": "int32"
+          "format": "int64"
         },
-        "labels": {
+        "k2": {
           "type": "integer",
-          "format": "int32"
+          "format": "int64"
         },
-        "cacheLayer": {
+        "numFiles": {
           "type": "integer",
-          "format": "int32"
+          "format": "int64"
         }
       }
     },
@@ -363,41 +367,14 @@
       }
     },
     "apiInitializeResponse": {
-      "type": "object",
-      "properties": {
-        "proof": {
-          "$ref": "#/definitions/apiProof"
-        }
-      }
+      "type": "object"
     },
     "apiProof": {
       "type": "object",
       "properties": {
-        "id": {
+        "data": {
           "type": "string",
           "format": "byte"
-        },
-        "challenge": {
-          "type": "string",
-          "format": "byte"
-        },
-        "merkleRoot": {
-          "type": "string",
-          "format": "byte"
-        },
-        "provenLeaves": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "format": "byte"
-          }
-        },
-        "proofNodes": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "format": "byte"
-          }
         }
       }
     },

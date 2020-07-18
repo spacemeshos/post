@@ -1,10 +1,8 @@
 package shared
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
-	"github.com/nullstyle/go-xdr/xdr3"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -38,21 +36,15 @@ func IsInitFile(id []byte, file os.FileInfo) bool {
 	return !file.IsDir() && strings.HasPrefix(file.Name(), fmt.Sprintf("%x", id))
 }
 
-func PersistProof(datadir string, id []byte, proof *Proof) error {
-	var w bytes.Buffer
-	_, err := xdr.Marshal(&w, &proof)
-	if err != nil {
-		return fmt.Errorf("serialization failure: %v", err)
-	}
-
+func PersistProof(datadir string, id []byte, ch Challenge, proof []byte) error {
 	dir := GetProofsDir(datadir, id)
-	err = os.Mkdir(dir, OwnerReadWriteExec)
+	err := os.Mkdir(dir, OwnerReadWriteExec)
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("dir creation failure: %v", err)
 	}
 
-	filename := GetProofFilename(datadir, id, proof.Challenge)
-	err = ioutil.WriteFile(filename, w.Bytes(), OwnerReadWrite)
+	filename := GetProofFilename(datadir, id, ch)
+	err = ioutil.WriteFile(filename, proof, OwnerReadWrite)
 	if err != nil {
 		return fmt.Errorf("write to disk failure: %v", err)
 	}
@@ -60,7 +52,7 @@ func PersistProof(datadir string, id []byte, proof *Proof) error {
 	return nil
 }
 
-func FetchProof(datadir string, id []byte, challenge []byte) (*Proof, error) {
+func FetchProof(datadir string, id []byte, challenge []byte) ([]byte, error) {
 	filename := GetProofFilename(datadir, id, challenge)
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -71,13 +63,7 @@ func FetchProof(datadir string, id []byte, challenge []byte) (*Proof, error) {
 		return nil, fmt.Errorf("read file failure: %v", err)
 	}
 
-	proof := &Proof{}
-	_, err = xdr.Unmarshal(bytes.NewReader(data), proof)
-	if err != nil {
-		return nil, err
-	}
-
-	return proof, nil
+	return data, nil
 }
 
 func Min(x, y int) int {

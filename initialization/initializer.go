@@ -7,36 +7,20 @@ import (
 	"errors"
 	"fmt"
 	"github.com/nullstyle/go-xdr/xdr3"
-	"github.com/spacemeshos/merkle-tree"
-	"github.com/spacemeshos/merkle-tree/cache"
 	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/oracle"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
-	"github.com/spacemeshos/smutil/log"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 )
 
-const (
-	LabelGroupSize = config.LabelGroupSize
-)
-
 type (
-	Config           = config.Config
-	Proof            = shared.Proof
-	Difficulty       = shared.Difficulty
-	Logger           = shared.Logger
-	MTreeOutput      = shared.MTreeOutput
-	MTreeOutputEntry = shared.MTreeOutputEntry
-	CacheReader      = cache.CacheReader
-)
-
-var (
-	ValidateConfig = shared.ValidateConfig
-	NumLabelGroups = shared.NumLabelGroups
+	Config = config.Config
+	Proof  = shared.Proof
+	Logger = shared.Logger
 )
 
 type state int
@@ -85,7 +69,7 @@ type Initializer struct {
 }
 
 func NewInitializer(cfg *Config, id []byte) (*Initializer, error) {
-	if err := ValidateConfig(cfg); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -97,66 +81,26 @@ func (init *Initializer) SetLogger(logger Logger) {
 	init.logger = logger
 }
 
-// Initialize perform the initialization procedure and returns a proof of the
-// initialized data with an empty challenge. The data and the proof are applied
-// to the configuration of the Initializer instance: id, space, numProvenLabels and difficulty.
-// Difficulty determines the number of bits per label that are stored. Each leaf in the tree is 32 bytes = 256 bits.
-// The number of bits per label is 256 / LabelsPerGroup. LabelsPerGroup = 1 << difficulty.
-// Supported values range from 5 (8 bits per label) to 8 (1 bit per label).
-func (init *Initializer) Initialize() (*Proof, error) {
+// Initialize perform the initialization procedure.
+func (init *Initializer) Initialize() error {
 	if err := init.VerifyInitAllowed(); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := init.SaveMetadata(MetadataStateStarted); err != nil {
-		return nil, err
+		return err
 	}
 
-	fileSize := init.cfg.SpacePerUnit / uint64(init.cfg.NumFiles)
-	labelGroupsPerFile := NumLabelGroups(fileSize)
-
-	outputs, err := init.initFiles(init.cfg.NumFiles, labelGroupsPerFile)
-	if err != nil {
-		return nil, err
-	}
-
-	output, err := shared.Merge(outputs)
-	if err != nil {
-		return nil, err
-	}
-
-	leafReader := output.Reader.GetLayerReader(0)
-	width, err := leafReader.Width()
-	if err != nil {
-		err = fmt.Errorf("failed to get leaves reader width: %v", err)
-		log.Error(err.Error())
-		return nil, err
-	}
-
-	difficulty := Difficulty(init.cfg.Difficulty)
-	provenLeafIndices := shared.CalcProvenLeafIndices(output.Root, width<<difficulty, uint8(init.cfg.NumProvenLabels), difficulty)
-	_, provenLeaves, proofNodes, err := merkle.GenerateProof(provenLeafIndices, output.Reader)
-	if err != nil {
-		return nil, err
-	}
-
-	err = leafReader.Close()
-	if err != nil {
-		return nil, err
+	numLabelsPerFile := init.cfg.NumLabels / uint64(init.cfg.NumFiles)
+	if err := init.initFiles(int(init.cfg.NumFiles), numLabelsPerFile); err != nil {
+		return err
 	}
 
 	if err := init.SaveMetadata(MetadataStateCompleted); err != nil {
-		return nil, err
+		return err
 	}
 
-	proof := &Proof{
-		Challenge:    shared.ZeroChallenge,
-		MerkleRoot:   output.Root,
-		ProvenLeaves: provenLeaves,
-		ProofNodes:   proofNodes,
-	}
-
-	return proof, err
+	return nil
 }
 
 func (init *Initializer) Reset() error {
@@ -247,11 +191,11 @@ func (init *Initializer) VerifyInitAllowed() error {
 	return nil
 }
 
-func (init *Initializer) initFiles(numFiles int, labelGroupsPerFile uint64) ([]*MTreeOutput, error) {
+func (init *Initializer) initFiles(numFiles int, numLabelsPerFile uint64) error {
 	filesParallelism, infileParallelism := init.CalcParallelism()
 	numWorkers := filesParallelism
 	jobsChan := make(chan int, numFiles)
-	resultsChan := make(chan *MTreeOutputEntry, numFiles)
+	okChan := make(chan struct{}, numFiles)
 	errChan := make(chan error, 0)
 
 	init.logger.Info("initialization: start writing %v files, parallelism degree: %v, dir: %v", numFiles, numWorkers, init.dir)
@@ -269,108 +213,71 @@ func (init *Initializer) initFiles(numFiles int, labelGroupsPerFile uint64) ([]*
 					return
 				}
 
-				output, err := init.initFile(index, labelGroupsPerFile, infileParallelism)
-				if err != nil {
+				if err := init.initFile(index, numLabelsPerFile, infileParallelism); err != nil {
 					errChan <- err
 					return
 				}
 
-				resultsChan <- &MTreeOutputEntry{Index: index, MTreeOutput: output}
+				okChan <- struct{}{}
 			}
 		}()
 	}
 
-	outputs := make([]*MTreeOutput, numFiles)
 	for i := 0; i < numFiles; i++ {
 		select {
-		case res := <-resultsChan:
-			outputs[res.Index] = res.MTreeOutput
+		case <-okChan:
 		case err := <-errChan:
-			return nil, err
+			return err
 		}
 	}
 
-	return outputs, nil
+	return nil
 }
 
-func (init *Initializer) initFile(fileIndex int, labelGroupsPerFile uint64, infileParallelism int) (*MTreeOutput, error) {
+func (init *Initializer) initFile(fileIndex int, numLabels uint64, infileParallelism int) error {
 	// Initialize the labels file writer.
-	labelsWriter, err := persistence.NewLabelsWriter(init.cfg.DataDir, init.id, fileIndex)
+	labelsWriter, err := persistence.NewLabelsWriter(init.cfg.DataDir, init.id, fileIndex, init.cfg.LabelSize)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// Initialize the labels merkle tree with the execution-phase zero challenge.
-	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(init.cfg.LowestLayerToCacheDuringProofGeneration), cache.MakeSliceReadWriterFactory())
-	tree, err := merkle.NewTreeBuilder().
-		WithHashFunc(shared.ZeroChallenge.GenerateGetParentFunc()).
-		WithCacheWriter(cacheWriter).
-		Build()
-	if err != nil {
-		return nil, err
-	}
-
-	// Potentially perform recovery procedure.
-	// if file already exists, read it from start, and re-construct the merkle tree state.
-	// If file initialization was complete, return the merkle tree output.
-	// Otherwise continue to initialize from latest position.
+	// Potentially perform recovery procedure; continue to initialize from latest position.
 
 	labelsReader, err := labelsWriter.GetReader()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	existingWidth, err := labelsReader.Width()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if existingWidth > 0 {
-		if existingWidth > labelGroupsPerFile {
-			return nil, ErrStateInconsistent
+		if existingWidth > numLabels {
+			return ErrStateInconsistent
 		}
 
-		init.logger.Info("initialization recovery: starting file %v, position: %v, missing: %v", fileIndex, existingWidth, labelGroupsPerFile-existingWidth)
+		init.logger.Info("initialization recovery: starting file %v, position: %v, missing: %v", fileIndex, existingWidth, numLabels-existingWidth)
 
-		for {
-			lg, err := labelsReader.ReadNext()
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				return nil, err
-			}
-
-			err = tree.AddLeaf(lg)
-			if err != nil {
-				return nil, err
-			}
+		if existingWidth == numLabels {
+			return nil
 		}
-
-		if existingWidth == labelGroupsPerFile {
-			cacheWriter.SetLayer(0, labelsReader)
-			cacheReader, err := cacheWriter.GetReader()
-			if err != nil {
-				return nil, err
-			}
-
-			return &MTreeOutput{Reader: cacheReader, Root: tree.Root()}, nil
-		}
+	} else {
+		init.logger.Info("initialization: start writing file %v, parallelism degree: %v",
+			fileIndex, infileParallelism)
 	}
-
-	init.logger.Info("initialization: start writing file %v, parallelism degree: %v",
-		fileIndex, infileParallelism)
 
 	numWorkers := infileParallelism
 	workersChans := make([]chan [][]byte, numWorkers)
+	okChan := make(chan struct{}, 0)
 	errChan := make(chan error, 0)
-	finishedChan := make(chan struct{}, 0)
 
 	batchSize := 100 // CPU workers send data to IO worker in batches, to reduce channel ops overhead.
 	chanBufferSize := 100
 
 	// Start CPU workers.
-	fileOffset := uint64(fileIndex) * labelGroupsPerFile
+	fileOffset := uint64(fileIndex) * numLabels
 	for i := 0; i < numWorkers; i++ {
 		i := i
 		workersChans[i] = make(chan [][]byte, chanBufferSize)
@@ -383,9 +290,9 @@ func (init *Initializer) initFile(fileIndex int, labelGroupsPerFile uint64, infi
 			batch := make([][]byte, batchSize)
 
 			// Continue as long as the combined position didn't reach the file capacity.
-			for batchPosition+position < labelGroupsPerFile {
-				// Calculate the label group of the combined position and the global offset for this file.
-				batch[batchPosition] = CalcLabelGroup(init.id, batchPosition+position+fileOffset, Difficulty(init.cfg.Difficulty))
+			for batchPosition+position < numLabels {
+				// Calculate the label of the combined position and the global offset for this file.
+				batch[batchPosition] = oracle.WorkOracle(init.id, batchPosition+position+fileOffset, init.cfg.LabelSize)
 
 				// If batch was filled, send it over the channel, and instantiate a new empty batch.
 				// In addition, adjust position to the next location for this worker, after its own and all other workers batches.
@@ -411,63 +318,43 @@ func (init *Initializer) initFile(fileIndex int, labelGroupsPerFile uint64, infi
 		for i := 0; ; i++ {
 			// Consume the next batch from the next worker.
 			batch := <-workersChans[i%numWorkers]
-			for j, lg := range batch {
+			for j, label := range batch {
 
-				// The first empty label group indicates an unfilled batch which indicates the end of work.
-				if lg == nil {
+				// The first empty label indicates an unfilled batch which indicates the end of work.
+				if label == nil {
 					break batchesLoop
 				}
 
-				// Write label group to disk.
-				err := labelsWriter.Write(lg)
-				if err != nil {
-					errChan <- err
-					return
-				}
-
-				// Append label group as leaf in the merkle tree. The tree cache
-				// isn't suppose to handle writing of the leaf layer (0) to disk.
-				err = tree.AddLeaf(lg)
-				if err != nil {
+				// Write label to disk.
+				if err := labelsWriter.Write(label); err != nil {
 					errChan <- err
 					return
 				}
 
 				num := batchSize*i + j + 1
 				if uint64(num)%init.cfg.LabelsLogRate == 0 {
-					init.logger.Info("initialization: file %v completed %v label groups", fileIndex, num)
+					init.logger.Info("initialization: file %v completed %v labels", fileIndex, num)
 				}
 			}
 		}
 
-		close(finishedChan)
+		close(okChan)
 	}()
 
 	select {
-	case <-finishedChan:
+	case <-okChan:
 	case err := <-errChan:
-		return nil, err
-	}
-
-	labelsReader, err = labelsWriter.GetReader()
-	if err != nil {
-		return nil, err
+		return err
 	}
 
 	info, err := labelsWriter.Close()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	init.logger.Info("initialization: completed file %v, bytes written: %v", fileIndex, info.Size())
 
-	cacheWriter.SetLayer(0, labelsReader)
-	cacheReader, err := cacheWriter.GetReader()
-	if err != nil {
-		return nil, err
-	}
-
-	return &MTreeOutput{Reader: cacheReader, Root: tree.Root()}, nil
+	return nil
 }
 
 func (init *Initializer) CalcParallelism() (files int, infile int) {
@@ -494,7 +381,7 @@ func (init *Initializer) calcParallelism(max int) (files int, infile int) {
 }
 
 func (init *Initializer) State() (state, uint64, error) {
-	requiredSpace := init.cfg.SpacePerUnit
+	requiredSpace := init.cfg.Space()
 
 	files, err := ioutil.ReadDir(init.dir)
 	if err != nil {
@@ -534,7 +421,7 @@ func (init *Initializer) State() (state, uint64, error) {
 			requiredSpace -= uint64(file.Size())
 		}
 
-		if requiredSpace%LabelGroupSize != 0 {
+		if requiredSpace%uint64(init.cfg.LabelSize) != 0 {
 			return 0, 0, ErrStateInconsistent
 		}
 
@@ -589,7 +476,7 @@ func (init *Initializer) isInitFile(file os.FileInfo) bool {
 }
 
 func configMatch(cfg1 *config.Config, cfg2 *config.Config) bool {
-	return cfg1.SpacePerUnit == cfg2.SpacePerUnit &&
-		cfg1.NumFiles == cfg2.NumFiles &&
-		cfg1.Difficulty == cfg2.Difficulty
+	return cfg1.NumLabels == cfg2.NumLabels &&
+		cfg1.LabelSize == cfg2.LabelSize &&
+		cfg1.NumFiles == cfg2.NumFiles
 }

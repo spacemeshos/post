@@ -38,7 +38,7 @@ var _ api.PostServer = (*rpcServer)(nil)
 
 // newRPCServer creates and returns a new instance of the rpcServer.
 func NewRPCServer(s *shared.Signal, cfg *Config, logger Logger) (*rpcServer, error) {
-	if err := shared.ValidateConfig(cfg); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %v", err)
 	}
 
@@ -62,24 +62,11 @@ func (r *rpcServer) Initialize(ctx context.Context, in *api.InitializeRequest) (
 	}
 
 	init.SetLogger(r.logger)
-	proof, err := init.Initialize()
-	if err != nil {
+	if err := init.Initialize(); err != nil {
 		return nil, err
 	}
 
-	err = shared.PersistProof(r.cfg.DataDir, in.Id, proof)
-	if err != nil {
-		return nil, err
-	}
-
-	out := &api.InitializeResponse{Proof: &api.Proof{
-		Challenge:    proof.Challenge,
-		MerkleRoot:   proof.MerkleRoot,
-		ProvenLeaves: proof.ProvenLeaves,
-		ProofNodes:   proof.ProofNodes,
-	}}
-
-	return out, nil
+	return &api.InitializeResponse{}, nil
 }
 
 func (r *rpcServer) InitializeAsync(ctx context.Context, in *api.InitializeAsyncRequest) (*api.InitializeAsyncResponse, error) {
@@ -100,15 +87,8 @@ func (r *rpcServer) InitializeAsync(ctx context.Context, in *api.InitializeAsync
 
 		init, _ := initialization.NewInitializer(r.cfg, in.Id)
 		init.SetLogger(r.logger)
-		proof, err := init.Initialize()
-		if err != nil {
+		if err := init.Initialize(); err != nil {
 			r.logger.Error("initialization failure: %v", err)
-			return
-		}
-
-		err = shared.PersistProof(r.cfg.DataDir, in.Id, proof)
-		if err != nil {
-			r.logger.Error("proof persisting failure: %v", err)
 			return
 		}
 	}()
@@ -127,19 +107,14 @@ func (r *rpcServer) Execute(ctx context.Context, in *api.ExecuteRequest) (*api.E
 		return nil, err
 	}
 
-	err = shared.PersistProof(r.cfg.DataDir, in.Id, proof)
+	data := proof.Encode()
+
+	err = shared.PersistProof(r.cfg.DataDir, in.Id, in.Challenge, proof.Encode())
 	if err != nil {
 		return nil, err
 	}
 
-	out := &api.ExecuteResponse{Proof: &api.Proof{
-		Challenge:    proof.Challenge,
-		MerkleRoot:   proof.MerkleRoot,
-		ProvenLeaves: proof.ProvenLeaves,
-		ProofNodes:   proof.ProofNodes,
-	}}
-
-	return out, nil
+	return &api.ExecuteResponse{Proof: &api.Proof{Data: data}}, nil
 }
 
 func (r *rpcServer) ExecuteAsync(ctx context.Context, in *api.ExecuteAsyncRequest) (*api.ExecuteAsyncResponse, error) {
@@ -160,7 +135,7 @@ func (r *rpcServer) ExecuteAsync(ctx context.Context, in *api.ExecuteAsyncReques
 			return
 		}
 
-		err = shared.PersistProof(r.cfg.DataDir, in.Id, proof)
+		err = shared.PersistProof(r.cfg.DataDir, in.Id, in.Challenge, proof.Encode())
 		if err != nil {
 			r.logger.Error("proof persisting failure: %v", err)
 			return
@@ -171,19 +146,12 @@ func (r *rpcServer) ExecuteAsync(ctx context.Context, in *api.ExecuteAsyncReques
 }
 
 func (r *rpcServer) GetProof(ctx context.Context, in *api.GetProofRequest) (*api.GetProofResponse, error) {
-	proof, err := shared.FetchProof(r.cfg.DataDir, in.Id, in.Challenge)
+	data, err := shared.FetchProof(r.cfg.DataDir, in.Id, in.Challenge)
 	if err != nil {
 		return nil, err
 	}
 
-	out := &api.GetProofResponse{Proof: &api.Proof{
-		Challenge:    proof.Challenge,
-		MerkleRoot:   proof.MerkleRoot,
-		ProvenLeaves: proof.ProvenLeaves,
-		ProofNodes:   proof.ProofNodes,
-	}}
-
-	return out, nil
+	return &api.GetProofResponse{Proof: &api.Proof{Data: data}}, nil
 }
 
 func (r *rpcServer) Reset(ctx context.Context, in *api.ResetRequest) (*api.ResetResponse, error) {
@@ -230,11 +198,12 @@ func (r *rpcServer) GetInfo(ctx context.Context, in *api.GetInfoRequest) (*api.G
 	out := &api.GetInfoResponse{
 		Version: shared.Version(),
 		Config: &api.Config{
-			Datadir:      r.cfg.DataDir,
-			SpacePerUnit: int64(r.cfg.SpacePerUnit),
-			Difficulty:   int32(r.cfg.Difficulty),
-			Labels:       int32(r.cfg.NumProvenLabels),
-			CacheLayer:   int32(r.cfg.LowestLayerToCacheDuringProofGeneration),
+			Datadir:   r.cfg.DataDir,
+			NumLabels: uint64(r.cfg.NumLabels),
+			LabelSize: uint32(r.cfg.LabelSize),
+			K1:        uint32(r.cfg.K1),
+			K2:        uint32(r.cfg.K2),
+			NumFiles:  uint32(r.cfg.NumFiles),
 		},
 	}
 

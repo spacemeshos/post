@@ -49,11 +49,12 @@ func (cfg *serverConfig) genArgs() []string {
 	args = append(args, fmt.Sprintf("--homedir=%v", cfg.baseDir))
 	args = append(args, fmt.Sprintf("--rpclisten=%v", cfg.rpcListen))
 
-	args = append(args, fmt.Sprintf("--post-space=%v", cfg.SpacePerUnit))
 	args = append(args, fmt.Sprintf("--post-numfiles=%v", cfg.NumFiles))
-	args = append(args, fmt.Sprintf("--post-difficulty=%v", cfg.Difficulty))
-	args = append(args, fmt.Sprintf("--post-labels=%v", cfg.NumProvenLabels))
-	args = append(args, fmt.Sprintf("--post-cachelayer=%v", cfg.LowestLayerToCacheDuringProofGeneration))
+
+	args = append(args, fmt.Sprintf("--post-numlabels=%v", cfg.NumLabels))
+	args = append(args, fmt.Sprintf("--post-labelsize=%v", cfg.LabelSize))
+	args = append(args, fmt.Sprintf("--post-k1=%v", cfg.K1))
+	args = append(args, fmt.Sprintf("--post-k2=%v", cfg.K2))
 
 	args = append(args, fmt.Sprintf("--post-parallel-files=%v", cfg.MaxWriteFilesParallelism))
 	args = append(args, fmt.Sprintf("--post-parallel-infile=%v", cfg.MaxWriteInFileParallelism))
@@ -101,8 +102,8 @@ func (s *server) start() error {
 	var errb bytes.Buffer
 	s.cmd.Stderr = &errb
 
-	var a bytes.Buffer
-	s.cmd.Stdout = &a
+	var outb bytes.Buffer
+	s.cmd.Stdout = &outb
 
 	if err := s.cmd.Start(); err != nil {
 		return err
@@ -121,7 +122,7 @@ func (s *server) start() error {
 			// Don't propagate 'signal: killed' error,
 			// since it's an expected behavior.
 			if !strings.Contains(err.Error(), "signal: killed") {
-				s.errChan <- fmt.Errorf("%v\n%v\n", err, errb.String())
+				s.errChan <- fmt.Errorf("%v\n%v\n%v\n", err, errb.String(), outb.String())
 			}
 		}
 
