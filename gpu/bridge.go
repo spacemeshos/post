@@ -30,14 +30,17 @@ func cScryptPositions(id, salt []byte, startPosition, endPosition uint64, option
 	cHashLenBits := C.uchar(hashLenBits)
 	cSalt := (*C.uchar)(GoBytes(salt).CBytesClone().data)
 	cOptions := C.uint(options)
-
 	cOutputSize := C.size_t(outputSize)
 	cOut := (*C.uchar)(C.malloc(cOutputSize))
-	defer cFree(unsafe.Pointer(cOut))
-
 	cN := C.uint(n)
 	cR := C.uint(r)
 	cP := C.uint(p)
+
+	defer func() {
+		cFree(unsafe.Pointer(cId))
+		cFree(unsafe.Pointer(cSalt))
+		cFree(unsafe.Pointer(cOut))
+	}()
 
 	retVal := C.scryptPositions(
 		cId,
