@@ -18,6 +18,7 @@ func TestScryptPositions(t *testing.T) {
 	req := require.New(t)
 
 	providers := GetProviders()
+	fmt.Printf("providers: %+v\n", providers)
 	for _, p := range providers {
 		providerId := uint(p.Id)
 		startPosition := uint64(1)
