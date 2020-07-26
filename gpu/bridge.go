@@ -9,21 +9,50 @@ import (
 	"unsafe"
 )
 
-type cUchar = C.uchar
-type cUint = C.uint
-
-type APIType uint32
-
-const (
-	CPU       APIType = C.SPACEMESH_API_CPU
-	GPUCuda           = C.SPACEMESH_API_CUDA
-	GPUOpenCL         = C.SPACEMESH_API_OPENCL
-	GPUVulkan         = C.SPACEMESH_API_VULKAN
-	GPUAll            = C.SPACEMESH_API_GPU
-	ALL               = C.SPACEMESH_API_ALL
+type (
+	cChar  = C.char
+	cUchar = C.uchar
 )
 
-func cScryptPositions(id, salt []byte, startPosition, endPosition uint64, options uint32, hashLenBits uint8, outputSize uint64, n, r, p uint32) ([]byte, int) {
+const (
+	ComputeAPIClassUnspecified = ComputeAPIClass((C.ComputeApiClass)(C.COMPUTE_API_CLASS_UNSPECIFIED))
+	ComputeAPIClassCPU         = ComputeAPIClass((C.ComputeApiClass)(C.COMPUTE_API_CLASS_CPU))
+	ComputeAPIClassCuda        = ComputeAPIClass((C.ComputeApiClass)(C.COMPUTE_API_CLASS_CUDA))
+	ComputeAPIClassVulkan      = ComputeAPIClass((C.ComputeApiClass)(C.COMPUTE_API_CLASS_VULKAN))
+
+	StopResultOk           = StopResult(C.SPACEMESH_API_ERROR_NONE)
+	StopResultError        = StopResult(C.SPACEMESH_API_ERROR)
+	StopResultErrorTimeout = StopResult(C.SPACEMESH_API_ERROR_TIMEOUT)
+	StopResultErrorAlready = StopResult(C.SPACEMESH_API_ERROR_TIMEOUT)
+)
+
+type StopResult int
+
+type ComputeProvider struct {
+	Id         uint
+	Model      string
+	ComputeAPI ComputeAPIClass
+}
+
+type ComputeAPIClass uint
+
+func (c ComputeAPIClass) String() string {
+	switch c {
+	case ComputeAPIClassUnspecified:
+		return "Unspecified"
+	case ComputeAPIClassCPU:
+		return "CPU"
+	case ComputeAPIClassCuda:
+		return "Cuda"
+	case ComputeAPIClassVulkan:
+		return "Vulkan"
+	default:
+		return "N/A"
+	}
+}
+
+func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, hashLenBits uint8, options uint32, outputSize uint64, n, r, p uint32) ([]byte, int) {
+	cProviderId := C.uint(providerId)
 	cId := (*C.uchar)(GoBytes(id).CBytesClone().data)
 	cStartPosition := C.uint64_t(startPosition)
 	cEndPosition := C.uint64_t(endPosition)
@@ -43,6 +72,7 @@ func cScryptPositions(id, salt []byte, startPosition, endPosition uint64, option
 	}()
 
 	retVal := C.scryptPositions(
+		cProviderId,
 		cId,
 		cStartPosition,
 		cEndPosition,
@@ -57,18 +87,25 @@ func cScryptPositions(id, salt []byte, startPosition, endPosition uint64, option
 	return cBytesCloneToGoBytes(cOut, int(outputSize)), int(retVal)
 }
 
-func cStats() int {
-	return int(C.stats())
-}
+func cGetProviders() []ComputeProvider {
+	numProviders := C.spacemesh_api_get_providers(nil, 0)
+	cProviders := make([]C.PostComputeProvider, numProviders)
+	providers := make([]ComputeProvider, numProviders)
 
-func cGPUCount(apiType APIType, onlyAvailable bool) int {
-	cAPIType := C.int(apiType)
-	var cOnlyAvailable C.int
-	if onlyAvailable {
-		cOnlyAvailable = 1
+	_ = C.spacemesh_api_get_providers(&cProviders[0], numProviders)
+
+	for i := 0; i < int(numProviders); i++ {
+		providers[i].Id = uint(cProviders[i].id)
+		providers[i].Model = cStringArrayToGoString(cProviders[i].model)
+		providers[i].ComputeAPI = ComputeAPIClass(cProviders[i].compute_api)
 	}
 
-	return int(C.spacemesh_api_get_gpu_count(cAPIType, cOnlyAvailable))
+	return providers
+}
+
+func cStop(msTimeout uint) StopResult {
+	cMsTimeout := C.uint(msTimeout)
+	return StopResult(C.stop(cMsTimeout))
 }
 
 func cFree(p unsafe.Pointer) {

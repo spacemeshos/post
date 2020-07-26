@@ -2,48 +2,53 @@ package gpu
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
+	"time"
 )
 
-const n, r, p = 512, 1, 1
+func GetProviders() []ComputeProvider {
+	return cGetProviders()
+}
 
-func ScryptPositions(id, salt []byte, startPosition, endPosition uint64, options uint32, hashLenBits uint8) ([]byte, error) {
+func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, hashLenBits uint8, options uint32) ([]byte, error) {
 	if hashLenBits < 1 || hashLenBits > 8 {
-		return nil, fmt.Errorf("invalid hashLenBits value, expected range: 1-8, given: %v", hashLenBits)
+		return nil, fmt.Errorf("invalid hashLenBits value; expected: 1-8, given: %v", hashLenBits)
 	}
 
+	const n, r, p = 512, 1, 1
 	outputSize := calcOutputSize(startPosition, endPosition, hashLenBits)
 
-	output, retVal := cScryptPositions(id, salt, startPosition, endPosition, options, hashLenBits, outputSize, n, r, p)
-
+	output, retVal := cScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options, outputSize, n, r, p)
 	switch retVal {
 	case 0:
 		return output, nil
 	case -1:
-		return nil, errors.New("no available gpu")
+		return nil, fmt.Errorf("invalid provider id: %v", providerId)
 	default:
 		panic("unreachable")
 	}
 }
 
-type Capabilities struct {
-	CPU       bool
-	GPUCuda   bool
-	GPUOpenCL bool
-	GPUVulkan bool
+func Benchmark(providerId uint) (uint64, error) {
+	// TODO(moshababo): once fixed, use the stop function, and make the benchmark
+	// function to run for a defined time duration.
+	id := []byte("id")
+	salt := []byte("salt")
+	startPosition := uint64(1)
+	endPosition := uint64(1 << 14)
+	hashLenBits := uint8(8)
+	options := uint32(0)
+
+	// TODO(moshababo): refactor ScryptPositions to return the internal time duration, which is more accurate.
+	t := time.Now()
+	output, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
+	d := time.Since(t)
+	if err != nil {
+		return 0, err
+	}
+
+	return uint64(float64(len(output)) / d.Seconds()), nil
 }
 
-func Stats() Capabilities {
-	s := cStats()
-
-	c := Capabilities{}
-	c.CPU = s&int(CPU) == int(CPU)
-	c.GPUCuda = s&int(GPUCuda) == int(GPUCuda)
-	c.GPUOpenCL = s&int(GPUOpenCL) == int(GPUOpenCL)
-	c.GPUVulkan = s&int(GPUVulkan) == int(GPUVulkan)
-	return c
-}
-
-func GPUCount(apiType APIType, onlyAvailable bool) int {
-	return cGPUCount(apiType, onlyAvailable)
+func Stop() StopResult {
+	return cStop(2000)
 }
