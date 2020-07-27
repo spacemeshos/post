@@ -22,8 +22,8 @@ type (
 // NewLabelsReader returns a new labels reader from the initialization files.
 // If the initialization was split into multiple files, they will be grouped
 // into one unified reader.
-func NewLabelsReader(datadir string, id []byte) (LayerReadWriter, error) {
-	readers, err := GetReaders(datadir, id)
+func NewLabelsReader(datadir string, id []byte, labelSize uint) (LayerReadWriter, error) {
+	readers, err := GetReaders(datadir, id, labelSize)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func NewLabelsReader(datadir string, id []byte) (LayerReadWriter, error) {
 	return Merge(readers)
 }
 
-func GetReaders(datadir string, id []byte) ([]LayerReadWriter, error) {
+func GetReaders(datadir string, id []byte, labelSize uint) ([]LayerReadWriter, error) {
 	dir := shared.GetInitDir(datadir, id)
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
@@ -48,7 +48,7 @@ func GetReaders(datadir string, id []byte) ([]LayerReadWriter, error) {
 		if !shared.IsInitFile(id, file) {
 			continue
 		}
-		reader, err := newReader(filepath.Join(dir, file.Name()), LabelGroupSize)
+		reader, err := newReader(filepath.Join(dir, file.Name()), uint64(labelSize))
 		if err != nil {
 			return nil, err
 		}

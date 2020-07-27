@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/integration"
-	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/rpc/api"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/validation"
@@ -35,8 +34,10 @@ func TestHarness(t *testing.T) {
 	assert := require.New(t)
 
 	cfg := *cfg
-	cfg.SpacePerUnit = 1 << 25
+	cfg.NumLabels = 1 << 22
+	cfg.LabelSize = 8
 	cfg.NumFiles = 4
+	assert.NoError(cfg.Validate())
 
 	h := newHarness(assert, &cfg)
 	defer func() {
@@ -60,25 +61,28 @@ func testInfo(h *integration.Harness, assert *require.Assertions, ctx context.Co
 	info, err := h.GetInfo(ctx, &api.GetInfoRequest{})
 	assert.NoError(err)
 	assert.Equal(info.Version, shared.Version())
-	assert.Equal(uint64(info.Config.SpacePerUnit), cfg.SpacePerUnit)
-	assert.Equal(uint(info.Config.Difficulty), cfg.Difficulty)
-	assert.Equal(uint(info.Config.Labels), cfg.NumProvenLabels)
-	assert.Equal(uint(info.Config.CacheLayer), cfg.LowestLayerToCacheDuringProofGeneration)
+	assert.Equal(uint64(info.Config.NumLabels), cfg.NumLabels)
+	assert.Equal(uint(info.Config.LabelSize), cfg.LabelSize)
+	assert.Equal(uint(info.Config.K1), cfg.K1)
+	assert.Equal(uint(info.Config.K2), cfg.K2)
+	assert.Equal(uint(info.Config.NumFiles), cfg.NumFiles)
 }
 
 func testInitialize(h *integration.Harness, assert *require.Assertions, ctx context.Context, cfg *config.Config) {
-	resInit, err := h.Initialize(ctx, &api.InitializeRequest{Id: id})
+	_, err := h.Initialize(ctx, &api.InitializeRequest{Id: id})
 	assert.NoError(err)
 
-	nativeProof := wireToNativeProof(resInit.Proof)
+	resProof, err := h.Execute(ctx, &api.ExecuteRequest{Id: id, Challenge: shared.ZeroChallenge})
+	assert.NoError(err)
+
+	proof := shared.Proof{}
+	err = proof.Decode(resProof.Proof.Data)
+	assert.NoError(err)
+
 	v, err := validation.NewValidator(cfg)
 	assert.NoError(err)
-	err = v.Validate(id, nativeProof)
+	err = v.Validate(id, &proof)
 	assert.NoError(err)
-
-	resProof, err := h.GetProof(ctx, &api.GetProofRequest{Id: id, Challenge: shared.ZeroChallenge})
-	assert.NoError(err)
-	assert.Equal(resProof.Proof, resInit.Proof)
 
 	_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
 	assert.EqualError(err, "rpc error: code = Unknown desc = already completed")
@@ -106,7 +110,8 @@ func TestHarness_CrashRecovery(t *testing.T) {
 	ctx, _ := context.WithTimeout(context.Background(), time.Duration(30*time.Second))
 
 	cfg := *cfg
-	cfg.SpacePerUnit = 1 << 26
+	cfg.NumLabels = 1 << 25
+	cfg.LabelSize = 8
 	cfg.NumFiles = 4
 	cfg.MaxWriteFilesParallelism = 2
 	cfg.MaxWriteInFileParallelism = 2
@@ -117,7 +122,7 @@ func TestHarness_CrashRecovery(t *testing.T) {
 	resState, err := h.GetState(ctx, &api.GetStateRequest{Id: id})
 	assert.NoError(err)
 	assert.Equal("NotStarted", resState.State.String())
-	assert.Equal(cfg.SpacePerUnit, resState.RequiredSpace)
+	assert.Equal(cfg.Space(), resState.RequiredSpace)
 
 	// Start initializing, and wait a short time, so completion won't be reached.
 	_, err = h.InitializeAsync(ctx, &api.InitializeAsyncRequest{Id: id})
@@ -158,17 +163,11 @@ func TestHarness_CrashRecovery(t *testing.T) {
 	resState, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
 	assert.NoError(err)
 	assert.Equal("Crashed", resState.State.String())
-	assert.True(resState.RequiredSpace < cfg.SpacePerUnit)
+	assert.True(resState.RequiredSpace < cfg.Space())
 	assert.True(resState.RequiredSpace > 0)
 
 	// Complete the initialization procedure.
-	resInit, err := h.Initialize(ctx, &api.InitializeRequest{Id: id})
-	assert.NoError(err)
-
-	nativeProof := wireToNativeProof(resInit.Proof)
-	v, err := validation.NewValidator(&cfg)
-	assert.NoError(err)
-	err = v.Validate(id, nativeProof)
+	_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
 	assert.NoError(err)
 
 	// Verify the initialization state.
@@ -199,13 +198,4 @@ func newHarness(assert *require.Assertions, cfg *config.Config) *integration.Har
 	}()
 
 	return h
-}
-
-func wireToNativeProof(proof *api.Proof) *proving.Proof {
-	return &proving.Proof{
-		Challenge:    shared.Challenge(proof.Challenge),
-		MerkleRoot:   proof.MerkleRoot,
-		ProvenLeaves: proof.ProvenLeaves,
-		ProofNodes:   proof.ProofNodes,
-	}
 }

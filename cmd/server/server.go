@@ -29,8 +29,8 @@ var Cmd = &cobra.Command{
 			return
 		}
 
-		logger.Info("Version: %s, SpacePerUnit: %v, Difficulty: %v, NumCPU: %v",
-			shared.Version(), s.cfg.PostCfg.SpacePerUnit, s.cfg.PostCfg.Difficulty, runtime.NumCPU())
+		logger.Info("Version: %s, NumLabels: %v, LabelSize: %v, DataDir: %v, NumCPU: %v",
+			shared.Version(), s.cfg.PostCfg.NumLabels, s.cfg.PostCfg.LabelSize, s.cfg.PostCfg.DataDir, runtime.NumCPU())
 
 		err = s.Start(cmd, args, logger)
 		if err != nil {

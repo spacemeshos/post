@@ -6,6 +6,7 @@ import (
 	"github.com/spacemeshos/ed25519"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
+	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/validation"
 	smlog "github.com/spacemeshos/smutil/log"
@@ -23,8 +24,9 @@ var (
 
 func init() {
 	flag.StringVar(&cfg.DataDir, "datadir", cfg.DataDir, "filesystem datadir path")
-	flag.Uint64Var(&cfg.SpacePerUnit, "space", cfg.SpacePerUnit, "space per unit, in bytes")
-	flag.IntVar(&cfg.NumFiles, "numfiles", cfg.NumFiles, "number of files")
+	flag.Uint64Var(&cfg.NumLabels, "numlabels", cfg.NumLabels, "number of labels")
+	flag.UintVar(&cfg.LabelSize, "labelsize", cfg.LabelSize, "label size")
+	flag.UintVar(&cfg.NumFiles, "numfiles", cfg.NumFiles, "number of files")
 	flag.BoolVar(&reset, "reset", false, "whether to reset the given id initialization folder before start initializing")
 	idHex := flag.String("id", "", "id (public key) in hex")
 
@@ -62,22 +64,34 @@ func main() {
 		}
 	}
 
-	proof, err := init.Initialize()
-	if err != nil {
+	if err := init.Initialize(); err != nil {
 		if err == shared.ErrInitCompleted {
 			log.Print(err)
 			return
 		}
-		log.Fatalf("initialization failure: %v", err)
+		log.Fatalf("failed to initialize: %v", err)
 	}
 
-	v, _ := validation.NewValidator(cfg)
-	if err := v.Validate(id, proof); err != nil {
+	prover, err := proving.NewProver(cfg, id)
+	if err != nil {
+		log.Fatal(err)
+	}
+	prover.SetLogger(smlog.AppLog)
+	proof, err := prover.GenerateProof(shared.ZeroChallenge)
+	if err != nil {
+		log.Fatalf("failed to generate proof: %v", err)
+	}
+
+	validator, err := validation.NewValidator(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := validator.Validate(id, proof); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := shared.PersistProof(cfg.DataDir, id, proof); err != nil {
-		log.Fatalf("persisting proof failure: %v", err)
+	if err := shared.PersistProof(cfg.DataDir, id, proof.Challenge, proof.Encode()); err != nil {
+		log.Fatalf("failed to persist proof: %v", err)
 	}
 }
 

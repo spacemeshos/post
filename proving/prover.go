@@ -1,11 +1,13 @@
 package proving
 
 import (
+	"bytes"
+	"context"
+	"encoding/binary"
 	"fmt"
-	"github.com/spacemeshos/merkle-tree"
-	"github.com/spacemeshos/merkle-tree/cache"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
+	"github.com/spacemeshos/post/oracle"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
 	"io"
@@ -13,19 +15,19 @@ import (
 )
 
 const (
-	LabelGroupSize = config.LabelGroupSize
+	MaxIterations          = 10
+	NumNoncesPerIterations = 10
 )
 
 type (
-	Config           = config.Config
-	Proof            = shared.Proof
-	Logger           = shared.Logger
-	Difficulty       = shared.Difficulty
-	Challenge        = shared.Challenge
-	MTreeOutput      = shared.MTreeOutput
-	MTreeOutputEntry = shared.MTreeOutputEntry
-	CacheReader      = cache.CacheReader
-	LayerReadWriter  = cache.LayerReadWriter
+	Config    = config.Config
+	Proof     = shared.Proof
+	Logger    = shared.Logger
+	Challenge = shared.Challenge
+)
+
+var (
+	FastOracle = oracle.FastOracle
 )
 
 type Prover struct {
@@ -35,7 +37,7 @@ type Prover struct {
 }
 
 func NewProver(cfg *Config, id []byte) (*Prover, error) {
-	if err := shared.ValidateConfig(cfg); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -47,149 +49,176 @@ func (p *Prover) SetLogger(logger Logger) {
 }
 
 func (p *Prover) GenerateProof(challenge Challenge) (proof *Proof, err error) {
-	proof, err = p.generateProof(challenge)
-	if err != nil {
-		err = fmt.Errorf("proof generation failed: %v", err)
-		p.logger.Error(err.Error())
+	if err := p.ValidateProofGeneration(); err != nil {
+		return nil, err
 	}
-	return proof, err
+
+	return p.generateProof(challenge)
+}
+
+func (p *Prover) ValidateProofGeneration() error {
+	init, err := initialization.NewInitializer(p.cfg, p.id)
+	if err != nil {
+		return err
+	}
+	if err := init.VerifyCompleted(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *Prover) tryNonce(ctx context.Context, ch Challenge, nonce uint32, readerChan <-chan []byte, difficulty uint64) ([]byte, error) {
+	var indices = bytes.NewBuffer(make([]byte, p.cfg.K2*8)[0:0])
+	var index uint64
+	var passed uint
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("cancelled: tried: %v, passed: %v, needed: %v", index, passed, p.cfg.K2)
+		case label, more := <-readerChan:
+			if !more {
+				return nil, fmt.Errorf("exhausted all labels; tried: %v, passed: %v, needed: %v", index, passed, p.cfg.K2)
+			}
+
+			hash := FastOracle(ch, nonce, label)
+
+			// Convert the fast oracle output's leading 64 bits to a number,
+			// so that it could be used to perform math comparisons.
+			hashNum := binary.LittleEndian.Uint64(hash[:])
+
+			// check the difficulty requirement.
+			if hashNum <= difficulty {
+				indexBytes := make([]byte, 8)
+				binary.LittleEndian.PutUint64(indexBytes, index)
+				indices.Write(indexBytes)
+				passed++
+
+				if passed >= p.cfg.K2 {
+					return indices.Bytes(), nil
+				}
+			}
+
+			index++
+		}
+	}
+
+	panic("unreachable")
+}
+
+type nonceResult struct {
+	nonce   uint32
+	indices []byte
+	err     error
 }
 
 func (p *Prover) generateProof(challenge Challenge) (*Proof, error) {
-	init, err := initialization.NewInitializer(p.cfg, p.id)
-	if err != nil {
-		return nil, err
-	}
-	if err := init.VerifyCompleted(); err != nil {
-		return nil, err
-	}
+	for i := 0; i < MaxIterations; i++ {
+		startNonce := uint32(i) * NumNoncesPerIterations
+		endNonce := startNonce + NumNoncesPerIterations - 1
 
-	difficulty := Difficulty(p.cfg.Difficulty)
-	if err := difficulty.Validate(); err != nil {
-		return nil, err
-	}
+		p.logger.Info("proving: starting iteration %d; startNonce: %v, endNonce: %v, challenge: %x", i+1, startNonce, endNonce, challenge)
 
-	proof := new(Proof)
-	proof.Challenge = challenge
-
-	readers, err := persistence.GetReaders(p.cfg.DataDir, p.id)
-	if err != nil {
-		return nil, err
-	}
-
-	outputs, err := p.generateMTrees(readers, challenge)
-	if err != nil {
-		return nil, err
-	}
-
-	output, err := shared.Merge(outputs)
-	if err != nil {
-		return nil, err
-	}
-
-	proof.MerkleRoot = output.Root
-
-	leafReader := output.Reader.GetLayerReader(0)
-	width, err := leafReader.Width()
-	if err != nil {
-		return nil, err
-	}
-
-	provenLeafIndices := shared.CalcProvenLeafIndices(
-		proof.MerkleRoot, width<<difficulty, uint8(p.cfg.NumProvenLabels), difficulty)
-
-	_, proof.ProvenLeaves, proof.ProofNodes, err = merkle.GenerateProof(provenLeafIndices, output.Reader)
-	if err != nil {
-		return nil, err
-	}
-
-	err = leafReader.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	return proof, nil
-}
-
-func (p *Prover) generateMTree(reader LayerReadWriter, challenge Challenge) (*MTreeOutput, error) {
-	cacheWriter := cache.NewWriter(cache.MinHeightPolicy(p.cfg.LowestLayerToCacheDuringProofGeneration),
-		cache.MakeSliceReadWriterFactory())
-
-	tree, err := merkle.NewTreeBuilder().WithHashFunc(challenge.GenerateGetParentFunc()).WithCacheWriter(cacheWriter).Build()
-	if err != nil {
-		return nil, err
-	}
-
-	for {
-		leaf, err := reader.ReadNext()
-		if err == io.EOF {
-			break
-		}
+		goodNonceResult, err := p.tryNonces(challenge, startNonce, endNonce)
 		if err != nil {
 			return nil, err
 		}
-		err = tree.AddLeaf(leaf)
-		if err != nil {
-			return nil, err
+
+		if goodNonceResult != nil {
+			p.logger.Info("proving: generated proof after %d iteration(s)", i+1)
+
+			return &Proof{
+				Challenge: challenge,
+				Nonce:     goodNonceResult.nonce,
+				Indices:   goodNonceResult.indices,
+			}, nil
 		}
 	}
 
-	cacheWriter.SetLayer(0, reader)
-	cacheReader, err := cacheWriter.GetReader()
+	return nil, fmt.Errorf("failed to generate proof; tried %v iterations, %v nonces each", MaxIterations, NumNoncesPerIterations)
+}
+
+func (p *Prover) tryNonces(challenge Challenge, startNonce, endNonce uint32) (*nonceResult, error) {
+	difficulty := p.cfg.ProvingDifficulty()
+	//
+	readers, err := persistence.GetReaders(p.cfg.DataDir, p.id, p.cfg.LabelSize)
 	if err != nil {
 		return nil, err
 	}
 
-	return &MTreeOutput{
-		Reader: cacheReader,
-		Root:   tree.Root(),
-	}, nil
-}
-
-func (p *Prover) generateMTrees(readers []LayerReadWriter, challenge Challenge) ([]*MTreeOutput, error) {
-	numFiles := len(readers)
-	numWorkers := p.CalcParallelism(numFiles)
-	jobsChan := make(chan int, numFiles)
-	resultsChan := make(chan *MTreeOutputEntry, numFiles)
-	errChan := make(chan error, 0)
-
-	p.logger.Info("execution: start executing %v files, parallelism degree: %v\n", numFiles, numWorkers)
-
-	for i := 0; i < numFiles; i++ {
-		jobsChan <- i
+	reader, err := persistence.Merge(readers)
+	if err != nil {
+		return nil, err
 	}
-	close(jobsChan)
 
-	for i := 0; i < numWorkers; i++ {
-		go func() {
-			for {
-				index, more := <-jobsChan
-				if !more {
-					return
+	numWorkers := endNonce - startNonce + 1
+	var indices []byte
+
+	workersChans := make([]chan []byte, numWorkers)
+	for i := range workersChans {
+		workersChans[i] = make(chan []byte, 1000) // TODO(moshababo): use numLabels/2 size instead? need just enough buffer to circulate between the two routines
+	}
+	resultsChan := make(chan nonceResult, numWorkers)
+	errChan := make(chan error, numWorkers)
+
+	// Start IO worker.
+	// Feed all labels into each worker chan.
+	go func() {
+		for {
+			label, err := reader.ReadNext()
+			if err != nil {
+				for i := range workersChans {
+					close(workersChans[i])
 				}
 
-				output, err := p.generateMTree(readers[index], challenge)
-				if err != nil {
+				if err != io.EOF {
 					errChan <- err
-					return
 				}
-
-				resultsChan <- &MTreeOutputEntry{Index: index, MTreeOutput: output}
+				break
 			}
+
+			for i := range workersChans {
+				workersChans[i] <- label
+			}
+		}
+	}()
+
+	// Start a worker for each nonce.
+	ctx, cancel := context.WithCancel(context.Background())
+	for i := uint32(0); i < numWorkers; i++ {
+		i := i
+		go func() {
+			nonce := startNonce + i
+			indices, err = p.tryNonce(ctx, challenge, nonce, workersChans[i], difficulty)
+			resultsChan <- nonceResult{nonce, indices, err}
 		}()
 	}
 
-	results := make([]*MTreeOutput, numFiles)
-	for i := 0; i < numFiles; i++ {
-		select {
-		case res := <-resultsChan:
-			results[res.Index] = res.MTreeOutput
-		case err := <-errChan:
-			return nil, err
+	// Drain the workers results chan.
+	var goodNonce *nonceResult
+	for i := uint32(0); i < numWorkers; i++ {
+		res := <-resultsChan
+		if res.err != nil {
+			p.logger.Info("proving: nonce %v failed: %v", res.nonce, res.err)
+		} else {
+			p.logger.Info("proving: nonce %v succeeded", res.nonce)
+			cancel()
+
+			// There might be multiple successful nonces due to race condition with the cancellation,
+			// but this is not a problem. We'll use the last one to arrive.
+			goodNonce = &res
 		}
 	}
 
-	return results, nil
+	// Check for an error from the IO worker.
+	select {
+	case err := <-errChan:
+		p.logger.Info("proving: error: %v", err)
+		return nil, err
+	default:
+	}
+
+	return goodNonce, nil
 }
 
 func (p *Prover) CalcParallelism(numFiles int) int {
