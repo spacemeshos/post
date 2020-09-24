@@ -3,6 +3,7 @@ package oracle
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"github.com/spacemeshos/post/gpu"
 	"github.com/spacemeshos/post/shared"
 )
 
@@ -10,13 +11,27 @@ type (
 	Challenge = shared.Challenge
 )
 
-func WorkOracle(identity []byte, index uint64, size uint) []byte {
-	input := make([]byte, len(identity)+binary.Size(index))
-	copy(input, identity)
-	binary.LittleEndian.PutUint64(input[len(identity):], index)
+func WorkOracle(computeProviderId uint, id []byte, startPosition, endPosition uint64, labelSize uint8) ([]byte, error) {
+	salt := make([]byte, 32) // TODO(moshababo): apply salt
+	options := uint32(0)
+	output, _, err := gpu.ScryptPositions(computeProviderId, id, salt, startPosition, endPosition, labelSize, options)
+	return output, err
+}
 
-	sum256 := sha256.Sum256(input) // TODO(moshababo): use scrypt
-	return sum256[:size]
+func WorkOracleOne(cpuProviderID uint, id []byte, position uint64, labelSize uint8) []byte {
+	salt := make([]byte, 32) // TODO(moshababo): apply salt
+	options := uint32(0)
+	output, _, _ := gpu.ScryptPositions(cpuProviderID, id, salt, position, position, labelSize, options)
+	return output
+
+	/*
+		// Example for an alternative Go implementation:
+		input := make([]byte, len(id)+binary.Size(position))
+		copy(input, id)
+		binary.LittleEndian.PutUint64(input[len(id):], position)
+		output := scrypt(input)
+		return output[:labelSize/8] // Must also include the last (labelSize%8) bits as an additional byte.
+	*/
 }
 
 func FastOracle(ch Challenge, nonce uint32, label []byte) [32]byte {

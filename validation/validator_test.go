@@ -7,15 +7,15 @@ import (
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
+	"github.com/spacemeshos/smutil/log"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
-	"math"
 	"os"
 	"testing"
 )
 
 var (
-	id             = hexDecode("deadbeef")
+	id             = make([]byte, 32)
 	challenge      = shared.ZeroChallenge
 	cfg            *Config
 	NewInitializer = initialization.NewInitializer
@@ -26,11 +26,9 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	cfg = config.DefaultConfig()
+	cfg.NumLabels = 1 << 15
+	cfg.LabelSize = 8
 	cfg.DataDir, _ = ioutil.TempDir("", "post-test")
-	cfg.LabelsLogRate = uint64(math.MaxUint64)
-	if err := cfg.Validate(); err != nil {
-		panic(err)
-	}
 
 	res := m.Run()
 	os.Exit(res)
@@ -41,7 +39,7 @@ func TestValidate(t *testing.T) {
 
 	init, err := NewInitializer(cfg, id)
 	r.NoError(err)
-	err = init.Initialize()
+	err = init.Initialize(initialization.CPUProviderID())
 	r.NoError(err)
 
 	testGenerateProof(r, id, cfg)
@@ -53,14 +51,12 @@ func TestValidate(t *testing.T) {
 func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
 	p, err := NewProver(cfg, id)
 	r.NoError(err)
-	//p.SetLogger(log.AppLog)
+	p.SetLogger(log.AppLog)
 
-	proof, err := p.GenerateProof(id)
+	proof, proofMetadata, err := p.GenerateProof(id)
 	r.NoError(err)
 
-	v, err := NewValidator(cfg)
-	r.NoError(err)
-	err = v.Validate(id, proof)
+	err = Validate(id, proof, proofMetadata)
 	r.NoError(err)
 }
 

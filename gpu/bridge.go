@@ -6,8 +6,14 @@ package gpu
 //
 import "C"
 import (
+	"github.com/spacemeshos/post/shared"
+	"sync"
 	"unsafe"
 )
+
+// mtx is a mutual exclusion lock for serializing calls to libgpu.
+// If not applied, concurrent calls are expected to cause a crash.
+var mtx sync.Mutex
 
 type (
 	cChar  = C.char
@@ -20,19 +26,12 @@ const (
 	ComputeAPIClassCuda        = ComputeAPIClass((C.ComputeApiClass)(C.COMPUTE_API_CLASS_CUDA))
 	ComputeAPIClassVulkan      = ComputeAPIClass((C.ComputeApiClass)(C.COMPUTE_API_CLASS_VULKAN))
 
-	StopResultOk           = StopResult(C.SPACEMESH_API_ERROR_NONE)
-	StopResultError        = StopResult(C.SPACEMESH_API_ERROR)
-	StopResultErrorTimeout = StopResult(C.SPACEMESH_API_ERROR_TIMEOUT)
-	StopResultErrorAlready = StopResult(C.SPACEMESH_API_ERROR_TIMEOUT)
+	StopResultOk             = StopResult(C.SPACEMESH_API_ERROR_NONE)
+	StopResultError          = StopResult(C.SPACEMESH_API_ERROR)
+	StopResultErrorTimeout   = StopResult(C.SPACEMESH_API_ERROR_TIMEOUT)
+	StopResultErrorAlready   = StopResult(C.SPACEMESH_API_ERROR_ALREADY)
+	StopResultErrorCancelled = StopResult(C.SPACEMESH_API_ERROR_CANCELED)
 )
-
-type StopResult int
-
-type ComputeProvider struct {
-	Id         uint
-	Model      string
-	ComputeAPI ComputeAPIClass
-}
 
 type ComputeAPIClass uint
 
@@ -51,7 +50,31 @@ func (c ComputeAPIClass) String() string {
 	}
 }
 
-func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, hashLenBits uint8, options uint32, outputSize uint64, n, r, p uint32) ([]byte, int) {
+type StopResult int
+
+func (s StopResult) String() string {
+	switch s {
+	case StopResultOk:
+		return "ok"
+	case StopResultError:
+		return "general error"
+	case StopResultErrorTimeout:
+		return "timeout"
+	case StopResultErrorAlready:
+		return "already stopped"
+	case StopResultErrorCancelled:
+		return "cancelled"
+	default:
+		panic("unreachable")
+	}
+}
+
+func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, hashLenBits uint8, options uint32, n, r, p uint32) ([]byte, int, int) {
+	mtx.Lock()
+	defer mtx.Unlock()
+
+	outputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(hashLenBits))
+
 	cProviderId := C.uint(providerId)
 	cId := (*C.uchar)(GoBytes(id).CBytesClone().data)
 	cStartPosition := C.uint64_t(startPosition)
@@ -60,10 +83,12 @@ func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPositi
 	cSalt := (*C.uchar)(GoBytes(salt).CBytesClone().data)
 	cOptions := C.uint(options)
 	cOutputSize := C.size_t(outputSize)
-	cOut := (*C.uchar)(C.malloc(cOutputSize))
+	cOut := (*C.uchar)(C.calloc(cOutputSize, 1))
 	cN := C.uint(n)
 	cR := C.uint(r)
 	cP := C.uint(p)
+	var cHashesComputed C.uint64_t
+	var cHashesPerSec C.uint64_t
 
 	defer func() {
 		cFree(unsafe.Pointer(cId))
@@ -83,11 +108,20 @@ func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPositi
 		cN,
 		cR,
 		cP,
+		&cHashesComputed,
+		&cHashesPerSec,
 	)
-	return cBytesCloneToGoBytes(cOut, int(outputSize)), int(retVal)
+
+	// Output size could be smaller than anticipated if `C.stop` was called while `C.scryptPositions` was blocking.
+	outputSize = shared.DataSize(uint64(cHashesComputed), uint(hashLenBits))
+
+	return cBytesCloneToGoBytes(cOut, int(outputSize)), int(cHashesPerSec), int(retVal)
 }
 
 func cGetProviders() []ComputeProvider {
+	mtx.Lock()
+	defer mtx.Unlock()
+
 	numProviders := C.spacemesh_api_get_providers(nil, 0)
 	cProviders := make([]C.PostComputeProvider, numProviders)
 	providers := make([]ComputeProvider, numProviders)
@@ -95,12 +129,16 @@ func cGetProviders() []ComputeProvider {
 	_ = C.spacemesh_api_get_providers(&cProviders[0], numProviders)
 
 	for i := 0; i < int(numProviders); i++ {
-		providers[i].Id = uint(cProviders[i].id)
+		providers[i].ID = uint(cProviders[i].id)
 		providers[i].Model = cStringArrayToGoString(cProviders[i].model)
 		providers[i].ComputeAPI = ComputeAPIClass(cProviders[i].compute_api)
 	}
 
 	return providers
+}
+
+func cStopCleared() bool {
+	return C.spacemesh_api_stop_inprogress() == 0
 }
 
 func cStop(msTimeout uint) StopResult {

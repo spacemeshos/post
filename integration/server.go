@@ -50,19 +50,10 @@ func (cfg *serverConfig) genArgs() []string {
 	args = append(args, fmt.Sprintf("--rpclisten=%v", cfg.rpcListen))
 
 	args = append(args, fmt.Sprintf("--post-numfiles=%v", cfg.NumFiles))
-
 	args = append(args, fmt.Sprintf("--post-numlabels=%v", cfg.NumLabels))
 	args = append(args, fmt.Sprintf("--post-labelsize=%v", cfg.LabelSize))
 	args = append(args, fmt.Sprintf("--post-k1=%v", cfg.K1))
 	args = append(args, fmt.Sprintf("--post-k2=%v", cfg.K2))
-
-	args = append(args, fmt.Sprintf("--post-parallel-files=%v", cfg.MaxWriteFilesParallelism))
-	args = append(args, fmt.Sprintf("--post-parallel-infile=%v", cfg.MaxWriteInFileParallelism))
-	args = append(args, fmt.Sprintf("--post-parallel-read=%v", cfg.MaxReadFilesParallelism))
-
-	// Disabling disk space availability checks because datadir is a temp dir,
-	// and so stats might not be reliable.
-	args = append(args, fmt.Sprintf("--post-disable-space-checks"))
 
 	return args
 }

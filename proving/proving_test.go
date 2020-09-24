@@ -3,7 +3,6 @@ package proving
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
@@ -16,15 +15,16 @@ import (
 
 var (
 	cfg            *Config
-	id             = hexDecode("deadbeef")
+	id             = make([]byte, 32)
 	challenge      = shared.ZeroChallenge
 	NewInitializer = initialization.NewInitializer
 )
 
 func init() {
 	cfg = config.DefaultConfig()
+	cfg.NumLabels = 1 << 15
+	cfg.LabelSize = 8
 	cfg.DataDir, _ = ioutil.TempDir("", "post-test")
-	cfg.LabelsLogRate = uint64(math.MaxUint64)
 	if err := cfg.Validate(); err != nil {
 		panic(err)
 	}
@@ -34,7 +34,8 @@ func TestProver(t *testing.T) {
 	r := require.New(t)
 	init, err := NewInitializer(cfg, id)
 	r.NoError(err)
-	err = init.Initialize()
+
+	err = init.Initialize(initialization.CPUProviderID())
 	r.NoError(err)
 	defer func() {
 		err := init.Reset()
@@ -46,9 +47,10 @@ func TestProver(t *testing.T) {
 
 	//p.SetLogger(log.AppLog)
 
-	proof, err := p.GenerateProof(id)
+	proof, proofMetaData, err := p.GenerateProof(id)
 	r.NoError(err)
 	r.NotNil(proof)
+	r.NotNil(proofMetaData)
 }
 
 func TestCalcProvingDifficulty(t *testing.T) {
@@ -67,7 +69,7 @@ func TestCalcProvingDifficulty(t *testing.T) {
 	maxTarget := uint64(math.MaxUint64)
 	fmt.Printf("max target: %d\n", maxTarget)
 
-	if ok := uint64MulOverflow(NumLabels, K1); ok {
+	if ok := shared.Uint64MulOverflow(NumLabels, K1); ok {
 		panic("NumLabels*K1 overflow")
 	}
 
@@ -103,17 +105,4 @@ func TestCalcProvingDifficulty(t *testing.T) {
 
 		fmt.Println()
 	}
-}
-
-func hexDecode(s string) []byte {
-	node, _ := hex.DecodeString(s)
-	return node
-}
-
-func uint64MulOverflow(a, b uint64) bool {
-	if a == 0 || b == 0 {
-		return false
-	}
-	c := a * b
-	return c/b != a
 }

@@ -2,6 +2,7 @@ package gpu
 
 import (
 	"fmt"
+	"github.com/spacemeshos/post/shared"
 	"github.com/stretchr/testify/require"
 	"sync"
 	"testing"
@@ -9,25 +10,55 @@ import (
 )
 
 var (
-	id      = []byte("id")
-	salt    = []byte("salt")
+	id      = make([]byte, 32)
+	salt    = make([]byte, 32)
 	options = uint32(0)
 )
 
 func TestScryptPositions(t *testing.T) {
-	t.Skip() // Currently failing on CI.
 	req := require.New(t)
 
-	providers := GetProviders()
+	providers := Providers()
+	var prevOutput []byte
 	for _, p := range providers {
-		providerId := uint(p.Id)
+		providerId := uint(p.ID)
 		startPosition := uint64(1)
 		endPosition := uint64(1 << 11)
 		hashLenBits := uint8(4)
-		output, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
+		output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
 		req.NoError(err)
 		req.NotNil(output)
-		req.Equal(1<<10, len(output))
+
+		// Assert that output content is equal between different providers.
+		if prevOutput == nil {
+			prevOutput = output
+		} else {
+			req.Equal(prevOutput, output, fmt.Sprintf("not equal: provider: %v, hashLenBits: %v", p.Model, hashLenBits))
+		}
+	}
+}
+
+func TestScryptPositions_HashLenBits(t *testing.T) {
+	req := require.New(t)
+
+	providers := Providers()
+	for hashLenBits := uint8(1); hashLenBits <= 8; hashLenBits++ {
+		var prevOutput []byte
+		for _, p := range providers {
+			providerId := uint(p.ID)
+			startPosition := uint64(1)
+			endPosition := uint64(1 << 4)
+			output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
+			req.NoError(err)
+			req.NotNil(output)
+
+			// Assert that output content is equal between different providers.
+			if prevOutput == nil {
+				prevOutput = output
+			} else {
+				req.Equal(prevOutput, output, fmt.Sprintf("not equal: provider: %v, hashLenBits: %v", p.Model, hashLenBits))
+			}
+		}
 	}
 }
 
@@ -35,7 +66,7 @@ func TestScryptPositions_InvalidProviderId(t *testing.T) {
 	req := require.New(t)
 
 	invalidProviderId := uint(1 << 10)
-	output, err := ScryptPositions(invalidProviderId, id, salt, 1, 1, 8, options)
+	output, _, err := ScryptPositions(invalidProviderId, id, salt, 1, 1, 8, options)
 	req.EqualError(err, fmt.Sprintf("invalid provider id: %d", invalidProviderId))
 	req.Nil(output)
 }
@@ -43,31 +74,30 @@ func TestScryptPositions_InvalidProviderId(t *testing.T) {
 func TestStop(t *testing.T) {
 	req := require.New(t)
 
-	providers := GetProviders()
+	providers := Providers()
 	for _, p := range providers {
-		// CPU-mode stop currently not working.
-		if p.ComputeAPI == ComputeAPIClassCPU {
-			continue
-		}
-
 		var wg sync.WaitGroup
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
 			time.Sleep(1 * time.Second)
-			res := cStop(2000)
+			res := cStop(10000)
 			req.Equal(StopResultOk, res)
 		}()
 		go func() {
 			defer wg.Done()
-			providerId := uint(p.Id)
+			providerId := uint(p.ID)
 			startPosition := uint64(1)
-			endPosition := uint64(1 << 20)
+			endPosition := uint64(1 << 18)
 			hashLenBits := uint8(8)
-			output, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
+			output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
 			req.NoError(err)
 			req.NotNil(output)
-			req.Equal(1<<20, len(output))
+
+			// `output` size is expected be smaller than expected due to `Stop` call.
+			expectedOutputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(hashLenBits))
+			req.True(len(output) > 0)
+			req.True(len(output) < int(expectedOutputSize))
 		}()
 		c := make(chan struct{})
 		go func() {
@@ -76,23 +106,86 @@ func TestStop(t *testing.T) {
 		}()
 		select {
 		case <-c:
-		case <-time.After(3 * time.Second):
+		case <-time.After(10 * time.Second):
 			req.Fail(fmt.Sprintf("stop timed out; provider: %+v", p))
+		}
+
+		// Testing that a call to `ScryptPositions` after `Stop` is working properly.
+		providerID := uint(p.ID)
+		startPosition := uint64(1)
+		endPosition := uint64(1 << 17)
+		hashLenBits := uint8(8)
+		output, _, err := ScryptPositions(providerID, id, salt, startPosition, endPosition, hashLenBits, options)
+		req.NoError(err)
+		req.NotNil(output)
+		expectedOutputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(hashLenBits))
+		req.Equal(int(expectedOutputSize), len(output))
+	}
+}
+
+func TestStop_SameThread(t *testing.T) {
+	req := require.New(t)
+
+	providers := Providers()
+	for _, p := range providers {
+		go func() {
+			time.Sleep(1 * time.Second)
+			res := cStop(10000)
+			req.Equal(StopResultOk, res)
+		}()
+		providerID := uint(p.ID)
+		startPosition := uint64(1)
+		endPosition := uint64(1 << 18)
+		hashLenBits := uint8(8)
+		output, _, err := ScryptPositions(providerID, id, salt, startPosition, endPosition, hashLenBits, options)
+		req.NoError(err)
+		req.NotNil(output)
+
+		// `output` size is expected be smaller than expected due to `Stop` call.
+		outputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(hashLenBits))
+		req.True(len(output) > 0)
+		req.True(len(output) < int(outputSize))
+
+		// Testing that a call to `ScryptPositions` after `Stop` is working properly.
+		startPosition = uint64(1)
+		endPosition = uint64(1 << 17)
+		output, _, err = ScryptPositions(providerID, id, salt, startPosition, endPosition, hashLenBits, options)
+		req.NoError(err)
+		req.NotNil(output)
+		expectedOutputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(hashLenBits))
+		req.Equal(int(expectedOutputSize), len(output))
+	}
+}
+
+func TestScryptPositions_PartialByte(t *testing.T) {
+	req := require.New(t)
+
+	providers := Providers()
+	var prevOutput []byte
+	for _, p := range providers {
+		providerId := uint(p.ID)
+		startPosition := uint64(1)
+		endPosition := uint64(9)
+		hashLenBits := uint8(4)
+		output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
+		req.NoError(err)
+		req.NotNil(output)
+
+		// Assert that output content is equal between different providers.
+		if prevOutput == nil {
+			prevOutput = output
+		} else {
+			req.Equal(prevOutput, output, fmt.Sprintf("not equal: provider: %v, hashLenBits: %v", p.Model, hashLenBits))
 		}
 	}
 }
 
-//func TestBenchmark(t *testing.T) {
-//	req := require.New(t)
-//
-//	results := make(map[string]uint64)
-//	providers := GetProviders()
-//	for _, p := range providers {
-//		providerId := uint(p.Id)
-//		hps, err := Benchmark(providerId)
-//		req.NoError(err)
-//		results[p.Model] = hps
-//	}
-//
-//	fmt.Printf("%v\n", results)
-//}
+func TestBenchmark(t *testing.T) {
+	req := require.New(t)
+
+	for _, p := range Providers() {
+		b, err := p.Benchmark()
+		req.NoError(err)
+		req.True(b > 0)
+	}
+}

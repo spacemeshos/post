@@ -9,9 +9,8 @@ func TestProof_Encode_Decode(t *testing.T) {
 	req := require.New(t)
 
 	vBase := Proof{
-		Challenge: makeNonEmptyBytes(32),
-		Nonce:     256,
-		Indices:   makeNonEmptyBytes(100),
+		Nonce:   256,
+		Indices: makeNonEmptyBytes(100),
 	}
 	v := Proof{}
 	err := v.Decode(vBase.Encode())

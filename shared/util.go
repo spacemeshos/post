@@ -1,23 +1,21 @@
 package shared
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
+	"github.com/nullstyle/go-xdr/xdr3"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-func GetInitDir(datadir string, id []byte) string {
-	return filepath.Join(datadir, hex.EncodeToString(id))
+func GetProofsDir(datadir string) string {
+	return filepath.Join(datadir, "proofs")
 }
 
-func GetProofsDir(datadir string, id []byte) string {
-	return filepath.Join(GetInitDir(datadir, id), "proofs")
-}
-
-func GetProofFilename(datadir string, id []byte, challenge []byte) string {
+func GetProofFilename(datadir string, challenge []byte) string {
 	// Use a special name for the zero challenge, which otherwise
 	// will result in empty filename.
 	c := hex.EncodeToString(challenge)
@@ -25,7 +23,7 @@ func GetProofFilename(datadir string, id []byte, challenge []byte) string {
 		c = "0"
 	}
 
-	return filepath.Join(GetProofsDir(datadir, id), c)
+	return filepath.Join(GetProofsDir(datadir), c)
 }
 
 func InitFileName(id []byte, index int) string {
@@ -36,15 +34,25 @@ func IsInitFile(id []byte, file os.FileInfo) bool {
 	return !file.IsDir() && strings.HasPrefix(file.Name(), fmt.Sprintf("%x", id))
 }
 
-func PersistProof(datadir string, id []byte, ch Challenge, proof []byte) error {
-	dir := GetProofsDir(datadir, id)
-	err := os.Mkdir(dir, OwnerReadWriteExec)
-	if err != nil && !os.IsExist(err) {
-		return fmt.Errorf("dir creation failure: %v", err)
+type ProofWithMetadata struct {
+	Proof         *Proof
+	ProofMetadata *ProofMetadata
+}
+
+func PersistProof(datadir string, proof *Proof, proofMetadata *ProofMetadata) error {
+	var w bytes.Buffer
+	_, err := xdr.Marshal(&w, &ProofWithMetadata{proof, proofMetadata})
+	if err != nil {
+		return fmt.Errorf("encoding failure: %v", err)
 	}
 
-	filename := GetProofFilename(datadir, id, ch)
-	err = ioutil.WriteFile(filename, proof, OwnerReadWrite)
+	dir := GetProofsDir(datadir)
+	err = os.Mkdir(dir, OwnerReadWriteExec)
+	if err != nil && !os.IsExist(err) {
+		return fmt.Errorf("mkdir failure: %v", err)
+	}
+	filename := GetProofFilename(datadir, proofMetadata.Challenge)
+	err = ioutil.WriteFile(filename, w.Bytes(), OwnerReadWrite)
 	if err != nil {
 		return fmt.Errorf("write to disk failure: %v", err)
 	}
@@ -52,18 +60,24 @@ func PersistProof(datadir string, id []byte, ch Challenge, proof []byte) error {
 	return nil
 }
 
-func FetchProof(datadir string, id []byte, challenge []byte) ([]byte, error) {
-	filename := GetProofFilename(datadir, id, challenge)
+func FetchProof(datadir string, challenge []byte) (*Proof, *ProofMetadata, error) {
+	filename := GetProofFilename(datadir, challenge)
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, ErrProofNotExist
+			return nil, nil, ErrProofNotExist
 		}
 
-		return nil, fmt.Errorf("read file failure: %v", err)
+		return nil, nil, fmt.Errorf("read file failure: %v", err)
 	}
 
-	return data, nil
+	proofWithMetadata := &ProofWithMetadata{}
+	_, err = xdr.Unmarshal(bytes.NewReader(data), proofWithMetadata)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return proofWithMetadata.Proof, proofWithMetadata.ProofMetadata, nil
 }
 
 func Min(x, y int) int {
