@@ -144,7 +144,8 @@ func NewInitializer(cfg *Config, id []byte) (*Initializer, error) {
 	}, nil
 }
 
-// Initialize perform the initialization procedure.
+// Initialize is the process in which the prover commits to store some data, by having its storage filled with
+// pseudo-random data with respect to a specific id. This data is the result of a computationally-expensive operation.
 func (init *Initializer) Initialize(computeProviderID uint) error {
 	init.mtx.Lock()
 	if init.initializing {

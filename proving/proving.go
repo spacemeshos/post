@@ -45,6 +45,11 @@ func NewProver(cfg *Config, id []byte) (*Prover, error) {
 	return &Prover{cfg, id, shared.DisabledLogger{}}, nil
 }
 
+// GenerateProof (analogous to the PoST protocol Execution phase) receives a challenge that cannot be predicted,
+// and reads the entire PoST data to generate a proof in response to the challenge to prove that
+// the prover data exists at the time of invocation.
+// Generating a proof can be repeated arbitrarily many times without repeating the PoST protocol Initialization phase;
+// thus despite the initialization essentially serving as a PoW, the amortized computational complexity can be made arbitrarily small.
 func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, error) {
 	if err := p.ValidateProofGeneration(); err != nil {
 		return nil, nil, err

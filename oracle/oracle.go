@@ -25,7 +25,7 @@ func WorkOracleOne(cpuProviderID uint, id []byte, position uint64, labelSize uin
 	return output
 
 	/*
-		// Example for an alternative Go implementation:
+		// A template for an alternative Go implementation:
 		input := make([]byte, len(id)+binary.Size(position))
 		copy(input, id)
 		binary.LittleEndian.PutUint64(input[len(id):], position)
