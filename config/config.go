@@ -23,12 +23,12 @@ const (
 )
 
 const (
-	DefaultDataDirName         = "data"
-	DefaultNumFiles            = 1
-	DefaultLabelsCalcBatchSize = 1 << 14
+	DefaultDataDirName      = "data"
+	DefaultNumFiles         = 1
+	DefaultComputeBatchSize = 1 << 14
 
 	// 1MB space. Temporary value.
-	DefaultNumLabels = 1 << 17
+	DefaultNumLabels = 1 << 20
 	DefaultLabelSize = 8
 
 	DefaultK1 = 1 << 10
@@ -40,9 +40,9 @@ var (
 )
 
 type Config struct {
-	DataDir             string `mapstructure:"post-datadir"`
-	NumFiles            uint   `mapstructure:"post-numfiles"`
-	LabelsCalcBatchSize uint   `mapstructure:"post-labels-calc-batch-size"`
+	DataDir          string `mapstructure:"post-datadir"`
+	NumFiles         uint   `mapstructure:"post-numfiles"`
+	ComputeBatchSize uint   `mapstructure:"post-compute-batch-size"`
 
 	// Protocol params.
 	NumLabels uint64 `mapstructure:"post-numlabels"`
@@ -98,9 +98,9 @@ func (cfg *Config) Validate() error {
 
 func DefaultConfig() *Config {
 	return &Config{
-		DataDir:             DefaultDataDir,
-		NumFiles:            DefaultNumFiles,
-		LabelsCalcBatchSize: DefaultLabelsCalcBatchSize,
+		DataDir:          DefaultDataDir,
+		NumFiles:         DefaultNumFiles,
+		ComputeBatchSize: DefaultComputeBatchSize,
 
 		LabelSize: DefaultLabelSize,
 		NumLabels: DefaultNumLabels,

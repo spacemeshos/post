@@ -50,7 +50,7 @@ func (m benchMode) isValid() bool { return m >= single && m <= full }
 
 func (m benchMode) String() string { return modes[m-1] }
 
-// TODO(moshababo): extend benchmarks to contain a variance of `LabelsCalcBatchSize` values.
+// TODO(moshababo): extend benchmarks to contain a variance of `ComputeBatchSize` values.
 // the current benchmarks are of the old PoST version, and were merely fixed to be working
 // and to have a variance of `computeProviderID` values. They should be improved once used again.
 func main() {

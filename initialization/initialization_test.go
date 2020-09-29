@@ -79,7 +79,7 @@ func TestStop(t *testing.T) {
 			r.True(p > prev)
 			prev = p
 		}
-		r.Equal(float64(1), prev)
+		r.True(float64(1) > prev)
 	}()
 	go func() {
 		time.Sleep(1 * time.Second)

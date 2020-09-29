@@ -176,8 +176,8 @@ func (init *Initializer) Initialize(computeProviderID uint) error {
 
 	fileNumLabels := init.cfg.NumLabels / uint64(init.cfg.NumFiles)
 
-	init.logger.Info("initialization: starting to write %v file(s); numLabels: %v, fileNumLabels: %v, labelSize: %v, labelsCalcBatchSize: %v, datadir: %v",
-		init.cfg.NumFiles, init.cfg.NumLabels, fileNumLabels, init.cfg.LabelSize, init.cfg.LabelsCalcBatchSize, init.cfg.DataDir)
+	init.logger.Info("initialization: starting to write %v file(s); numLabels: %v, fileNumLabels: %v, labelSize: %v, computeBatchSize: %v, datadir: %v",
+		init.cfg.NumFiles, init.cfg.NumLabels, fileNumLabels, init.cfg.LabelSize, init.cfg.ComputeBatchSize, init.cfg.DataDir)
 
 	for i := 0; i < int(init.cfg.NumFiles); i++ {
 		if err := init.initFile(computeProviderID, i, fileNumLabels); err != nil {
@@ -336,7 +336,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 
 	fileOffset := uint64(fileIndex) * numLabelsPerFile
 	currentPosition := existingWidth
-	batchSize := init.cfg.LabelsCalcBatchSize
+	batchSize := init.cfg.ComputeBatchSize
 	outputChan := make(chan []byte, 1024)
 	computeErr := make(chan error, 1)
 	ioError := make(chan error, 1)
