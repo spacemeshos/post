@@ -14,9 +14,8 @@ import (
 )
 
 const (
-	MaxIterations          = 10 // TODO(moshababo): update the recommended value
-	NumNoncesPerIterations = 10 // TODO(moshababo): update the recommended value
-
+	MaxIterations         = 10 // TODO(moshababo): update the recommended value
+	NumNoncesPerIteration = 10 // TODO(moshababo): update the recommended value
 )
 
 type (
@@ -56,8 +55,8 @@ func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, err
 	}
 
 	for i := 0; i < MaxIterations; i++ {
-		startNonce := uint32(i) * NumNoncesPerIterations
-		endNonce := startNonce + NumNoncesPerIterations - 1
+		startNonce := uint32(i) * NumNoncesPerIteration
+		endNonce := startNonce + NumNoncesPerIteration - 1
 
 		p.logger.Debug("proving: starting iteration %d; startNonce: %v, endNonce: %v, challenge: %x", i+1, startNonce, endNonce, challenge)
 
@@ -84,7 +83,7 @@ func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, err
 		}
 	}
 
-	return nil, nil, fmt.Errorf("failed to generate proof; tried %v iterations, %v nonces each", MaxIterations, NumNoncesPerIterations)
+	return nil, nil, fmt.Errorf("failed to generate proof; tried %v iterations, %v nonces each", MaxIterations, NumNoncesPerIteration)
 }
 
 func (p *Prover) SetLogger(logger Logger) {
