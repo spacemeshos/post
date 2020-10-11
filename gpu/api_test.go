@@ -15,6 +15,17 @@ var (
 	options = uint32(0)
 )
 
+func TestMoshe(t *testing.T) {
+	req := require.New(t)
+
+	output, _, err := ScryptPositions(2, id, salt, 1, 8, 1, options)
+	req.NoError(err)
+
+	fmt.Printf("Output: %v\n", output)
+
+}
+
+// TestScryptPositions is an output correctness sanity test. It doesn't cover many cases.
 func TestScryptPositions(t *testing.T) {
 	req := require.New(t)
 
@@ -23,8 +34,8 @@ func TestScryptPositions(t *testing.T) {
 	for _, p := range providers {
 		providerId := uint(p.ID)
 		startPosition := uint64(1)
-		endPosition := uint64(1 << 11)
-		hashLenBits := uint8(4)
+		endPosition := uint64(1 << 8)
+		hashLenBits := uint32(4)
 		output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
 		req.NoError(err)
 		req.NotNil(output)
@@ -38,19 +49,21 @@ func TestScryptPositions(t *testing.T) {
 	}
 }
 
+// TestScryptPositions_HashLenBits tests output correctness for the entire value range of HashLenBits for a specific batch size.
 func TestScryptPositions_HashLenBits(t *testing.T) {
 	req := require.New(t)
 
 	providers := Providers()
-	for hashLenBits := uint8(1); hashLenBits <= 8; hashLenBits++ {
+	for hashLenBits := uint32(1); hashLenBits <= 256; hashLenBits++ {
 		var prevOutput []byte
 		for _, p := range providers {
 			providerId := uint(p.ID)
 			startPosition := uint64(1)
-			endPosition := uint64(1 << 4)
-			output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
+			endPosition := uint64(1 << 8)
+			output, hs, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
 			req.NoError(err)
 			req.NotNil(output)
+			fmt.Printf("provider: %v, len: %v, hs: %v\n", p.Model, hashLenBits, hs)
 
 			// Assert that output content is equal between different providers.
 			if prevOutput == nil {
@@ -89,7 +102,7 @@ func TestStop(t *testing.T) {
 			providerId := uint(p.ID)
 			startPosition := uint64(1)
 			endPosition := uint64(1 << 18)
-			hashLenBits := uint8(8)
+			hashLenBits := uint32(8)
 			output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
 			req.NoError(err)
 			req.NotNil(output)
@@ -114,7 +127,7 @@ func TestStop(t *testing.T) {
 		providerID := uint(p.ID)
 		startPosition := uint64(1)
 		endPosition := uint64(1 << 17)
-		hashLenBits := uint8(8)
+		hashLenBits := uint32(8)
 		output, _, err := ScryptPositions(providerID, id, salt, startPosition, endPosition, hashLenBits, options)
 		req.NoError(err)
 		req.NotNil(output)
@@ -136,7 +149,7 @@ func TestStop_SameThread(t *testing.T) {
 		providerID := uint(p.ID)
 		startPosition := uint64(1)
 		endPosition := uint64(1 << 18)
-		hashLenBits := uint8(8)
+		hashLenBits := uint32(8)
 		output, _, err := ScryptPositions(providerID, id, salt, startPosition, endPosition, hashLenBits, options)
 		req.NoError(err)
 		req.NotNil(output)
@@ -166,7 +179,7 @@ func TestScryptPositions_PartialByte(t *testing.T) {
 		providerId := uint(p.ID)
 		startPosition := uint64(1)
 		endPosition := uint64(9)
-		hashLenBits := uint8(4)
+		hashLenBits := uint32(4)
 		output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
 		req.NoError(err)
 		req.NotNil(output)

@@ -143,12 +143,7 @@ func (p *Prover) tryNonce(ctx context.Context, ch Challenge, nonce uint32, reade
 func (p *Prover) tryNonces(challenge Challenge, startNonce, endNonce uint32) (*nonceResult, error) {
 	difficulty := shared.ProvingDifficulty(p.cfg.NumLabels, uint64(p.cfg.K1))
 
-	readers, err := persistence.GetReaders(p.cfg.DataDir, p.id, p.cfg.LabelSize)
-	if err != nil {
-		return nil, err
-	}
-
-	reader, err := persistence.Merge(readers)
+	reader, err := persistence.NewLabelsReader(p.cfg.DataDir, p.id, p.cfg.LabelSize)
 	if err != nil {
 		return nil, err
 	}

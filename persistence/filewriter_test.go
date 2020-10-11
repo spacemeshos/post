@@ -1,7 +1,9 @@
 package persistence
 
 import (
-	"encoding/hex"
+	"fmt"
+	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/oracle"
 	"github.com/stretchr/testify/require"
 	"io"
 	"io/ioutil"
@@ -9,80 +11,99 @@ import (
 	"testing"
 )
 
-var (
-	tempdir, _ = ioutil.TempDir("", "post-test")
-)
-
-type Label []byte
-
-func TestMain(m *testing.M) {
-	res := m.Run()
-	_ = os.RemoveAll(tempdir)
-	os.Exit(res)
-}
-
-func TestLabelsReaderAndWriter(t *testing.T) {
+func TestFileWriter_Width(t *testing.T) {
 	req := require.New(t)
-	id, labelGroups := generateIdAndLabels()
-	labelsToWriter := make([]Label, 0)
 
-	for i, labelGroup := range labelGroups {
-		writer, err := NewLabelsWriter(tempdir, id, i, labelSize*8)
-		req.NoError(err)
+	labelSize := uint(1)
+	id := make([]byte, 32)
+	index := 0
+	datadir, _ := ioutil.TempDir("", "post-test")
 
-		for _, label := range labelGroup {
-			err := writer.Write(label)
-			req.NoError(err)
-
-			// For later assertion.
-			labelsToWriter = append(labelsToWriter, label)
-		}
-		_, err = writer.Close()
-		req.NoError(err)
-	}
-
-	reader, err := NewLabelsReader(tempdir, id, labelSize*8)
+	writer, err := NewLabelsWriter(datadir, id, index, labelSize)
 	req.NoError(err)
+	width, err := writer.Width()
+	req.NoError(err)
+	req.Equal(uint64(0), width)
 
-	labelsFromReader := make([]Label, len(labelsToWriter))
-	for i := range labelsFromReader {
-		labelsFromReader[i], err = reader.ReadNext()
-		req.NoError(err)
-	}
-	shouldBeNil, err := reader.ReadNext()
-	req.Equal(io.EOF, err)
-	req.Nil(shouldBeNil)
+	// Write 2 bytes (16 labels, 1 bit each)
+	err = writer.Append([]byte{0xFF, 0xFF})
+	req.NoError(err)
+	width, err = writer.Width()
+	req.NoError(err)
+	req.Equal(uint64(0), width)
 
-	req.EqualValues(labelsToWriter, labelsFromReader)
+	err = writer.Flush()
+	req.NoError(err)
+	width, err = writer.Width()
+	req.NoError(err)
+	req.Equal(uint64(16), width)
+	info, err := writer.Close()
+	req.NoError(err)
+	req.Equal(int64(2), info.Size())
+
+	writer, err = NewLabelsWriter(datadir, id, index, labelSize)
+	req.NoError(err)
+	width, err = writer.Width()
+	req.NoError(err)
+	req.Equal(uint64(16), width)
+
+	_ = os.RemoveAll(datadir)
 }
 
-func generateIdAndLabels() ([]byte, [][]Label) {
-	id, _ := hex.DecodeString("deadbeef")
-	labels := [][]Label{
-		{
-			NewLabelFromUint64(0, labelSize),
-			NewLabelFromUint64(1, labelSize),
-			NewLabelFromUint64(2, labelSize),
-			NewLabelFromUint64(3, labelSize),
-		},
-		{
-			NewLabelFromUint64(4, labelSize),
-			NewLabelFromUint64(5, labelSize),
-			NewLabelFromUint64(6, labelSize),
-			NewLabelFromUint64(7, labelSize),
-		},
-		{
-			NewLabelFromUint64(8, labelSize),
-			NewLabelFromUint64(9, labelSize),
-			NewLabelFromUint64(10, labelSize),
-			NewLabelFromUint64(11, labelSize),
-		},
-		{
-			NewLabelFromUint64(12, labelSize),
-			NewLabelFromUint64(13, labelSize),
-			NewLabelFromUint64(14, labelSize),
-			NewLabelFromUint64(15, labelSize),
-		},
+// TestLabelCorrectness tests, for variation of label sizes, the correctness of
+// reading labels from disk (written in multiple files).
+func TestLabelCorrectness(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
 	}
-	return id, labels
+
+	req := require.New(t)
+
+	numFiles := 2
+	numFileBatches := 2
+	batchSize := 256
+	id := make([]byte, 32)
+	datadir, _ := ioutil.TempDir("", "post-test")
+
+	for labelSize := uint32(config.MinLabelSize); labelSize <= config.MaxLabelSize; labelSize++ {
+		// Write labels to files.
+		for i := 0; i < numFiles; i++ {
+			writer, err := NewLabelsWriter(datadir, id, i, uint(labelSize))
+			req.NoError(err)
+			for j := 0; j < numFileBatches; j++ {
+				numBatch := i*numFileBatches + j
+				startPosition := uint64(numBatch * batchSize)
+				endPosition := startPosition + uint64(batchSize) - 1
+
+				labels, err := oracle.WorkOracle(2, id, startPosition, endPosition, labelSize)
+				req.NoError(err)
+				err = writer.Append(labels)
+				req.NoError(err)
+
+			}
+			_, err = writer.Close()
+			req.NoError(err)
+		}
+
+		// Read labels from files and compare each to a label compute.
+		reader, err := NewLabelsReader(datadir, id, uint(labelSize))
+		req.NoError(err)
+		var position uint64
+		for {
+			label, err := reader.ReadNext()
+			if err != nil {
+				if err == io.EOF {
+					req.Equal(uint64(numFiles*numFileBatches*batchSize), position)
+					break
+				}
+				req.Fail(err.Error())
+			}
+
+			labelCompute := oracle.WorkOracleOne(2, id, position, labelSize)
+			req.Equal(labelCompute, label, fmt.Sprintf("position: %v, labelSize: %v", position, labelSize))
+
+			position++
+		}
+		_ = os.RemoveAll(datadir)
+	}
 }

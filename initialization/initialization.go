@@ -304,18 +304,13 @@ func (init *Initializer) VerifyInitAllowed() error {
 
 func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabelsPerFile uint64) error {
 	// Initialize the labels file writer.
-	labelsWriter, err := persistence.NewLabelsWriter(init.cfg.DataDir, init.id, fileIndex, init.cfg.LabelSize)
+	writer, err := persistence.NewLabelsWriter(init.cfg.DataDir, init.id, fileIndex, init.cfg.LabelSize)
 	if err != nil {
 		return err
 	}
 
 	// Potentially perform recovery procedure; continue to initialize from latest position.
-	labelsReader, err := labelsWriter.GetReader()
-	if err != nil {
-		return err
-	}
-
-	existingWidth, err := labelsReader.Width()
+	existingWidth, err := writer.Width()
 	if err != nil {
 		return err
 	}
@@ -372,7 +367,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 			// Calculate labels of the batch position range.
 			startPosition := fileOffset + currentPosition
 			endPosition := startPosition + uint64(batchSize) - 1
-			output, err := oracle.WorkOracle(computeProviderID, init.id, startPosition, endPosition, uint8(init.cfg.LabelSize))
+			output, err := oracle.WorkOracle(computeProviderID, init.id, startPosition, endPosition, uint32(init.cfg.LabelSize))
 			if err != nil {
 				computeErr <- err
 				return
@@ -392,12 +387,12 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 		for {
 			batch, more := <-outputChan
 			if !more {
-				_ = labelsWriter.Flush()
+				_ = writer.Flush()
 				return
 			}
 
 			// Write labels batch to disk.
-			if err := labelsWriter.Write(batch); err != nil {
+			if err := writer.Append(batch); err != nil {
 				ioError <- err
 				return
 			}
@@ -414,7 +409,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 	default:
 	}
 
-	info, err := labelsWriter.Close()
+	info, err := writer.Close()
 	if err != nil {
 		return err
 	}

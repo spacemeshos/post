@@ -35,17 +35,22 @@ func TestMain(m *testing.M) {
 }
 
 func TestValidate(t *testing.T) {
-	r := require.New(t)
+	req := require.New(t)
 
 	init, err := NewInitializer(cfg, id)
-	r.NoError(err)
+	req.NoError(err)
 	err = init.Initialize(initialization.CPUProviderID())
-	r.NoError(err)
+	req.NoError(err)
 
-	testGenerateProof(r, id, cfg)
+	p, err := NewProver(cfg, id)
+	req.NoError(err)
+	proof, proofMetadata, err := p.GenerateProof(id)
+	req.NoError(err)
+	err = Validate(id, proof, proofMetadata)
+	req.NoError(err)
 
 	err = init.Reset()
-	r.NoError(err)
+	req.NoError(err)
 }
 
 func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {

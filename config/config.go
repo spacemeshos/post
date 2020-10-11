@@ -79,7 +79,12 @@ func (cfg *Config) Validate() error {
 	}
 
 	if cfg.NumLabels%uint64(cfg.NumFiles) != 0 {
-		return fmt.Errorf("`NumLabels` (%v) must be evenly divisible by `NumFiles` (%v)", cfg.NumLabels, cfg.NumFiles)
+		return fmt.Errorf("invalid `NumLabels`; expected: evenly divisible by `NumFiles` (%v), given: %d", cfg.NumFiles, cfg.NumLabels)
+	}
+
+	// (ComputeBatchSize%8 == 0) will guarantee that labels writing is in byte-granularity, regardless of LabelSize.
+	if cfg.ComputeBatchSize%8 != 0 {
+		return fmt.Errorf("invalid `ComputeBatchSize`; expected: evenly divisible by 8, given: %d", cfg.ComputeBatchSize)
 	}
 
 	fileNumLabels := cfg.NumLabels / uint64(cfg.NumFiles)

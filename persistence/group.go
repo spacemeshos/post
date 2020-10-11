@@ -5,82 +5,62 @@ import (
 	"io"
 )
 
-type ReadWriterGroup struct {
-	chunks           []ReadWriter
-	activeChunkIndex int
-	widthPerChunk    uint64
-	lastChunkWidth   uint64
+type GroupReader struct {
+	readers           []Reader
+	activeReaderIndex int
+	readerWidth       uint64
+	lastReaderWidth   uint64
 }
 
-// A compile time check to ensure that ReadWriterGroup fully implements ReadWriter.
-var _ ReadWriter = (*ReadWriterGroup)(nil)
+// A compile time check to ensure that GroupReader fully implements the Reader interface.
+var _ Reader = (*GroupReader)(nil)
 
 // Group groups a slice of ReadWriter into one continuous ReadWriter.
-func Group(chunks []ReadWriter) (*ReadWriterGroup, error) {
-	if len(chunks) < 2 {
-		return nil, errors.New("number of chunks must be at least 2")
+func Group(readers []Reader) (*GroupReader, error) {
+	if len(readers) < 2 {
+		return nil, errors.New("number of readers must be at least 2")
 	}
 
-	widthPerChunk, err := chunks[0].Width()
-	if err != nil {
-		return nil, err
-	}
-	if widthPerChunk == 0 {
-		return nil, errors.New("0 width chunks are not allowed")
-	}
-
-	// Verify that all chunks, except the last one, have the same width.
-	var lastLayerWidth uint64
-	for i := 1; i < len(chunks); i++ {
-		chunk := chunks[i]
-		if chunk == nil {
-			return nil, errors.New("nil chunks are not allowed")
+	// Verify that all readers, except the last one, have the same width.
+	var readerWidth uint64
+	var lastReaderWidth uint64
+	for i := 0; i < len(readers); i++ {
+		if readers[i] == nil {
+			return nil, errors.New("nil readers are not allowed")
 		}
-		width, err := chunks[i].Width()
+		width, err := readers[i].Width()
 		if err != nil {
 			return nil, err
 		}
 
-		if i == len(chunks)-1 {
-			lastLayerWidth = width
-		} else {
-			if width != widthPerChunk && i < len(chunks)-1 {
-				return nil, errors.New("chunks width mismatch")
-			}
+		if width == 0 {
+			return nil, errors.New("0 width readers are not allowed")
+		}
+
+		if i == len(readers)-1 {
+			lastReaderWidth = width
+			continue
+		}
+
+		if readerWidth == 0 {
+			readerWidth = width
+		} else if width != readerWidth {
+			return nil, errors.New("readers width mismatch")
 		}
 	}
 
-	g := &ReadWriterGroup{
-		chunks:         chunks,
-		widthPerChunk:  widthPerChunk,
-		lastChunkWidth: lastLayerWidth,
-	}
-
-	return g, nil
+	return &GroupReader{
+		readers:         readers,
+		readerWidth:     readerWidth,
+		lastReaderWidth: lastReaderWidth,
+	}, nil
 }
 
-func (g *ReadWriterGroup) Seek(index uint64) error {
-	// Find the target chunk.
-	chunkIndex := int(index / g.widthPerChunk)
-	if chunkIndex >= len(g.chunks) {
-		return io.EOF
-	}
-
-	g.activeChunkIndex = chunkIndex
-
-	indexInChunk := index % g.widthPerChunk
-	return g.chunks[chunkIndex].Seek(indexInChunk)
-}
-
-func (g *ReadWriterGroup) ReadNext() ([]byte, error) {
-	val, err := g.chunks[g.activeChunkIndex].ReadNext()
+func (g *GroupReader) ReadNext() ([]byte, error) {
+	val, err := g.readers[g.activeReaderIndex].ReadNext()
 	if err != nil {
-		if err == io.EOF && g.activeChunkIndex < len(g.chunks)-1 {
-			g.activeChunkIndex++
-			err = g.chunks[g.activeChunkIndex].Seek(0)
-			if err != nil {
-				return nil, err
-			}
+		if err == io.EOF && g.activeReaderIndex < len(g.readers)-1 {
+			g.activeReaderIndex++
 			return g.ReadNext()
 		}
 		return nil, err
@@ -89,17 +69,13 @@ func (g *ReadWriterGroup) ReadNext() ([]byte, error) {
 	return val, nil
 }
 
-func (g *ReadWriterGroup) Width() (uint64, error) {
-	return uint64(len(g.chunks)-1)*g.widthPerChunk + g.lastChunkWidth, nil
+func (g *GroupReader) Width() (uint64, error) {
+	return uint64(len(g.readers)-1)*g.readerWidth + g.lastReaderWidth, nil
 }
 
-func (g *ReadWriterGroup) Append(p []byte) (n int, err error) { return 0, nil }
-
-func (g *ReadWriterGroup) Flush() error { return nil }
-
-func (g *ReadWriterGroup) Close() error {
-	for _, chunk := range g.chunks {
-		err := chunk.Close()
+func (g *GroupReader) Close() error {
+	for _, r := range g.readers {
+		err := r.Close()
 		if err != nil {
 			return err
 		}
