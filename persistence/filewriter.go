@@ -8,13 +8,13 @@ import (
 )
 
 type FileWriter struct {
-	f        *os.File
+	file     *os.File
 	buf      *bufio.Writer
 	itemSize uint
 }
 
 // A compile time check to ensure that FileWriter fully implements the Writer interface.
-//var _ Writer = (*FileWriter)(nil)
+var _ Writer = (*FileWriter)(nil)
 
 func NewFileWriter(filename string, itemSize uint) (*FileWriter, error) {
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, shared.OwnerReadWrite)
@@ -22,23 +22,19 @@ func NewFileWriter(filename string, itemSize uint) (*FileWriter, error) {
 		return nil, err
 	}
 	return &FileWriter{
-		f:        f,
+		file:     f,
 		buf:      bufio.NewWriter(f),
 		itemSize: itemSize,
 	}, nil
 }
 
-func (w *FileWriter) Append(b []byte) error {
+func (w *FileWriter) Write(b []byte) error {
 	_, err := w.buf.Write(b)
-	if err != nil {
-		return fmt.Errorf("failed to write: %v", err)
-	}
-
-	return nil
+	return err
 }
 
 func (r *FileWriter) Width() (uint64, error) {
-	info, err := r.f.Stat()
+	info, err := r.file.Stat()
 	if err != nil {
 		return 0, err
 	}
@@ -54,23 +50,23 @@ func (w *FileWriter) Flush() error {
 	return nil
 }
 
-func (w *FileWriter) Close() (os.FileInfo, error) {
+func (w *FileWriter) Close() (*os.FileInfo, error) {
 	err := w.buf.Flush()
 	if err != nil {
 		return nil, err
 	}
 	w.buf = nil
 
-	info, err := w.f.Stat()
+	info, err := w.file.Stat()
 	if err != nil {
 		return nil, err
 	}
 
-	err = w.f.Close()
+	err = w.file.Close()
 	if err != nil {
 		return nil, err
 	}
-	w.f = nil
+	w.file = nil
 
-	return info, nil
+	return &info, nil
 }

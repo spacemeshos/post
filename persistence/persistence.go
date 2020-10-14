@@ -10,13 +10,13 @@ import (
 )
 
 type Writer interface {
-	Append(p []byte) error
+	Write(p []byte) error
 	Flush() error
-	Close() error
+	Close() (*os.FileInfo, error)
 }
 
 type Reader interface {
-	ReadNext() ([]byte, error)
+	Read(p []byte) (n int, err error)
 	Width() (uint64, error)
 	Close() error
 }

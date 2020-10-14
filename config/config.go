@@ -11,7 +11,9 @@ const (
 	// In bytes. 1 peta-byte of storage.
 	// This would protect against number of labels uint64 overflow as well,
 	// since the number of labels per byte can be 8 at most (3 extra left bit shifts).
-	MaxDataSize = 1 << 50
+	MaxDataSize      = 1 << 50
+	MaxNumLabels     = 1<<54 - 1 // TODO: FIX (after API changes)
+	MinFileNumLabels = 32
 
 	MinFileDataSize = 32
 

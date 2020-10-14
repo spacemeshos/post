@@ -16,41 +16,55 @@ import (
 var (
 	cfg            *Config
 	id             = make([]byte, 32)
-	challenge      = shared.ZeroChallenge
 	NewInitializer = initialization.NewInitializer
 )
 
 func init() {
 	cfg = config.DefaultConfig()
-	cfg.NumLabels = 1 << 15
-	cfg.LabelSize = 8
 	cfg.DataDir, _ = ioutil.TempDir("", "post-test")
-	if err := cfg.Validate(); err != nil {
-		panic(err)
-	}
+	cfg.LabelSize = 8
 }
 
+// TODO: verifier tests should range through labelSizes
+
 func TestProver(t *testing.T) {
-	r := require.New(t)
-	init, err := NewInitializer(cfg, id)
-	r.NoError(err)
+	req := require.New(t)
 
-	err = init.Initialize(initialization.CPUProviderID())
-	r.NoError(err)
-	defer func() {
-		err := init.Reset()
-		r.NoError(err)
-	}()
+	// Test one numLabel value for every index size, up to 16,
+	// which should result in a different size of the list of indices.
+	for numLabels := uint64(config.MinFileNumLabels); numLabels < 1<<16; numLabels <<= 1 {
+		cfg := *cfg
+		cfg.NumLabels = numLabels
+		cfg.K1 = uint(numLabels)
+		cfg.K2 = uint(numLabels)
+		init, err := NewInitializer(&cfg, id)
+		req.NoError(err)
 
-	p, err := NewProver(cfg, id)
-	r.NoError(err)
+		err = init.Initialize(initialization.CPUProviderID())
+		req.NoError(err)
 
-	//p.SetLogger(log.AppLog)
+		p, err := NewProver(&cfg, id)
+		req.NoError(err)
 
-	proof, proofMetaData, err := p.GenerateProof(id)
-	r.NoError(err)
-	r.NotNil(proof)
-	r.NotNil(proofMetaData)
+		ch := make(Challenge, 32)
+		binary.BigEndian.PutUint64(ch, numLabels)
+		proof, proofMetaData, err := p.GenerateProof(ch)
+		req.NoError(err, fmt.Sprintf("numLabels: %d", numLabels))
+		req.NotNil(proof)
+		req.NotNil(proofMetaData)
+
+		req.Equal(cfg.NumLabels, proofMetaData.NumLabels)
+		req.Equal(cfg.LabelSize, proofMetaData.LabelSize)
+		req.Equal(cfg.K1, proofMetaData.K1)
+		req.Equal(cfg.K2, proofMetaData.K2)
+		req.Equal(ch, proofMetaData.Challenge)
+
+		indexBitSize := uint(shared.NumBits(p.cfg.NumLabels))
+		req.Equal(shared.Size(indexBitSize, p.cfg.K2), uint(len(proof.Indices)))
+
+		err = init.Reset()
+		req.NoError(err)
+	}
 }
 
 func TestCalcProvingDifficulty(t *testing.T) {

@@ -17,9 +17,8 @@ import (
 )
 
 var (
-	challenge = shared.ZeroChallenge
-	id        = make([]byte, 32)
-	cfg       *Config
+	id  = make([]byte, 32)
+	cfg *Config
 )
 
 func TestMain(m *testing.M) {
@@ -282,17 +281,18 @@ func initData(datadir string, id []byte, labelSize uint) ([]byte, error) {
 		return nil, err
 	}
 
-	buf := bytes.NewBuffer(nil)
+	gsReader := shared.NewGranSpecificReader(reader, 8)
+	writer := bytes.NewBuffer(nil)
 	for {
-		b, err := reader.ReadNext()
+		b, err := gsReader.ReadNext()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return nil, err
 		}
-		buf.Write(b)
+		writer.Write(b)
 	}
 
-	return buf.Bytes(), nil
+	return writer.Bytes(), nil
 }

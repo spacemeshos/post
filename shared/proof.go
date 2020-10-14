@@ -1,9 +1,7 @@
 package shared
 
 import (
-	"bytes"
 	"encoding/binary"
-	"errors"
 )
 
 type Proof struct {
@@ -34,15 +32,9 @@ func (p *Proof) Encode() []byte {
 // method pointer receiver value, hence the previous value is overridden.
 // This method is intended to be called on a zero-value instance.
 func (p *Proof) Decode(data []byte) error {
-	const minIndicesLen = 10 // TODO(moshababo): implement (after applying bit granularity)
-	if len(data) < 4+minIndicesLen {
-		return errors.New("invalid input: too short")
-	}
-	buf := bytes.NewBuffer(data)
-
 	proof := Proof{}
-	proof.Nonce = binary.LittleEndian.Uint32(buf.Next(4))
-	proof.Indices = buf.Bytes()
+	proof.Nonce = binary.LittleEndian.Uint32(data[:4])
+	proof.Indices = data[4:]
 
 	// Override the method pointer receiver value.
 	*p = proof

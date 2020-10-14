@@ -5,6 +5,17 @@ import (
 	"testing"
 )
 
+func TestUintBE(t *testing.T) {
+	req := require.New(t)
+
+	for i := 0; i < 8; i++ {
+		var v uint64 = 1 << uint64(i*8)
+		b := make([]byte, i+1)
+		PutUintBE(b, v)
+		req.Equal(v, UintBE(b))
+	}
+}
+
 func TestDataSize(t *testing.T) {
 	req := require.New(t)
 

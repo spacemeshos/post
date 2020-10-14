@@ -103,7 +103,9 @@ func (p *Prover) ValidateProofGeneration() error {
 }
 
 func (p *Prover) tryNonce(ctx context.Context, ch Challenge, nonce uint32, readerChan <-chan []byte, difficulty uint64) ([]byte, error) {
-	var indices = bytes.NewBuffer(make([]byte, p.cfg.K2*8)[0:0])
+	var indexBitSize = uint(shared.NumBits(p.cfg.NumLabels))
+	var buf = bytes.NewBuffer(make([]byte, shared.Size(indexBitSize, p.cfg.K2))[0:0])
+	var gsWriter = shared.NewGranSpecificWriter(buf, indexBitSize)
 	var index uint64
 	var passed uint
 	for {
@@ -121,23 +123,24 @@ func (p *Prover) tryNonce(ctx context.Context, ch Challenge, nonce uint32, reade
 			// so that it could be used to perform math comparisons.
 			hashNum := binary.LittleEndian.Uint64(hash[:])
 
-			// check the difficulty requirement.
+			// Check the difficulty requirement.
 			if hashNum <= difficulty {
-				indexBytes := make([]byte, 8) // TODO(moshababo): support variable bit granularity index size.
-				binary.LittleEndian.PutUint64(indexBytes, index)
-				indices.Write(indexBytes)
+				if err := gsWriter.WriteUintBE(index); err != nil {
+					return nil, err
+				}
 				passed++
 
 				if passed >= p.cfg.K2 {
-					return indices.Bytes(), nil
+					if err := gsWriter.Flush(); err != nil {
+						return nil, err
+					}
+					return buf.Bytes(), nil
 				}
 			}
 
 			index++
 		}
 	}
-
-	panic("unreachable")
 }
 
 func (p *Prover) tryNonces(challenge Challenge, startNonce, endNonce uint32) (*nonceResult, error) {
@@ -147,6 +150,7 @@ func (p *Prover) tryNonces(challenge Challenge, startNonce, endNonce uint32) (*n
 	if err != nil {
 		return nil, err
 	}
+	gsReader := shared.NewGranSpecificReader(reader, p.cfg.LabelSize)
 
 	numWorkers := endNonce - startNonce + 1
 	var indices []byte
@@ -162,7 +166,7 @@ func (p *Prover) tryNonces(challenge Challenge, startNonce, endNonce uint32) (*n
 	// Feed all labels into each worker chan.
 	go func() {
 		for {
-			label, err := reader.ReadNext()
+			label, err := gsReader.ReadNext()
 			if err != nil {
 				for i := range workersChans {
 					close(workersChans[i])

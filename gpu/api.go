@@ -35,9 +35,9 @@ func Providers() []ComputeProvider {
 	return cGetProviders()
 }
 
-func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, hashLenBits uint8, options uint32) ([]byte, int, error) {
-	if hashLenBits < 1 || hashLenBits > 8 {
-		return nil, 0, fmt.Errorf("invalid `hashLenBits` value; expected: 1-8, given: %v", hashLenBits)
+func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, labelSize uint8, options uint32) ([]byte, int, error) {
+	if labelSize < 1 || labelSize > 8 {
+		return nil, 0, fmt.Errorf("invalid `hashLenBits` value; expected: 1-8, given: %v", labelSize)
 	}
 	if len(id) != 32 {
 		return nil, 0, fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(id))
@@ -62,7 +62,7 @@ func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPositio
 	}
 
 	const n, r, p = 512, 1, 1
-	output, hashesPerSec, retVal := cScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options, n, r, p)
+	output, hashesPerSec, retVal := cScryptPositions(providerId, id, salt, startPosition, endPosition, labelSize, options, n, r, p)
 	switch retVal {
 	case 0:
 		return output, hashesPerSec, nil

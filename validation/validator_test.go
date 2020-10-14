@@ -3,12 +3,16 @@ package validation
 import (
 	"encoding/hex"
 	"flag"
+	"fmt"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
+	"github.com/spacemeshos/post/oracle"
+	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/smutil/log"
 	"github.com/stretchr/testify/require"
+	"io"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -16,11 +20,77 @@ import (
 
 var (
 	id             = make([]byte, 32)
-	challenge      = shared.ZeroChallenge
 	cfg            *Config
 	NewInitializer = initialization.NewInitializer
+	CPUProviderID  = initialization.CPUProviderID()
 	NewProver      = proving.NewProver
 )
+
+// TestLabelsCorrectness tests, for variation of label sizes, the correctness of
+// reading labels from disk (written in multiple files) when compared to a single label compute.
+// It is covers the following components: labels compute lib (oracle pkg), labels writer (persistence pkg),
+// labels reader (persistence pkg), and the granularity-specific reader (shared pkg).
+// it proceeds as follows:
+// 1. Compute labels, in batches, and write them into multiple files (prover).
+// 2. Read the sequence of labels from the files according to the specified label size (prover),
+//    and ensure that each one equals a single label compute (verifier).
+func TestLabelsCorrectness(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	req := require.New(t)
+
+	numFiles := 2
+	numFileBatches := 2
+	batchSize := 256
+	id := make([]byte, 32)
+	datadir, _ := ioutil.TempDir("", "post-test")
+
+	for labelSize := uint32(config.MinLabelSize); labelSize <= config.MaxLabelSize; labelSize++ {
+		// Write.
+		for i := 0; i < numFiles; i++ {
+			writer, err := persistence.NewLabelsWriter(datadir, id, i, uint(labelSize))
+			req.NoError(err)
+			for j := 0; j < numFileBatches; j++ {
+				numBatch := i*numFileBatches + j
+				startPosition := uint64(numBatch * batchSize)
+				endPosition := startPosition + uint64(batchSize) - 1
+
+				labels, err := oracle.WorkOracle(2, id, startPosition, endPosition, labelSize)
+				req.NoError(err)
+				err = writer.Write(labels)
+				req.NoError(err)
+
+			}
+			_, err = writer.Close()
+			req.NoError(err)
+		}
+
+		// Read.
+		reader, err := persistence.NewLabelsReader(datadir, id, uint(labelSize))
+		gsReader := shared.NewGranSpecificReader(reader, uint(labelSize))
+		req.NoError(err)
+		var position uint64
+		for {
+			label, err := gsReader.ReadNext()
+			if err != nil {
+				if err == io.EOF {
+					req.Equal(uint64(numFiles*numFileBatches*batchSize), position)
+					break
+				}
+				req.Fail(err.Error())
+			}
+
+			// Verify correctness.
+			labelCompute := oracle.WorkOracleOne(CPUProviderID, id, position, labelSize)
+			req.Equal(labelCompute, label, fmt.Sprintf("position: %v, labelSize: %v", position, labelSize))
+
+			position++
+		}
+		_ = os.RemoveAll(datadir)
+	}
+}
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -39,7 +109,7 @@ func TestValidate(t *testing.T) {
 
 	init, err := NewInitializer(cfg, id)
 	req.NoError(err)
-	err = init.Initialize(initialization.CPUProviderID())
+	err = init.Initialize(CPUProviderID)
 	req.NoError(err)
 
 	p, err := NewProver(cfg, id)

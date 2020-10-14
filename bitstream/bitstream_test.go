@@ -1,13 +1,25 @@
-package bitstream
+package bitstream_test
 
 import (
 	"bytes"
 	"errors"
+	"github.com/spacemeshos/post/bitstream"
+	"github.com/spacemeshos/post/shared"
 	"github.com/stretchr/testify/require"
 	"io"
-	"math"
 	"strings"
 	"testing"
+)
+
+const (
+	Zero = bitstream.Zero
+	One  = bitstream.One
+)
+
+var (
+	NewWriter = bitstream.NewWriter
+	NewReader = bitstream.NewReader
+	NumBits   = shared.NumBits
 )
 
 func TestUint64BE(t *testing.T) {
@@ -21,7 +33,7 @@ func TestUint64BE(t *testing.T) {
 
 	// Write.
 	for i := from; i < to; i++ {
-		err := w.WriteUint64BE(i, numBits(i))
+		err := w.WriteUint64BE(i, NumBits(i))
 		req.NoError(err)
 		err = w.WriteUint64BE(i, 64)
 		req.NoError(err)
@@ -32,7 +44,7 @@ func TestUint64BE(t *testing.T) {
 
 	// Read.
 	for i := from; i < to; i++ {
-		num, err := r.ReadUint64BE(numBits(i))
+		num, err := r.ReadUint64BE(NumBits(i))
 		req.NoError(err)
 		req.Equal(i, num)
 		num, err = r.ReadUint64BE(64)
@@ -61,7 +73,7 @@ func TestUint64BE_Mixed(t *testing.T) {
 		req.NoError(err)
 
 		// Write i.
-		numBits := int(math.Log2(float64(i))) + 1
+		numBits := NumBits(i)
 		err = w.WriteUint64BE(i, numBits)
 		req.NoError(err)
 
@@ -288,10 +300,6 @@ func TestBadWriter_1(t *testing.T) {
 	br := NewWriter(&badWriter{})
 	err := br.WriteUint64BE(256, 8)
 	req.Equal(err, ErrBadWriter)
-}
-
-func numBits(val uint64) int {
-	return int(math.Log2(float64(val))) + 1
 }
 
 type badWriter struct{}

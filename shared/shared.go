@@ -41,3 +41,33 @@ func Uint64MulOverflow(a, b uint64) bool {
 	c := a * b
 	return c/b != a
 }
+
+func NumBits(val uint64) int {
+	return int(math.Log2(float64(val))) + 1
+}
+
+func Size(itemBitSize uint, numItems uint) uint {
+	bitSize := itemBitSize * numItems
+	return (bitSize + 7) / 8 // Integer ceil of (indicesBitSize / 8).
+}
+
+// PutUintBE
+func PutUintBE(b []byte, v uint64) {
+	numBits := len(b) * 8
+
+	// Eliminate unnecessary MS bits.
+	v <<= 64 - uint(numBits)
+
+	for i := 0; i < len(b); i++ {
+		b[i] = byte(v >> uint64(56-(8*i)))
+	}
+}
+
+func UintBE(b []byte) uint64 {
+	var v uint64
+	for i := 0; i < len(b); i++ {
+		v <<= 8
+		v |= uint64(b[i])
+	}
+	return v
+}

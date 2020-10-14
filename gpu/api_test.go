@@ -36,7 +36,7 @@ func TestScryptPositions(t *testing.T) {
 		startPosition := uint64(1)
 		endPosition := uint64(1 << 8)
 		hashLenBits := uint32(4)
-		output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
+		output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, uint8(hashLenBits), options)
 		req.NoError(err)
 		req.NotNil(output)
 
@@ -60,7 +60,7 @@ func TestScryptPositions_HashLenBits(t *testing.T) {
 			providerId := uint(p.ID)
 			startPosition := uint64(1)
 			endPosition := uint64(1 << 8)
-			output, hs, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
+			output, hs, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, uint8(hashLenBits), options)
 			req.NoError(err)
 			req.NotNil(output)
 			fmt.Printf("provider: %v, len: %v, hs: %v\n", p.Model, hashLenBits, hs)
@@ -103,7 +103,7 @@ func TestStop(t *testing.T) {
 			startPosition := uint64(1)
 			endPosition := uint64(1 << 18)
 			hashLenBits := uint32(8)
-			output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
+			output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, uint8(hashLenBits), options)
 			req.NoError(err)
 			req.NotNil(output)
 
@@ -128,7 +128,7 @@ func TestStop(t *testing.T) {
 		startPosition := uint64(1)
 		endPosition := uint64(1 << 17)
 		hashLenBits := uint32(8)
-		output, _, err := ScryptPositions(providerID, id, salt, startPosition, endPosition, hashLenBits, options)
+		output, _, err := ScryptPositions(providerID, id, salt, startPosition, endPosition, uint8(hashLenBits), options)
 		req.NoError(err)
 		req.NotNil(output)
 		expectedOutputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(hashLenBits))
@@ -150,7 +150,7 @@ func TestStop_SameThread(t *testing.T) {
 		startPosition := uint64(1)
 		endPosition := uint64(1 << 18)
 		hashLenBits := uint32(8)
-		output, _, err := ScryptPositions(providerID, id, salt, startPosition, endPosition, hashLenBits, options)
+		output, _, err := ScryptPositions(providerID, id, salt, startPosition, endPosition, uint8(hashLenBits), options)
 		req.NoError(err)
 		req.NotNil(output)
 
@@ -162,7 +162,7 @@ func TestStop_SameThread(t *testing.T) {
 		// Testing that a call to `ScryptPositions` after `Stop` is working properly.
 		startPosition = uint64(1)
 		endPosition = uint64(1 << 17)
-		output, _, err = ScryptPositions(providerID, id, salt, startPosition, endPosition, hashLenBits, options)
+		output, _, err = ScryptPositions(providerID, id, salt, startPosition, endPosition, uint8(hashLenBits), options)
 		req.NoError(err)
 		req.NotNil(output)
 		expectedOutputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(hashLenBits))
@@ -180,7 +180,7 @@ func TestScryptPositions_PartialByte(t *testing.T) {
 		startPosition := uint64(1)
 		endPosition := uint64(9)
 		hashLenBits := uint32(4)
-		output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, hashLenBits, options)
+		output, _, err := ScryptPositions(providerId, id, salt, startPosition, endPosition, uint8(hashLenBits), options)
 		req.NoError(err)
 		req.NotNil(output)
 

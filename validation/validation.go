@@ -20,10 +20,6 @@ var (
 	FastOracle    = oracle.FastOracle
 )
 
-type Validator struct {
-	cfg *Config
-}
-
 // Validate ensures the validity of the given proof. It returns nil if the proof is valid or an error describing the
 // failure, otherwise.
 func Validate(id []byte, p *proving.Proof, m *proving.ProofMetadata) error {
@@ -31,25 +27,28 @@ func Validate(id []byte, p *proving.Proof, m *proving.ProofMetadata) error {
 		return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(id))
 	}
 
-	expectedNum := m.K2
-	expectedSize := expectedNum * 8
+	var indexBitSize = uint(shared.NumBits(m.NumLabels))
+	var expectedSize = shared.Size(indexBitSize, m.K2)
 	if expectedSize != uint(len(p.Indices)) {
 		return fmt.Errorf("invalid indices set size; expected %d, given: %d", expectedSize, len(p.Indices))
 	}
 
 	difficulty := shared.ProvingDifficulty(m.NumLabels, uint64(m.K1))
 	buf := bytes.NewBuffer(p.Indices)
-	indicesSet := make(map[uint64]bool, expectedNum)
+	gsReader := shared.NewGranSpecificReader(buf, indexBitSize)
+	indicesSet := make(map[uint64]bool, m.K2)
 
-	for i := uint(0); i < expectedNum; i++ {
-		indexBytes := buf.Next(8)
-		index := binary.LittleEndian.Uint64(indexBytes)
+	for i := uint(0); i < m.K2; i++ {
+		index, err := gsReader.ReadNextUintBE()
+		if err != nil {
+			return err
+		}
 		if indicesSet[index] {
 			return fmt.Errorf("non-unique index: %d", index)
 		}
 		indicesSet[index] = true
 
-		label := WorkOracleOne(initialization.CPUProviderID(), id, index, uint8(m.LabelSize))
+		label := WorkOracleOne(initialization.CPUProviderID(), id, index, uint32(m.LabelSize))
 		hash := FastOracle(m.Challenge, p.Nonce, label)
 		hashNum := binary.LittleEndian.Uint64(hash[:])
 		if hashNum > difficulty {

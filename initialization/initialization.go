@@ -392,7 +392,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 			}
 
 			// Write labels batch to disk.
-			if err := writer.Append(batch); err != nil {
+			if err := writer.Write(batch); err != nil {
 				ioError <- err
 				return
 			}
@@ -414,7 +414,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 		return err
 	}
 
-	init.logger.Info("initialization: file #%v completed; bytes written: %v", fileIndex, info.Size())
+	init.logger.Info("initialization: file #%v completed; bytes written: %v", fileIndex, (*info).Size())
 
 	return nil
 }

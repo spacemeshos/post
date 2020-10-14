@@ -15,7 +15,7 @@ type GroupReader struct {
 // A compile time check to ensure that GroupReader fully implements the Reader interface.
 var _ Reader = (*GroupReader)(nil)
 
-// Group groups a slice of ReadWriter into one continuous ReadWriter.
+// Group groups a slice of Reader into one continuous Reader.
 func Group(readers []Reader) (*GroupReader, error) {
 	if len(readers) < 2 {
 		return nil, errors.New("number of readers must be at least 2")
@@ -56,17 +56,17 @@ func Group(readers []Reader) (*GroupReader, error) {
 	}, nil
 }
 
-func (g *GroupReader) ReadNext() ([]byte, error) {
-	val, err := g.readers[g.activeReaderIndex].ReadNext()
+func (g *GroupReader) Read(p []byte) (int, error) {
+	n, err := g.readers[g.activeReaderIndex].Read(p)
 	if err != nil {
 		if err == io.EOF && g.activeReaderIndex < len(g.readers)-1 {
 			g.activeReaderIndex++
-			return g.ReadNext()
+			return g.Read(p)
 		}
-		return nil, err
+		return n, err
 	}
 
-	return val, nil
+	return n, nil
 }
 
 func (g *GroupReader) Width() (uint64, error) {

@@ -25,7 +25,7 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 		req.NoError(err)
 
 		for _, label := range labelGroup {
-			err := writer.Append(label)
+			err := writer.Write(label)
 			req.NoError(err)
 
 			// For later assertion.
@@ -40,12 +40,16 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 
 	readLabels := make([]Label, len(writtenLabels))
 	for i := range readLabels {
-		readLabels[i], err = reader.ReadNext()
+		p := make([]byte, labelSize/8)
+		_, err = reader.Read(p)
 		req.NoError(err)
+		readLabels[i] = p
 	}
-	shouldBeNil, err := reader.ReadNext()
+
+	p := make([]byte, labelSize/8)
+	_, err = reader.Read(p)
 	req.Equal(io.EOF, err)
-	req.Nil(shouldBeNil)
+	req.Nil(p)
 
 	req.EqualValues(writtenLabels, readLabels)
 

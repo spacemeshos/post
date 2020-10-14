@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"github.com/stretchr/testify/require"
 	"io"
+	"os"
 	"testing"
 )
 
@@ -19,15 +20,15 @@ func TestGroup(t *testing.T) {
 	writers[0] = newSliceWriter(&slices[0], labelSize)
 	writers[1] = newSliceWriter(&slices[1], labelSize)
 	writers[2] = newSliceWriter(&slices[2], labelSize)
-	_ = writers[0].Append(labels[0])
-	_ = writers[0].Append(labels[1])
-	_ = writers[0].Append(labels[2])
-	_ = writers[1].Append(labels[3])
-	_ = writers[1].Append(labels[4])
-	_ = writers[1].Append(labels[5])
-	_ = writers[2].Append(labels[6])
-	_ = writers[2].Append(labels[7])
-	_ = writers[2].Append(labels[8])
+	_ = writers[0].Write(labels[0])
+	_ = writers[0].Write(labels[1])
+	_ = writers[0].Write(labels[2])
+	_ = writers[1].Write(labels[3])
+	_ = writers[1].Write(labels[4])
+	_ = writers[1].Write(labels[5])
+	_ = writers[2].Write(labels[6])
+	_ = writers[2].Write(labels[7])
+	_ = writers[2].Write(labels[8])
 
 	// Create group reader.
 	readers := make([]Reader, 3)
@@ -42,15 +43,17 @@ func TestGroup(t *testing.T) {
 	r.Equal(width, uint64(len(labels)))
 
 	for _, label := range labels {
-		val, err := reader.ReadNext()
+		p := make([]byte, labelSize/8)
+		_, err = reader.Read(p)
 		r.NoError(err)
-		r.Equal(val, label)
+		r.Equal(p, label)
 	}
 
 	// Verify EOF.
-	val, err := reader.ReadNext()
+	p := make([]byte, labelSize/8)
+	_, err = reader.Read(p)
 	r.Equal(err, io.EOF)
-	r.Nil(val)
+	r.Nil(p)
 
 	err = reader.Close()
 	r.NoError(err)
@@ -68,13 +71,13 @@ func TestGroupWithShorterLastLayer(t *testing.T) {
 	writers[0] = newSliceWriter(&slices[0], labelSize)
 	writers[1] = newSliceWriter(&slices[1], labelSize)
 	writers[2] = newSliceWriter(&slices[2], labelSize)
-	_ = writers[0].Append(labels[0])
-	_ = writers[0].Append(labels[1])
-	_ = writers[0].Append(labels[2])
-	_ = writers[1].Append(labels[3])
-	_ = writers[1].Append(labels[4])
-	_ = writers[1].Append(labels[5])
-	_ = writers[2].Append(labels[6])
+	_ = writers[0].Write(labels[0])
+	_ = writers[0].Write(labels[1])
+	_ = writers[0].Write(labels[2])
+	_ = writers[1].Write(labels[3])
+	_ = writers[1].Write(labels[4])
+	_ = writers[1].Write(labels[5])
+	_ = writers[2].Write(labels[6])
 
 	// Create group reader.
 	readers := make([]Reader, 3)
@@ -90,15 +93,17 @@ func TestGroupWithShorterLastLayer(t *testing.T) {
 
 	// Iterate over the layer.
 	for _, label := range labels {
-		val, err := reader.ReadNext()
+		p := make([]byte, labelSize/8)
+		_, err := reader.Read(p)
 		r.NoError(err)
-		r.Equal(val, label)
+		r.Equal(p, label)
 	}
 
 	// Verify EOF.
-	val, err := reader.ReadNext()
+	p := make([]byte, labelSize/8)
+	_, err = reader.Read(p)
 	r.Equal(err, io.EOF)
-	r.Nil(val)
+	r.Nil(p)
 
 	err = reader.Close()
 	r.NoError(err)
@@ -124,13 +129,13 @@ func TestGroupWithShorterMidReader(t *testing.T) {
 	writers[0] = newSliceWriter(&slices[0], labelSize)
 	writers[1] = newSliceWriter(&slices[1], labelSize)
 	writers[2] = newSliceWriter(&slices[2], labelSize)
-	_ = writers[0].Append(labels[0])
-	_ = writers[0].Append(labels[1])
-	_ = writers[0].Append(labels[2])
-	_ = writers[1].Append(labels[3])
-	_ = writers[2].Append(labels[4])
-	_ = writers[2].Append(labels[5])
-	_ = writers[2].Append(labels[6])
+	_ = writers[0].Write(labels[0])
+	_ = writers[0].Write(labels[1])
+	_ = writers[0].Write(labels[2])
+	_ = writers[1].Write(labels[3])
+	_ = writers[2].Write(labels[4])
+	_ = writers[2].Write(labels[5])
+	_ = writers[2].Write(labels[6])
 
 	// Create group reader.
 	readers := make([]Reader, 3)
@@ -171,7 +176,7 @@ func newSliceWriter(slice *[][]byte, itemSize uint) *sliceWriter {
 	}
 }
 
-func (s *sliceWriter) Append(p []byte) error {
+func (s *sliceWriter) Write(p []byte) error {
 	*s.slice = append(*s.slice, p)
 	return nil
 }
@@ -180,8 +185,8 @@ func (s *sliceWriter) Flush() error {
 	return nil
 }
 
-func (s *sliceWriter) Close() error {
-	return nil
+func (s *sliceWriter) Close() (*os.FileInfo, error) {
+	return nil, nil
 }
 
 type sliceReader struct {
@@ -200,14 +205,13 @@ func newSliceReader(slice [][]byte, itemSize uint) *sliceReader {
 	}
 }
 
-func (s *sliceReader) ReadNext() ([]byte, error) {
+func (s *sliceReader) Read(p []byte) (int, error) {
 	if s.position >= uint64(len(s.slice)) {
-		return nil, io.EOF
+		return 0, io.EOF
 	}
-	value := make([]byte, s.itemSize/8)
-	copy(value, s.slice[s.position])
+	copy(p, s.slice[s.position])
 	s.position++
-	return value, nil
+	return len(p), nil
 }
 
 func (s *sliceReader) Width() (uint64, error) {
