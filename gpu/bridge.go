@@ -69,7 +69,7 @@ func (s StopResult) String() string {
 	}
 }
 
-func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, labelSize uint8, options uint32, n, r, p uint32) ([]byte, int, int) {
+func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, labelSize uint32, options uint32, n, r, p uint32) ([]byte, int, int) {
 	mtx.Lock()
 	defer mtx.Unlock()
 
@@ -79,7 +79,7 @@ func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPositi
 	cId := (*C.uchar)(GoBytes(id).CBytesClone().data)
 	cStartPosition := C.uint64_t(startPosition)
 	cEndPosition := C.uint64_t(endPosition)
-	cHashLenBits := C.uchar(labelSize)
+	cHashLenBits := C.uint32_t(labelSize)
 	cSalt := (*C.uchar)(GoBytes(salt).CBytesClone().data)
 	cOptions := C.uint(options)
 	cOutputSize := C.size_t(outputSize)

@@ -3,6 +3,7 @@ package gpu
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/spacemeshos/post/config"
 	"time"
 )
 
@@ -16,7 +17,7 @@ func (p *ComputeProvider) Benchmark() (int, error) {
 	id := make([]byte, 32)
 	salt := make([]byte, 32)
 	options := uint32(0)
-	hashLenBits := uint8(8)
+	hashLenBits := uint32(8)
 	startPosition := uint64(1)
 	endPosition := uint64(1 << 20)
 	if p.Model == "CPU" {
@@ -35,15 +36,18 @@ func Providers() []ComputeProvider {
 	return cGetProviders()
 }
 
-func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, labelSize uint8, options uint32) ([]byte, int, error) {
-	if labelSize < 1 || labelSize > 8 {
-		return nil, 0, fmt.Errorf("invalid `hashLenBits` value; expected: 1-8, given: %v", labelSize)
-	}
+func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, labelSize uint32, options uint32) ([]byte, int, error) {
 	if len(id) != 32 {
 		return nil, 0, fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(id))
 	}
+
 	if len(salt) != 32 {
 		return nil, 0, fmt.Errorf("invalid `salt` length; expected: 32, given: %v", len(salt))
+	}
+
+	if labelSize < config.MinLabelSize || labelSize > config.MaxLabelSize {
+		return nil, 0, fmt.Errorf("invalid `labelSize`; expected: %d-%d, given: %v",
+			config.MinLabelSize, config.MaxLabelSize, labelSize)
 	}
 
 	// Wait for the stop flag clearance for avoiding a race condition which can
