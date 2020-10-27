@@ -8,7 +8,7 @@ import (
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
-	"github.com/spacemeshos/post/validation"
+	"github.com/spacemeshos/post/verifying"
 	smlog "github.com/spacemeshos/smutil/log"
 	"io/ioutil"
 	"log"
@@ -82,7 +82,7 @@ func main() {
 		log.Fatalf("failed to generate proof: %v", err)
 	}
 
-	if err := validation.Validate(id, proof, proofMetadata); err != nil {
+	if err := verifying.Verify(proof, proofMetadata); err != nil {
 		log.Fatal(err)
 	}
 

@@ -9,36 +9,17 @@ import (
 	"sort"
 )
 
-type Writer interface {
-	Write(p []byte) error
-	Flush() error
-	Close() (*os.FileInfo, error)
-}
-
 type Reader interface {
 	Read(p []byte) (n int, err error)
-	Width() (uint64, error)
+	NumLabels() (uint64, error)
 	Close() error
-}
-
-func NewLabelsWriter(datadir string, id []byte, index int, labelSize uint) (*FileWriter, error) {
-	if len(id) > 64 {
-		return nil, fmt.Errorf("id cannot be longer than 64 bytes; given: %d", len(id))
-	}
-
-	if err := os.MkdirAll(datadir, shared.OwnerReadWriteExec); err != nil {
-		return nil, err
-	}
-
-	filename := filepath.Join(datadir, shared.InitFileName(id, index))
-	return NewFileWriter(filename, labelSize)
 }
 
 // NewLabelsReader returns a new labels reader from the initialization files.
 // If the initialization was split into multiple files, they will be grouped
 // into one unified reader.
-func NewLabelsReader(datadir string, id []byte, labelSize uint) (Reader, error) {
-	readers, err := GetReaders(datadir, id, labelSize)
+func NewLabelsReader(datadir string, labelSize uint) (Reader, error) {
+	readers, err := GetReaders(datadir, labelSize)
 	if err != nil {
 		return nil, err
 	}
@@ -49,22 +30,29 @@ func NewLabelsReader(datadir string, id []byte, labelSize uint) (Reader, error) 
 	return Group(readers)
 }
 
-func GetReaders(datadir string, id []byte, labelSize uint) ([]Reader, error) {
+func GetReaders(datadir string, labelSize uint) ([]Reader, error) {
 	files, err := ioutil.ReadDir(datadir)
 	if err != nil {
 		return nil, fmt.Errorf("initialization directory not found: %v", err)
 	}
-
 	if len(files) == 0 {
 		return nil, fmt.Errorf("initialization directory (%v) is empty", datadir)
 	}
-	sort.Sort(numericalSorter(files))
 
-	readers := make([]Reader, 0)
+	// Filter.
+	var initFiles []os.FileInfo
 	for _, file := range files {
-		if !shared.IsInitFile(id, file) {
-			continue
+		if shared.IsInitFile(file) {
+			initFiles = append(initFiles, file)
 		}
+	}
+
+	// Sort.
+	sort.Sort(numericalSorter(initFiles))
+
+	// Initialize readers.
+	var readers []Reader
+	for _, file := range initFiles {
 		reader, err := NewFileReader(filepath.Join(datadir, file.Name()), labelSize)
 		if err != nil {
 			return nil, err
@@ -73,4 +61,13 @@ func GetReaders(datadir string, id []byte, labelSize uint) ([]Reader, error) {
 	}
 
 	return readers, nil
+}
+
+func NewLabelsWriter(datadir string, index int, labelSize uint) (*FileWriter, error) {
+	if err := os.MkdirAll(datadir, shared.OwnerReadWriteExec); err != nil {
+		return nil, err
+	}
+
+	filename := filepath.Join(datadir, shared.InitFileName(index))
+	return NewFileWriter(filename, labelSize)
 }

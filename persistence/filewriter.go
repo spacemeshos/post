@@ -8,23 +8,21 @@ import (
 )
 
 type FileWriter struct {
-	file     *os.File
-	buf      *bufio.Writer
-	itemSize uint
+	file *os.File
+	buf  *bufio.Writer
+
+	labelBitSize uint
 }
 
-// A compile time check to ensure that FileWriter fully implements the Writer interface.
-var _ Writer = (*FileWriter)(nil)
-
-func NewFileWriter(filename string, itemSize uint) (*FileWriter, error) {
+func NewFileWriter(filename string, labelBitSize uint) (*FileWriter, error) {
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, shared.OwnerReadWrite)
 	if err != nil {
 		return nil, err
 	}
 	return &FileWriter{
-		file:     f,
-		buf:      bufio.NewWriter(f),
-		itemSize: itemSize,
+		file:         f,
+		buf:          bufio.NewWriter(f),
+		labelBitSize: labelBitSize,
 	}, nil
 }
 
@@ -33,18 +31,32 @@ func (w *FileWriter) Write(b []byte) error {
 	return err
 }
 
-func (r *FileWriter) Width() (uint64, error) {
-	info, err := r.file.Stat()
+func (w *FileWriter) Flush() error {
+	if err := w.buf.Flush(); err != nil {
+		return fmt.Errorf("failed to flush disk writer: %v", err)
+	}
+
+	return nil
+}
+
+func (w *FileWriter) NumLabelsWritten() (uint64, error) {
+	info, err := w.file.Stat()
 	if err != nil {
 		return 0, err
 	}
 
-	return uint64(info.Size()) * 8 / uint64(r.itemSize), nil
+	return uint64(info.Size()) * 8 / uint64(w.labelBitSize), nil
 }
 
-func (w *FileWriter) Flush() error {
-	if err := w.buf.Flush(); err != nil {
-		return fmt.Errorf("failed to flush disk writer: %v", err)
+func (w *FileWriter) Truncate(numLabels uint64) error {
+	bitSize := numLabels * uint64(w.labelBitSize)
+	if bitSize%8 != 0 {
+		return fmt.Errorf("invalid `numLabels`; expected: evenly divisible by 8 (alone, or when multipled by `labelSize`), given: %d", numLabels)
+	}
+
+	size := int64(bitSize / 8)
+	if err := w.file.Truncate(size); err != nil {
+		return fmt.Errorf("failed to truncate file: %v", err)
 	}
 
 	return nil

@@ -12,7 +12,7 @@ import (
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/proving"
-	"github.com/spacemeshos/post/validation"
+	"github.com/spacemeshos/post/verifying"
 	"io"
 	"log"
 	"os"
@@ -120,7 +120,7 @@ func main() {
 		eExec := time.Since(t)
 
 		t = time.Now()
-		err = validation.Validate(id, proof, proofMetadata)
+		err = verifying.Verify(proof, proofMetadata)
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -118,6 +118,7 @@ func (r *rpcServer) Execute(ctx context.Context, in *api.ExecuteRequest) (*api.E
 			Indices: proof.Indices,
 		},
 		ProofMetadata: &api.ProofMetadata{
+			Id:        proofMetadata.ID,
 			Challenge: proofMetadata.Challenge,
 			NumLabels: proofMetadata.NumLabels,
 			LabelSize: uint32(proofMetadata.LabelSize),
@@ -205,15 +206,20 @@ func (r *rpcServer) GetState(ctx context.Context, in *api.GetStateRequest) (*api
 		return nil, err
 	}
 	init.SetLogger(r.logger)
-	state, err := init.DiskState()
+
+	numLabelsWritten, err := init.NumLabelsWritten()
 	if err != nil {
 		return nil, err
 	}
-
-	return &api.GetStateResponse{
-		State:        api.GetStateResponse_State(state.InitState - 1), // native state starts at 1, wire at 0.
-		BytesWritten: state.BytesWritten,
-	}, nil
+	var state api.GetStateResponse_State
+	if numLabelsWritten == 0 {
+		state = api.GetStateResponse_NotStarted // zero value.
+	} else if numLabelsWritten < r.cfg.NumLabels {
+		state = api.GetStateResponse_Stopped
+	} else {
+		state = api.GetStateResponse_Completed
+	}
+	return &api.GetStateResponse{State: state, NumLabelsWritten: numLabelsWritten}, nil
 }
 
 func (r *rpcServer) GetInfo(ctx context.Context, in *api.GetInfoRequest) (*api.GetInfoResponse, error) {
@@ -255,13 +261,4 @@ func (r *rpcServer) removeInitializing(id []byte) {
 
 	idHex := hex.EncodeToString(id)
 	delete(r.initializing, idHex)
-}
-
-func CPUProviderId(providers []initialization.ComputeProvider) uint {
-	for _, p := range providers {
-		if p.Model == "CPU" {
-			return p.ID
-		}
-	}
-	panic("unreachable")
 }

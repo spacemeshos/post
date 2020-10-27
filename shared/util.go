@@ -8,7 +8,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
+	"regexp"
+	"strconv"
 )
 
 func GetProofsDir(datadir string) string {
@@ -26,12 +27,25 @@ func GetProofFilename(datadir string, challenge []byte) string {
 	return filepath.Join(GetProofsDir(datadir), c)
 }
 
-func InitFileName(id []byte, index int) string {
-	return fmt.Sprintf("%x-%d", id, index)
+func InitFileName(index int) string {
+	return fmt.Sprintf("postdata_%d.bin", index)
 }
 
-func IsInitFile(id []byte, file os.FileInfo) bool {
-	return !file.IsDir() && strings.HasPrefix(file.Name(), fmt.Sprintf("%x", id))
+func IsInitFile(file os.FileInfo) bool {
+	if file.IsDir() {
+		return false
+	}
+
+	re := regexp.MustCompile("postdata_(.*).bin")
+	matches := re.FindStringSubmatch(file.Name())
+	if len(matches) != 2 {
+		return false
+	}
+	if _, err := strconv.Atoi(matches[1]); err != nil {
+		return false
+	}
+
+	return true
 }
 
 type ProofWithMetadata struct {

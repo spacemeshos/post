@@ -50,7 +50,7 @@ func NewProver(cfg *Config, id []byte) (*Prover, error) {
 // Generating a proof can be repeated arbitrarily many times without repeating the PoST protocol Initialization phase;
 // thus despite the initialization essentially serving as a PoW, the amortized computational complexity can be made arbitrarily small.
 func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, error) {
-	if err := p.ValidateProofGeneration(); err != nil {
+	if err := p.VerifyGenerateProofAllowed(); err != nil {
 		return nil, nil, err
 	}
 
@@ -73,6 +73,7 @@ func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, err
 				Indices: goodNonceResult.indices,
 			}
 			proofMetadata := &ProofMetadata{
+				ID:        p.id,
 				Challenge: challenge,
 				NumLabels: p.cfg.NumLabels,
 				LabelSize: p.cfg.LabelSize,
@@ -90,16 +91,17 @@ func (p *Prover) SetLogger(logger Logger) {
 	p.logger = logger
 }
 
-func (p *Prover) ValidateProofGeneration() error {
+func (p *Prover) VerifyGenerateProofAllowed() error {
 	init, err := initialization.NewInitializer(p.cfg, p.id)
 	if err != nil {
 		return err
 	}
-	if err := init.VerifyCompleted(); err != nil {
+
+	if err := init.VerifyMetadata(); err != nil {
 		return err
 	}
 
-	return nil
+	return init.VerifyCompleted()
 }
 
 func (p *Prover) tryNonce(ctx context.Context, ch Challenge, nonce uint32, readerChan <-chan []byte, difficulty uint64) ([]byte, error) {
@@ -146,7 +148,7 @@ func (p *Prover) tryNonce(ctx context.Context, ch Challenge, nonce uint32, reade
 func (p *Prover) tryNonces(challenge Challenge, startNonce, endNonce uint32) (*nonceResult, error) {
 	difficulty := shared.ProvingDifficulty(p.cfg.NumLabels, uint64(p.cfg.K1))
 
-	reader, err := persistence.NewLabelsReader(p.cfg.DataDir, p.id, p.cfg.LabelSize)
+	reader, err := persistence.NewLabelsReader(p.cfg.DataDir, p.cfg.LabelSize)
 	if err != nil {
 		return nil, err
 	}

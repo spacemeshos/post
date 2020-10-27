@@ -8,15 +8,16 @@ import (
 )
 
 type FileReader struct {
-	file     *os.File
-	buf      *bufio.Reader
-	itemSize uint
+	file *os.File
+	buf  *bufio.Reader
+
+	labelBitSize uint
 }
 
 // A compile time check to ensure that FileReader fully implements the Reader interface.
 var _ Reader = (*FileReader)(nil)
 
-func NewFileReader(name string, itemSize uint) (*FileReader, error) {
+func NewFileReader(name string, labelBitSize uint) (*FileReader, error) {
 	file, err := os.OpenFile(name, os.O_RDONLY, shared.OwnerReadWrite)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file for labels reader: %v", err)
@@ -26,7 +27,7 @@ func NewFileReader(name string, itemSize uint) (*FileReader, error) {
 	return &FileReader{
 		file,
 		buf,
-		itemSize,
+		labelBitSize,
 	}, nil
 }
 
@@ -34,12 +35,12 @@ func (r *FileReader) Read(p []byte) (int, error) {
 	return r.buf.Read(p)
 }
 
-func (r *FileReader) Width() (uint64, error) {
+func (r *FileReader) NumLabels() (uint64, error) {
 	info, err := r.file.Stat()
 	if err != nil {
 		return 0, err
 	}
-	return uint64(info.Size()) * 8 / uint64(r.itemSize), nil
+	return uint64(info.Size()) * 8 / uint64(r.labelBitSize), nil
 }
 
 func (r *FileReader) Close() error {

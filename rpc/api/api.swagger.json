@@ -378,7 +378,7 @@
         "state": {
           "$ref": "#/definitions/apiGetStateResponseState"
         },
-        "bytes_written": {
+        "num_labels_written": {
           "type": "string",
           "format": "uint64"
         }
@@ -390,7 +390,6 @@
         "NotStarted",
         "Completed",
         "Stopped",
-        "Crashed",
         "Initializing"
       ],
       "default": "NotStarted"
@@ -435,6 +434,10 @@
     "apiProofMetadata": {
       "type": "object",
       "properties": {
+        "id": {
+          "type": "string",
+          "format": "byte"
+        },
         "challenge": {
           "type": "string",
           "format": "byte"

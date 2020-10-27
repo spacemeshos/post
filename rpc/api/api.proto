@@ -121,11 +121,10 @@ message GetStateResponse {
         NotStarted = 0;
         Completed = 1;
         Stopped = 2;
-        Crashed = 3;
-        Initializing = 4;
+        Initializing = 3;
     }
     State state = 1 [json_name = "state"];
-    uint64 bytes_written = 2 [json_name = "bytes_written"];
+    uint64 num_labels_written = 2 [json_name = "num_labels_written"];
 }
 
 message GetInfoRequest {
@@ -149,11 +148,12 @@ message Proof {
 }
 
 message ProofMetadata {
-    bytes challenge = 1 [json_name = "challenge"];
-    uint64 num_labels = 2 [json_name = "num_labels"];
-    uint32 label_size = 3 [json_name = "label_size"];
-    uint32 k1 = 4 [json_name = "k1"];
-    uint32 k2 = 5 [json_name = "k2"];
+    bytes id = 1 [json_name = "challenge"];
+    bytes challenge = 2 [json_name = "challenge"];
+    uint64 num_labels = 3 [json_name = "num_labels"];
+    uint32 label_size = 4 [json_name = "label_size"];
+    uint32 k1 = 5 [json_name = "k1"];
+    uint32 k2 = 6 [json_name = "k2"];
 }
 
 message Config {

@@ -1,7 +1,6 @@
-package validation
+package verifying
 
 import (
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"github.com/spacemeshos/post/config"
@@ -10,7 +9,6 @@ import (
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
-	"github.com/spacemeshos/smutil/log"
 	"github.com/stretchr/testify/require"
 	"io"
 	"io/ioutil"
@@ -19,12 +17,46 @@ import (
 )
 
 var (
-	id             = make([]byte, 32)
-	cfg            *Config
+	id = make([]byte, 32)
+	ch = make(proving.Challenge, 32)
+
+	cfg           = config.DefaultConfig()
+	CPUProviderID = initialization.CPUProviderID()
+
+	debug = flag.Bool("debug", false, "")
+
 	NewInitializer = initialization.NewInitializer
-	CPUProviderID  = initialization.CPUProviderID()
 	NewProver      = proving.NewProver
 )
+
+func TestMain(m *testing.M) {
+	cfg.DataDir, _ = ioutil.TempDir("", "post-test")
+	cfg.NumLabels = 1 << 12
+
+	res := m.Run()
+	os.Exit(res)
+}
+
+func TestVerify(t *testing.T) {
+	req := require.New(t)
+
+	init, err := NewInitializer(cfg, id)
+	req.NoError(err)
+	err = init.Initialize(CPUProviderID)
+	req.NoError(err)
+
+	p, err := NewProver(cfg, id)
+	req.NoError(err)
+	proof, proofMetadata, err := p.GenerateProof(ch)
+	req.NoError(err)
+
+	err = Verify(proof, proofMetadata)
+	req.NoError(err)
+
+	// Cleanup.
+	err = init.Reset()
+	req.NoError(err)
+}
 
 // TestLabelsCorrectness tests, for variation of label sizes, the correctness of
 // reading labels from disk (written in multiple files) when compared to a single label compute.
@@ -35,11 +67,10 @@ var (
 // 2. Read the sequence of labels from the files according to the specified label size (prover),
 //    and ensure that each one equals a single label compute (verifier).
 func TestLabelsCorrectness(t *testing.T) {
+	req := require.New(t)
 	if testing.Short() {
 		t.Skip()
 	}
-
-	req := require.New(t)
 
 	numFiles := 2
 	numFileBatches := 2
@@ -48,9 +79,13 @@ func TestLabelsCorrectness(t *testing.T) {
 	datadir, _ := ioutil.TempDir("", "post-test")
 
 	for labelSize := uint32(config.MinLabelSize); labelSize <= config.MaxLabelSize; labelSize++ {
+		if *debug {
+			fmt.Printf("label size: %v\n", labelSize)
+		}
+
 		// Write.
 		for i := 0; i < numFiles; i++ {
-			writer, err := persistence.NewLabelsWriter(datadir, id, i, uint(labelSize))
+			writer, err := persistence.NewLabelsWriter(datadir, i, uint(labelSize))
 			req.NoError(err)
 			for j := 0; j < numFileBatches; j++ {
 				numBatch := i*numFileBatches + j
@@ -68,7 +103,7 @@ func TestLabelsCorrectness(t *testing.T) {
 		}
 
 		// Read.
-		reader, err := persistence.NewLabelsReader(datadir, id, uint(labelSize))
+		reader, err := persistence.NewLabelsReader(datadir, uint(labelSize))
 		gsReader := shared.NewGranSpecificReader(reader, uint(labelSize))
 		req.NoError(err)
 		var position uint64
@@ -88,51 +123,10 @@ func TestLabelsCorrectness(t *testing.T) {
 
 			position++
 		}
+
+		// Cleanup.
 		_ = os.RemoveAll(datadir)
 	}
-}
-
-func TestMain(m *testing.M) {
-	flag.Parse()
-
-	cfg = config.DefaultConfig()
-	cfg.NumLabels = 1 << 15
-	cfg.LabelSize = 8
-	cfg.DataDir, _ = ioutil.TempDir("", "post-test")
-
-	res := m.Run()
-	os.Exit(res)
-}
-
-func TestValidate(t *testing.T) {
-	req := require.New(t)
-
-	init, err := NewInitializer(cfg, id)
-	req.NoError(err)
-	err = init.Initialize(CPUProviderID)
-	req.NoError(err)
-
-	p, err := NewProver(cfg, id)
-	req.NoError(err)
-	proof, proofMetadata, err := p.GenerateProof(id)
-	req.NoError(err)
-	err = Validate(id, proof, proofMetadata)
-	req.NoError(err)
-
-	err = init.Reset()
-	req.NoError(err)
-}
-
-func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
-	p, err := NewProver(cfg, id)
-	r.NoError(err)
-	p.SetLogger(log.AppLog)
-
-	proof, proofMetadata, err := p.GenerateProof(id)
-	r.NoError(err)
-
-	err = Validate(id, proof, proofMetadata)
-	r.NoError(err)
 }
 
 //func TestValidate2(t *testing.T) {
@@ -148,7 +142,7 @@ func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
 //
 //	v, err := NewValidator(&newCfg)
 //	r.NoError(err)
-//	err = v.Validate(id, proof)
+//	err = v.Verify(id, proof)
 //	r.Nil(err)
 //
 //	testGenerateProof(r, id, &newCfg)
@@ -170,7 +164,7 @@ func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
 //
 //	v, err := NewValidator(&newCfg)
 //	r.NoError(err)
-//	err = v.Validate(id, proof)
+//	err = v.Verify(id, proof)
 //	r.Nil(err)
 //
 //	testGenerateProof(r, id, &newCfg)
@@ -192,7 +186,7 @@ func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
 //
 //	v, err := NewValidator(&newCfg)
 //	r.NoError(err)
-//	err = v.Validate(id, proof)
+//	err = v.Verify(id, proof)
 //	r.Nil(err)
 //
 //	testGenerateProof(r, id, &newCfg)
@@ -247,7 +241,7 @@ func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
 //
 //	v, err := NewValidator(cfg)
 //	r.NoError(err)
-//	err = v.Validate(wrongIdentity, proof)
+//	err = v.Verify(wrongIdentity, proof)
 //	r.EqualError(err, "validation failed: label at index 91 should be 01101111, but found 00011101")
 //
 //	err = init.Reset()
@@ -266,7 +260,7 @@ func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
 //
 //	v, err := NewValidator(cfg)
 //	r.NoError(err)
-//	err = v.Validate(id, proof)
+//	err = v.Verify(id, proof)
 //	r.EqualError(err, "validation failed: merkle root mismatch")
 //
 //	err = init.Reset()
@@ -286,7 +280,7 @@ func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
 //
 //	v, err := NewValidator(cfg)
 //	r.NoError(err)
-//	err = v.Validate(id, proof)
+//	err = v.Verify(id, proof)
 //	r.EqualError(err, "validation failed: merkle root mismatch")
 //
 //	err = init.Reset()
@@ -305,7 +299,7 @@ func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
 //
 //	v, err := NewValidator(cfg)
 //	r.NoError(err)
-//	err = v.Validate(id, proof)
+//	err = v.Verify(id, proof)
 //	r.EqualError(err, "validation failed: number of derived leaf indices (4) doesn't match number of included proven leaves (3)")
 //
 //	err = init.Reset()
@@ -325,7 +319,7 @@ func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
 //
 //	v, err := NewValidator(cfg)
 //	r.NoError(err)
-//	err = v.Validate(id, proof)
+//	err = v.Verify(id, proof)
 //	r.EqualError(err, "validation failed: merkle root mismatch")
 //
 //	err = init.Reset()
@@ -344,7 +338,7 @@ func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
 //
 //	v, err := NewValidator(cfg)
 //	r.NoError(err)
-//	err = v.Validate(id, proof)
+//	err = v.Verify(id, proof)
 //	r.EqualError(err, "validation failed: merkle root mismatch")
 //
 //	err = init.Reset()
@@ -364,14 +358,9 @@ func testGenerateProof(r *require.Assertions, id []byte, cfg *Config) {
 //
 //	v, err := NewValidator(cfg)
 //	r.NoError(err)
-//	err = v.Validate(id, proof)
+//	err = v.Verify(id, proof)
 //	r.EqualError(err, "validation failed: merkle root mismatch")
 //
 //	err = init.Reset()
 //	r.NoError(err)
 //}
-
-func hexDecode(hexStr string) []byte {
-	node, _ := hex.DecodeString(hexStr)
-	return node
-}

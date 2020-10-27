@@ -15,13 +15,12 @@ type Label []byte
 func TestLabelsReaderAndWriter(t *testing.T) {
 	req := require.New(t)
 
-	id := make([]byte, 32)
 	labelGroups := genLabelGroups(labelSize)
 	writtenLabels := make([]Label, 0)
 	datadir, _ := ioutil.TempDir("", "post-test")
 
 	for i, labelGroup := range labelGroups {
-		writer, err := NewLabelsWriter(datadir, id, i, labelSize)
+		writer, err := NewLabelsWriter(datadir, i, labelSize)
 		req.NoError(err)
 
 		for _, label := range labelGroup {
@@ -35,7 +34,7 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 		req.NoError(err)
 	}
 
-	reader, err := NewLabelsReader(datadir, id, labelSize)
+	reader, err := NewLabelsReader(datadir, labelSize)
 	req.NoError(err)
 
 	readLabels := make([]Label, len(writtenLabels))
@@ -49,7 +48,7 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 	p := make([]byte, labelSize/8)
 	_, err = reader.Read(p)
 	req.Equal(io.EOF, err)
-	req.Nil(p)
+	req.Equal(p, make([]byte, labelSize/8)) // empty.
 
 	req.EqualValues(writtenLabels, readLabels)
 

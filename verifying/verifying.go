@@ -1,4 +1,4 @@
-package validation
+package verifying
 
 import (
 	"bytes"
@@ -20,11 +20,11 @@ var (
 	FastOracle    = oracle.FastOracle
 )
 
-// Validate ensures the validity of the given proof. It returns nil if the proof is valid or an error describing the
+// Verify ensures the validity of the given proof. It returns nil if the proof is valid or an error describing the
 // failure, otherwise.
-func Validate(id []byte, p *proving.Proof, m *proving.ProofMetadata) error {
-	if len(id) != 32 {
-		return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(id))
+func Verify(p *proving.Proof, m *proving.ProofMetadata) error {
+	if len(m.ID) != 32 {
+		return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(m.ID))
 	}
 
 	var indexBitSize = uint(shared.NumBits(m.NumLabels))
@@ -48,7 +48,7 @@ func Validate(id []byte, p *proving.Proof, m *proving.ProofMetadata) error {
 		}
 		indicesSet[index] = true
 
-		label := WorkOracleOne(initialization.CPUProviderID(), id, index, uint32(m.LabelSize))
+		label := WorkOracleOne(initialization.CPUProviderID(), m.ID, index, uint32(m.LabelSize))
 		hash := FastOracle(m.Challenge, p.Nonce, label)
 		hashNum := binary.LittleEndian.Uint64(hash[:])
 		if hashNum > difficulty {

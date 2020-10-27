@@ -8,14 +8,8 @@ import (
 )
 
 const (
-	// In bytes. 1 peta-byte of storage.
-	// This would protect against number of labels uint64 overflow as well,
-	// since the number of labels per byte can be 8 at most (3 extra left bit shifts).
-	MaxDataSize      = 1 << 50
-	MaxNumLabels     = 1<<54 - 1 // TODO: FIX (after API changes)
+	MaxNumLabels     = 1 << 50
 	MinFileNumLabels = 32
-
-	MinFileDataSize = 32
 
 	MaxNumFiles = 256
 	MinNumFiles = 1
@@ -55,9 +49,8 @@ type Config struct {
 
 // TODO(moshababo): add tests for all cases
 func (cfg *Config) Validate() error {
-	dataSize := shared.DataSize(cfg.NumLabels, cfg.LabelSize)
-	if dataSize > MaxDataSize {
-		return fmt.Errorf("invalid data size; expected: <= %d, given: %d", MaxDataSize, dataSize)
+	if cfg.NumLabels > MaxNumLabels {
+		return fmt.Errorf("invalid `NumLabels`; expected: <= %d, given: %d", MaxNumLabels, cfg.NumLabels)
 	}
 
 	if !shared.IsPowerOfTwo(uint64(cfg.NumFiles)) {
@@ -84,15 +77,22 @@ func (cfg *Config) Validate() error {
 		return fmt.Errorf("invalid `NumLabels`; expected: evenly divisible by `NumFiles` (%v), given: %d", cfg.NumFiles, cfg.NumLabels)
 	}
 
-	// (ComputeBatchSize%8 == 0) will guarantee that labels writing is in byte-granularity, regardless of LabelSize.
+	fileNumLabels := cfg.NumLabels / uint64(cfg.NumFiles)
+	if fileNumLabels < MinFileNumLabels {
+		return fmt.Errorf("invalid file number of labels; expected: >= %d, given: %d", MinFileNumLabels, fileNumLabels)
+	}
+
+	// Divisibility by 8 will guarantee that writing to disk, and in addition file truncating,
+	// is byte-granular, regardless of LabelSize.
 	if cfg.ComputeBatchSize%8 != 0 {
 		return fmt.Errorf("invalid `ComputeBatchSize`; expected: evenly divisible by 8, given: %d", cfg.ComputeBatchSize)
 	}
-
-	fileNumLabels := cfg.NumLabels / uint64(cfg.NumFiles)
-	fileDataSize := shared.DataSize(fileNumLabels, cfg.LabelSize)
-	if fileDataSize < MinFileDataSize {
-		return fmt.Errorf("invalid file data size; expected: >= %d, given: %d", MinFileDataSize, fileDataSize)
+	lastComputeBatchSize := fileNumLabels % uint64(cfg.ComputeBatchSize)
+	if lastComputeBatchSize%8 != 0 {
+		return fmt.Errorf("invalid last batch size; expected: evenly divisible by 8, given: %d", lastComputeBatchSize)
+	}
+	if fileNumLabels%8 != 0 {
+		return fmt.Errorf("invalid file number of labels; expected: evenly divisible by 8, given: %d", fileNumLabels)
 	}
 
 	if res := shared.Uint64MulOverflow(cfg.NumLabels, uint64(cfg.K1)); res {

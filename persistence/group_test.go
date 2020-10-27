@@ -15,7 +15,7 @@ func TestGroup(t *testing.T) {
 	labels := genLabels(9, labelSize)
 
 	// Split the labels into 3 separate writers.
-	writers := make([]Writer, 3)
+	writers := make([]*sliceWriter, 3)
 	slices := make([][][]byte, 3)
 	writers[0] = newSliceWriter(&slices[0], labelSize)
 	writers[1] = newSliceWriter(&slices[1], labelSize)
@@ -38,7 +38,7 @@ func TestGroup(t *testing.T) {
 	reader, err := Group(readers)
 	r.NoError(err)
 
-	width, err := reader.Width()
+	width, err := reader.NumLabels()
 	r.NoError(err)
 	r.Equal(width, uint64(len(labels)))
 
@@ -53,7 +53,7 @@ func TestGroup(t *testing.T) {
 	p := make([]byte, labelSize/8)
 	_, err = reader.Read(p)
 	r.Equal(err, io.EOF)
-	r.Nil(p)
+	r.Equal(p, make([]byte, labelSize/8)) // empty.
 
 	err = reader.Close()
 	r.NoError(err)
@@ -66,7 +66,7 @@ func TestGroupWithShorterLastLayer(t *testing.T) {
 	labels := genLabels(7, labelSize)
 
 	// Split the labels into 3 separate writers.
-	writers := make([]Writer, 3)
+	writers := make([]*sliceWriter, 3)
 	slices := make([][][]byte, 3)
 	writers[0] = newSliceWriter(&slices[0], labelSize)
 	writers[1] = newSliceWriter(&slices[1], labelSize)
@@ -87,7 +87,7 @@ func TestGroupWithShorterLastLayer(t *testing.T) {
 	reader, err := Group(readers)
 	r.NoError(err)
 
-	width, err := reader.Width()
+	width, err := reader.NumLabels()
 	r.NoError(err)
 	r.Equal(width, uint64(len(labels)))
 
@@ -103,7 +103,7 @@ func TestGroupWithShorterLastLayer(t *testing.T) {
 	p := make([]byte, labelSize/8)
 	_, err = reader.Read(p)
 	r.Equal(err, io.EOF)
-	r.Nil(p)
+	r.Equal(p, make([]byte, labelSize/8)) // empty.
 
 	err = reader.Close()
 	r.NoError(err)
@@ -114,7 +114,7 @@ func TestGroupWithShorterLastLayer(t *testing.T) {
 	readers[1] = newSliceReader(slices[1], labelSize)
 	readers[2] = newSliceReader([][]byte{}, labelSize)
 	_, err = Group(readers)
-	r.EqualError(err, "0 width readers are not allowed")
+	r.EqualError(err, "0 labels readers are not allowed")
 }
 
 func TestGroupWithShorterMidReader(t *testing.T) {
@@ -124,7 +124,7 @@ func TestGroupWithShorterMidReader(t *testing.T) {
 	labels := genLabels(7, labelSize)
 
 	// Split the labels into 3 separate writers.
-	writers := make([]Writer, 3)
+	writers := make([]*sliceWriter, 3)
 	slices := make([][][]byte, 3)
 	writers[0] = newSliceWriter(&slices[0], labelSize)
 	writers[1] = newSliceWriter(&slices[1], labelSize)
@@ -143,7 +143,7 @@ func TestGroupWithShorterMidReader(t *testing.T) {
 	readers[1] = newSliceReader(slices[1], labelSize)
 	readers[2] = newSliceReader(slices[2], labelSize)
 	_, err := Group(readers)
-	r.EqualError(err, "readers width mismatch")
+	r.EqualError(err, "readers' number of labels mismatch")
 }
 
 func genLabels(num int, labelSize uint) [][]byte {
@@ -165,9 +165,6 @@ type sliceWriter struct {
 	position uint64
 	itemSize uint
 }
-
-// A compile time check to ensure that sliceWriter fully implements the Writer interface.
-var _ Writer = (*sliceWriter)(nil)
 
 func newSliceWriter(slice *[][]byte, itemSize uint) *sliceWriter {
 	return &sliceWriter{
@@ -214,7 +211,7 @@ func (s *sliceReader) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func (s *sliceReader) Width() (uint64, error) {
+func (s *sliceReader) NumLabels() (uint64, error) {
 	return uint64(len(s.slice)), nil
 }
 

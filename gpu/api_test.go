@@ -41,7 +41,7 @@ func TestScryptPositions(t *testing.T) {
 		if prevOutput == nil {
 			prevOutput = output
 		} else {
-			req.Equal(prevOutput, output, fmt.Sprintf("not equal: provider: %v, hashLenBits: %v", p.Model, hashLenBits))
+			req.Equal(prevOutput, output, fmt.Sprintf("not equal: provider: %+v, hashLenBits: %v", p, hashLenBits))
 		}
 	}
 }
@@ -50,7 +50,7 @@ func TestScryptPositions(t *testing.T) {
 func TestScryptPositions_HashLenBits(t *testing.T) {
 	req := require.New(t)
 	if testing.Short() {
-		t.Skip("skipping test in short mode.")
+		t.Skip("long test")
 	}
 
 	providers := Providers()
@@ -65,14 +65,14 @@ func TestScryptPositions_HashLenBits(t *testing.T) {
 			req.NotNil(output)
 
 			if *debug {
-				fmt.Printf("provider: %v, len: %v, hs: %v\n", p.Model, hashLenBits, hs)
+				fmt.Printf("provider: %+v, len: %v, hs: %v\n", p, hashLenBits, hs)
 			}
 
 			// Assert that output content is equal between different providers.
 			if prevOutput == nil {
 				prevOutput = output
 			} else {
-				req.Equal(prevOutput, output, fmt.Sprintf("not equal: provider: %v, hashLenBits: %v", p.Model, hashLenBits))
+				req.Equal(prevOutput, output, fmt.Sprintf("not equal: provider: %+v, hashLenBits: %v", p, hashLenBits))
 			}
 		}
 	}

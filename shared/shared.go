@@ -14,17 +14,17 @@ var (
 )
 
 func DataSize(numLabels uint64, labelSize uint) uint64 {
-	dataSizeBits := numLabels * uint64(labelSize)
-	dataSize := dataSizeBits / 8
-	if dataSizeBits%8 > 0 {
+	dataBitSize := numLabels * uint64(labelSize)
+	dataSize := dataBitSize / 8
+	if dataBitSize%8 > 0 {
 		dataSize++
 	}
 	return dataSize
 }
 
 func NumLabels(dataSize uint64, labelSize uint) uint64 {
-	dataSizeBits := dataSize * 8
-	return dataSizeBits / uint64(labelSize)
+	dataBitSize := dataSize * 8
+	return dataBitSize / uint64(labelSize)
 }
 
 func ProvingDifficulty(numLabels uint64, k1 uint64) uint64 {

@@ -43,6 +43,7 @@ func (p *Proof) Decode(data []byte) error {
 }
 
 type ProofMetadata struct {
+	ID        []byte
 	Challenge Challenge
 	NumLabels uint64
 	LabelSize uint

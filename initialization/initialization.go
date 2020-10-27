@@ -12,7 +12,6 @@ import (
 	"github.com/spacemeshos/post/shared"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"sync"
 	"time"
@@ -30,61 +29,23 @@ var (
 	ErrAlreadyInitializing          = errors.New("already initializing")
 	ErrCannotResetWhileInitializing = errors.New("cannot reset while initializing")
 	ErrStopped                      = errors.New("stopped")
-
-	ErrStateMetadataFileMissing = errors.New("metadata file missing")
-	ErrStateInconsistent        = errors.New("inconsistent state")
+	ErrStateMetadataFileMissing     = errors.New("metadata file is missing")
 )
 
-type configMismatchError struct {
-	param    string
-	expected string
-	found    string
-	datadir  string
+type ConfigMismatchError struct {
+	Param    string
+	Expected string
+	Found    string
+	Datadir  string
 }
 
-func (err configMismatchError) Error() string {
+func (err ConfigMismatchError) Error() string {
 	return fmt.Sprintf("`%v` config mismatch; expected: %v, found: %v, datadir: %v",
-		err.param, err.expected, err.found, err.datadir)
-}
-
-type unexpectedFileSize struct {
-	expected string
-	found    string
-	filename string
-}
-
-func (err unexpectedFileSize) Error() string {
-	return fmt.Sprintf("unexpected file size; expected: %v, found: %v, filename: %v",
-		err.expected, err.found, err.filename)
+		err.Param, err.Expected, err.Found, err.Datadir)
 }
 
 type DiskState struct {
-	InitState    initState
-	BytesWritten uint64
-}
-
-type initState int
-
-const (
-	InitStateNotStarted initState = 1 + iota
-	InitStateCompleted
-	InitStateStopped
-	InitStateCrashed
-)
-
-func (s initState) String() string {
-	switch s {
-	case InitStateNotStarted:
-		return "not started"
-	case InitStateCompleted:
-		return "completed"
-	case InitStateStopped:
-		return "stopped"
-	case InitStateCrashed:
-		return "crashed"
-	default:
-		panic("unreachable")
-	}
+	NumLabelsWritten uint64
 }
 
 var (
@@ -166,32 +127,27 @@ func (init *Initializer) Initialize(computeProviderID uint) error {
 		}
 	}()
 
-	if err := init.VerifyInitAllowed(); err != nil {
+	if numLabelsWritten, err := init.NumLabelsWritten(); err != nil {
 		return err
+	} else if numLabelsWritten > 0 {
+		if err := init.VerifyMetadata(); err != nil {
+			return err
+		}
 	}
 
-	if err := init.SaveMetadata(MetadataInitStateStarted); err != nil {
+	if err := init.SaveMetadata(); err != nil {
 		return err
 	}
 
 	fileNumLabels := init.cfg.NumLabels / uint64(init.cfg.NumFiles)
 
-	init.logger.Info("initialization: starting to write %v file(s); numLabels: %v, fileNumLabels: %v, labelSize: %v, computeBatchSize: %v, datadir: %v",
+	init.logger.Info("initialization: starting to write %v file(s); number of labels: %v, number of labels per file: %v, label bit size: %v, compute batch size: %v, datadir: %v",
 		init.cfg.NumFiles, init.cfg.NumLabels, fileNumLabels, init.cfg.LabelSize, init.cfg.ComputeBatchSize, init.cfg.DataDir)
 
 	for i := 0; i < int(init.cfg.NumFiles); i++ {
 		if err := init.initFile(computeProviderID, i, fileNumLabels); err != nil {
-			if err == ErrStopped {
-				if err := init.SaveMetadata(MetadataInitStateStopped); err != nil {
-					return err
-				}
-			}
 			return err
 		}
-	}
-
-	if err := init.SaveMetadata(MetadataInitStateCompleted); err != nil {
-		return err
 	}
 
 	return nil
@@ -238,7 +194,7 @@ func (init *Initializer) Reset() error {
 	}
 
 	for _, file := range files {
-		if init.isInitFile(file) || file.Name() == metadataFileName {
+		if shared.IsInitFile(file) || file.Name() == metadataFileName {
 			path := filepath.Join(init.cfg.DataDir, file.Name())
 			if err := os.Remove(path); err != nil {
 				return fmt.Errorf("failed to delete file (%v): %v", path, err)
@@ -250,12 +206,12 @@ func (init *Initializer) Reset() error {
 }
 
 func (init *Initializer) VerifyStarted() error {
-	state, err := init.DiskState()
+	numLabelsWritten, err := init.NumLabelsWritten()
 	if err != nil {
 		return err
 	}
 
-	if state.InitState == InitStateNotStarted {
+	if numLabelsWritten == 0 {
 		return shared.ErrInitNotStarted
 	}
 
@@ -263,75 +219,69 @@ func (init *Initializer) VerifyStarted() error {
 }
 
 func (init *Initializer) VerifyNotCompleted() error {
-	diskState, err := init.DiskState()
+	numLabelsWritten, err := init.NumLabelsWritten()
 	if err != nil {
 		return err
 	}
 
-	if diskState.InitState == InitStateCompleted {
+	if numLabelsWritten == init.cfg.NumLabels {
 		return shared.ErrInitCompleted
-
 	}
 
 	return nil
 }
 
 func (init *Initializer) VerifyCompleted() error {
-	diskState, err := init.DiskState()
+	numLabelsWritten, err := init.NumLabelsWritten()
 	if err != nil {
 		return err
 	}
 
-	if diskState.InitState != InitStateCompleted {
-		return fmt.Errorf("initialization not completed; state: %s, datadir: %v", diskState.InitState, init.cfg.DataDir)
+	if numLabelsWritten != init.cfg.NumLabels {
+		return shared.ErrInitNotCompleted
 	}
 
 	return nil
 }
 
-func (init *Initializer) VerifyInitAllowed() error {
-	diskState, err := init.DiskState()
-	if err != nil {
-		return err
-	}
+func (init *Initializer) initFile(computeProviderID uint, fileIndex int, fileNumLabels uint64) error {
+	fileOffset := uint64(fileIndex) * fileNumLabels
+	fileTargetPosition := fileOffset + fileNumLabels
+	batchSize := init.cfg.ComputeBatchSize
 
-	if diskState.InitState == InitStateCompleted {
-		return shared.ErrInitCompleted
-	}
-
-	return nil
-}
-
-func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabelsPerFile uint64) error {
 	// Initialize the labels file writer.
-	writer, err := persistence.NewLabelsWriter(init.cfg.DataDir, init.id, fileIndex, init.cfg.LabelSize)
+	writer, err := persistence.NewLabelsWriter(init.cfg.DataDir, fileIndex, init.cfg.LabelSize)
 	if err != nil {
 		return err
 	}
 
-	// Potentially perform recovery procedure; continue to initialize from latest position.
-	existingWidth, err := writer.Width()
+	numLabelsWritten, err := writer.NumLabelsWritten()
 	if err != nil {
 		return err
 	}
 
-	if existingWidth > 0 {
-		if existingWidth > numLabelsPerFile {
-			return ErrStateInconsistent
-		}
-
-		if existingWidth == numLabelsPerFile {
+	if numLabelsWritten > 0 {
+		if numLabelsWritten == fileNumLabels {
+			init.logger.Info("initialization: file #%v already initialized; number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileOffset)
+			init.updateProgress(float64(fileTargetPosition) / float64(init.cfg.NumLabels))
 			return nil
 		}
 
-		init.logger.Debug("initialization recovery: start writing file %v, position: %v, number of missing labels: %v", fileIndex, existingWidth, numLabelsPerFile-existingWidth)
+		if numLabelsWritten > fileNumLabels {
+			init.logger.Info("initialization: truncating file #%v; current number of labels: %v, target number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileNumLabels, fileOffset)
+			if err := writer.Truncate(fileNumLabels); err != nil {
+				return err
+			}
+			init.updateProgress(float64(fileTargetPosition) / float64(init.cfg.NumLabels))
+			return nil
+		}
+
+		init.logger.Info("initialization: continuing to write file #%v; current number of labels: %v, target number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileNumLabels, fileOffset)
 	} else {
-		init.logger.Debug("initialization: starting to write file #%v; numLabels: %v", fileIndex, numLabelsPerFile)
+		init.logger.Info("initialization: starting to write file #%v; target number of labels: %v, start position: %v", fileIndex, fileNumLabels, fileOffset)
 	}
 
-	fileOffset := uint64(fileIndex) * numLabelsPerFile
-	currentPosition := existingWidth
-	batchSize := init.cfg.ComputeBatchSize
+	currentPosition := numLabelsWritten
 	outputChan := make(chan []byte, 1024)
 	computeErr := make(chan error, 1)
 	ioError := make(chan error, 1)
@@ -345,7 +295,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 			close(outputChan)
 			wg.Done()
 		}()
-		for currentPosition < numLabelsPerFile {
+		for currentPosition < fileNumLabels {
 			select {
 			case <-init.stopChan:
 				init.logger.Info("initialization: stopped")
@@ -357,7 +307,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 			}
 
 			// The last batch might need to be smaller.
-			remaining := uint(numLabelsPerFile - currentPosition)
+			remaining := uint(fileNumLabels - currentPosition)
 			if remaining < batchSize {
 				batchSize = remaining
 			}
@@ -375,9 +325,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 			outputChan <- output
 			currentPosition += uint64(batchSize)
 
-			if init.progressChan != nil {
-				init.progressChan <- float64(fileOffset+currentPosition) / float64(init.cfg.NumLabels)
-			}
+			init.updateProgress(float64(fileOffset+currentPosition) / float64(init.cfg.NumLabels))
 		}
 	}()
 
@@ -409,114 +357,103 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 	default:
 	}
 
-	info, err := writer.Close()
+	numLabelsWritten, err = writer.NumLabelsWritten()
 	if err != nil {
 		return err
 	}
 
-	init.logger.Info("initialization: file #%v completed; bytes written: %v", fileIndex, (*info).Size())
+	init.logger.Info("initialization: file #%v completed; number of labels written: %v", fileIndex, numLabelsWritten)
 
 	return nil
 }
 
-func (init *Initializer) DiskState() (*DiskState, error) {
+func (init *Initializer) updateProgress(pct float64) {
+	if init.progressChan != nil {
+		init.progressChan <- pct
+	}
+}
+
+func (init *Initializer) VerifyMetadata() error {
+	metadata, err := init.LoadMetadata()
+	if err != nil {
+		return err
+	}
+
+	if bytes.Compare(init.id, metadata.ID) != 0 {
+		return ConfigMismatchError{
+			Param:    "ID",
+			Expected: fmt.Sprintf("%x", init.id),
+			Found:    fmt.Sprintf("%x", metadata.ID),
+			Datadir:  init.cfg.DataDir,
+		}
+	}
+
+	if init.cfg.LabelSize != metadata.LabelSize {
+		return ConfigMismatchError{
+			Param:    "LabelSize",
+			Expected: fmt.Sprintf("%d", init.cfg.LabelSize),
+			Found:    fmt.Sprintf("%d", metadata.LabelSize),
+			Datadir:  init.cfg.DataDir,
+		}
+	}
+
+	if init.cfg.NumFiles != metadata.NumFiles {
+		return ConfigMismatchError{
+			Param:    "NumFiles",
+			Expected: fmt.Sprintf("%d", init.cfg.NumFiles),
+			Found:    fmt.Sprintf("%d", metadata.NumFiles),
+			Datadir:  init.cfg.DataDir,
+		}
+	}
+
+	// `NumLabels` alternation isn't supported (yet) for `NumFiles` > 1.
+	if init.cfg.NumLabels != metadata.NumLabels && init.cfg.NumFiles > 1 {
+		return ConfigMismatchError{
+			Param:    "NumLabels",
+			Expected: fmt.Sprintf("%d", init.cfg.NumLabels),
+			Found:    fmt.Sprintf("%d", metadata.NumLabels),
+			Datadir:  init.cfg.DataDir,
+		}
+	}
+
+	return nil
+}
+
+func (init *Initializer) NumLabelsWritten() (uint64, error) {
 	files, err := ioutil.ReadDir(init.cfg.DataDir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &DiskState{InitStateNotStarted, 0}, nil
+			return 0, nil
 		}
-		return nil, err
+		return 0, err
 	}
 
 	initFiles := make([]os.FileInfo, 0)
 	for _, file := range files {
-		if init.isInitFile(file) {
+		if shared.IsInitFile(file) {
 			initFiles = append(initFiles, file)
 		}
 	}
 
-	metadata, err := init.LoadMetadata()
-	if err != nil {
-		if err == ErrStateMetadataFileMissing && len(initFiles) == 0 {
-			return &DiskState{InitStateNotStarted, 0}, nil
-		}
-		return nil, err
+	if len(initFiles) == 0 {
+		return 0, nil
 	}
 
-	if bytes.Compare(init.id, metadata.ID) != 0 {
-		return nil, configMismatchError{
-			param:    "id",
-			expected: fmt.Sprintf("%x", init.id),
-			found:    fmt.Sprintf("%x", metadata.ID),
-			datadir:  init.cfg.DataDir,
-		}
-	}
-
-	if init.cfg.NumFiles != metadata.Cfg.NumFiles {
-		return nil, configMismatchError{
-			param:    "NumFiles",
-			expected: fmt.Sprintf("%d", init.cfg.NumFiles),
-			found:    fmt.Sprintf("%d", metadata.Cfg.NumFiles),
-			datadir:  init.cfg.DataDir,
-		}
-	}
-
-	if init.cfg.LabelSize != metadata.Cfg.LabelSize {
-		return nil, configMismatchError{
-			param:    "LabelSize",
-			expected: fmt.Sprintf("%d", init.cfg.LabelSize),
-			found:    fmt.Sprintf("%d", metadata.Cfg.LabelSize),
-			datadir:  init.cfg.DataDir,
-		}
-	}
-
-	fileNumLabels := init.cfg.NumLabels / uint64(init.cfg.NumFiles)
-	fileDataSize := shared.DataSize(fileNumLabels, init.cfg.LabelSize)
 	var bytesWritten uint64
 	for _, file := range initFiles {
-		fileSize := uint64(file.Size())
-		if fileSize > fileDataSize {
-			return nil, unexpectedFileSize{
-				expected: fmt.Sprintf("<= %d", fileDataSize),
-				found:    fmt.Sprintf("%d", fileSize),
-				filename: path.Join(init.cfg.DataDir, file.Name()),
-			}
-		}
-		if metadata.State == MetadataInitStateCompleted && fileSize < fileDataSize {
-			return nil, unexpectedFileSize{
-				expected: fmt.Sprintf("%d", fileDataSize),
-				found:    fmt.Sprintf("%d", fileSize),
-				filename: path.Join(init.cfg.DataDir, file.Name()),
-			}
-		}
-		bytesWritten += uint64(fileSize)
+		bytesWritten += uint64(file.Size())
 	}
 
-	if metadata.State == MetadataInitStateCompleted {
-		return &DiskState{InitStateCompleted, bytesWritten}, nil
-	}
-
-	switch metadata.State {
-	case MetadataInitStateStopped:
-		return &DiskState{InitStateStopped, bytesWritten}, nil
-	case MetadataInitStateStarted:
-		if bytesWritten > 0 {
-			return &DiskState{InitStateCrashed, bytesWritten}, nil
-		} else {
-			return &DiskState{InitStateNotStarted, 0}, nil
-		}
-	default:
-		return nil, ErrStateInconsistent
-	}
+	return shared.NumLabels(bytesWritten, init.cfg.LabelSize), nil
 }
 
-func (init *Initializer) SaveMetadata(state metadataInitState) error {
+func (init *Initializer) SaveMetadata() error {
 	err := os.MkdirAll(init.cfg.DataDir, shared.OwnerReadWriteExec)
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("dir creation failure: %v", err)
 	}
 
-	data, err := json.Marshal(metadata{*init.cfg, init.id, state})
+	data, err := json.Marshal(metadata{ID: init.id, NumLabels: init.cfg.NumLabels, NumFiles: init.cfg.NumFiles, LabelSize: init.cfg.LabelSize})
 	if err != nil {
 		return fmt.Errorf("serialization failure: %v", err)
 	}
@@ -549,8 +486,4 @@ func (init *Initializer) LoadMetadata() (*metadata, error) {
 
 func (init *Initializer) SetLogger(logger Logger) {
 	init.logger = logger
-}
-
-func (init *Initializer) isInitFile(file os.FileInfo) bool {
-	return shared.IsInitFile(init.id, file)
 }
