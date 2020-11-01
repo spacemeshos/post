@@ -16,7 +16,7 @@ var (
 	options = uint32(0)
 )
 
-var debug = flag.Bool("debug", false, "Debug mode")
+var debug = flag.Bool("debug", false, "")
 
 // TestScryptPositions is an output correctness sanity test. It doesn't cover many cases.
 func TestScryptPositions(t *testing.T) {
