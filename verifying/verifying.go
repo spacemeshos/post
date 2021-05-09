@@ -27,13 +27,14 @@ func Verify(p *proving.Proof, m *proving.ProofMetadata) error {
 		return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(m.ID))
 	}
 
-	var indexBitSize = uint(shared.NumBits(m.NumLabels))
+	var numLabels = uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
+	var indexBitSize = uint(shared.NumBits(numLabels))
 	var expectedSize = shared.Size(indexBitSize, m.K2)
 	if expectedSize != uint(len(p.Indices)) {
 		return fmt.Errorf("invalid indices set size; expected %d, given: %d", expectedSize, len(p.Indices))
 	}
 
-	difficulty := shared.ProvingDifficulty(m.NumLabels, uint64(m.K1))
+	difficulty := shared.ProvingDifficulty(numLabels, uint64(m.K1))
 	buf := bytes.NewBuffer(p.Indices)
 	gsReader := shared.NewGranSpecificReader(buf, indexBitSize)
 	indicesSet := make(map[uint64]bool, m.K2)
@@ -48,7 +49,7 @@ func Verify(p *proving.Proof, m *proving.ProofMetadata) error {
 		}
 		indicesSet[index] = true
 
-		label := WorkOracleOne(initialization.CPUProviderID(), m.ID, index, uint32(m.LabelSize))
+		label := WorkOracleOne(initialization.CPUProviderID(), m.ID, index, uint32(m.BitsPerLabel))
 		hash := FastOracle(m.Challenge, p.Nonce, label)
 		hashNum := binary.LittleEndian.Uint64(hash[:])
 		if hashNum > difficulty {

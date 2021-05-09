@@ -11,10 +11,10 @@ type FileWriter struct {
 	file *os.File
 	buf  *bufio.Writer
 
-	labelBitSize uint
+	bitsPerLabel uint
 }
 
-func NewFileWriter(filename string, labelBitSize uint) (*FileWriter, error) {
+func NewFileWriter(filename string, bitsPerLabel uint) (*FileWriter, error) {
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, shared.OwnerReadWrite)
 	if err != nil {
 		return nil, err
@@ -22,7 +22,7 @@ func NewFileWriter(filename string, labelBitSize uint) (*FileWriter, error) {
 	return &FileWriter{
 		file:         f,
 		buf:          bufio.NewWriter(f),
-		labelBitSize: labelBitSize,
+		bitsPerLabel: bitsPerLabel,
 	}, nil
 }
 
@@ -45,11 +45,11 @@ func (w *FileWriter) NumLabelsWritten() (uint64, error) {
 		return 0, err
 	}
 
-	return uint64(info.Size()) * 8 / uint64(w.labelBitSize), nil
+	return uint64(info.Size()) * 8 / uint64(w.bitsPerLabel), nil
 }
 
 func (w *FileWriter) Truncate(numLabels uint64) error {
-	bitSize := numLabels * uint64(w.labelBitSize)
+	bitSize := numLabels * uint64(w.bitsPerLabel)
 	if bitSize%8 != 0 {
 		return fmt.Errorf("invalid `numLabels`; expected: evenly divisible by 8 (alone, or when multipled by `labelSize`), given: %d", numLabels)
 	}

@@ -73,12 +73,13 @@ func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, err
 				Indices: goodNonceResult.indices,
 			}
 			proofMetadata := &ProofMetadata{
-				ID:        p.id,
-				Challenge: challenge,
-				NumLabels: p.cfg.NumLabels,
-				LabelSize: p.cfg.LabelSize,
-				K1:        p.cfg.K1,
-				K2:        p.cfg.K2,
+				ID:            p.id,
+				Challenge:     challenge,
+				BitsPerLabel:  p.cfg.BitsPerLabel,
+				LabelsPerUnit: p.cfg.LabelsPerUnit,
+				NumUnits:      p.cfg.NumUnits,
+				K1:            p.cfg.K1,
+				K2:            p.cfg.K2,
 			}
 			return proof, proofMetadata, nil
 		}
@@ -105,9 +106,10 @@ func (p *Prover) VerifyGenerateProofAllowed() error {
 }
 
 func (p *Prover) tryNonce(ctx context.Context, ch Challenge, nonce uint32, readerChan <-chan []byte, difficulty uint64) ([]byte, error) {
-	var indexBitSize = uint(shared.NumBits(p.cfg.NumLabels))
-	var buf = bytes.NewBuffer(make([]byte, shared.Size(indexBitSize, p.cfg.K2))[0:0])
-	var gsWriter = shared.NewGranSpecificWriter(buf, indexBitSize)
+	var numLabels = uint64(p.cfg.NumUnits) * uint64(p.cfg.LabelsPerUnit)
+	var bitsPerIndex = uint(shared.NumBits(numLabels))
+	var buf = bytes.NewBuffer(make([]byte, shared.Size(bitsPerIndex, p.cfg.K2))[0:0])
+	var gsWriter = shared.NewGranSpecificWriter(buf, bitsPerIndex)
 	var index uint64
 	var passed uint
 	for {
@@ -146,13 +148,14 @@ func (p *Prover) tryNonce(ctx context.Context, ch Challenge, nonce uint32, reade
 }
 
 func (p *Prover) tryNonces(challenge Challenge, startNonce, endNonce uint32) (*nonceResult, error) {
-	difficulty := shared.ProvingDifficulty(p.cfg.NumLabels, uint64(p.cfg.K1))
+	var numLabels = uint64(p.cfg.NumUnits) * uint64(p.cfg.LabelsPerUnit)
+	var difficulty = shared.ProvingDifficulty(numLabels, uint64(p.cfg.K1))
 
-	reader, err := persistence.NewLabelsReader(p.cfg.DataDir, p.cfg.LabelSize)
+	reader, err := persistence.NewLabelsReader(p.cfg.DataDir, p.cfg.BitsPerLabel)
 	if err != nil {
 		return nil, err
 	}
-	gsReader := shared.NewGranSpecificReader(reader, p.cfg.LabelSize)
+	gsReader := shared.NewGranSpecificReader(reader, p.cfg.BitsPerLabel)
 
 	numWorkers := endNonce - startNonce + 1
 	var indices []byte

@@ -139,13 +139,14 @@ func (init *Initializer) Initialize(computeProviderID uint) error {
 		return err
 	}
 
-	fileNumLabels := init.cfg.NumLabels / uint64(init.cfg.NumFiles)
+	numLabels := uint64(init.cfg.NumUnits) * uint64(init.cfg.LabelsPerUnit)
+	fileNumLabels := numLabels / uint64(init.cfg.NumFiles)
 
-	init.logger.Info("initialization: starting to write %v file(s); number of labels: %v, number of labels per file: %v, label bit size: %v, compute batch size: %v, datadir: %v",
-		init.cfg.NumFiles, init.cfg.NumLabels, fileNumLabels, init.cfg.LabelSize, init.cfg.ComputeBatchSize, init.cfg.DataDir)
+	init.logger.Info("initialization: starting to write %v file(s); number of units: %v, number of labels per unit: %v, number of bits per label: %v, compute batch size: %v, datadir: %v",
+		init.cfg.NumFiles, init.cfg.NumUnits, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel, init.cfg.ComputeBatchSize, init.cfg.DataDir)
 
 	for i := 0; i < int(init.cfg.NumFiles); i++ {
-		if err := init.initFile(computeProviderID, i, fileNumLabels); err != nil {
+		if err := init.initFile(computeProviderID, i, numLabels, fileNumLabels); err != nil {
 			return err
 		}
 	}
@@ -205,13 +206,31 @@ func (init *Initializer) Reset() error {
 	return nil
 }
 
-func (init *Initializer) VerifyStarted() error {
+func (init *Initializer) Started() (bool, error) {
 	numLabelsWritten, err := init.NumLabelsWritten()
+	if err != nil {
+		return false, err
+	}
+
+	return numLabelsWritten > 0, nil
+}
+
+func (init *Initializer) Completed() (bool, error) {
+	numLabelsWritten, err := init.NumLabelsWritten()
+	if err != nil {
+		return false, err
+	}
+
+	target := uint64(init.cfg.NumUnits) * uint64(init.cfg.LabelsPerUnit)
+	return numLabelsWritten == target, nil
+}
+
+func (init *Initializer) VerifyStarted() error {
+	started, err := init.Started()
 	if err != nil {
 		return err
 	}
-
-	if numLabelsWritten == 0 {
+	if started == false {
 		return shared.ErrInitNotStarted
 	}
 
@@ -219,12 +238,11 @@ func (init *Initializer) VerifyStarted() error {
 }
 
 func (init *Initializer) VerifyNotCompleted() error {
-	numLabelsWritten, err := init.NumLabelsWritten()
+	completed, err := init.Completed()
 	if err != nil {
 		return err
 	}
-
-	if numLabelsWritten == init.cfg.NumLabels {
+	if completed == true {
 		return shared.ErrInitCompleted
 	}
 
@@ -232,25 +250,24 @@ func (init *Initializer) VerifyNotCompleted() error {
 }
 
 func (init *Initializer) VerifyCompleted() error {
-	numLabelsWritten, err := init.NumLabelsWritten()
+	completed, err := init.Completed()
 	if err != nil {
 		return err
 	}
-
-	if numLabelsWritten != init.cfg.NumLabels {
+	if completed == false {
 		return shared.ErrInitNotCompleted
 	}
 
 	return nil
 }
 
-func (init *Initializer) initFile(computeProviderID uint, fileIndex int, fileNumLabels uint64) error {
+func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabels uint64, fileNumLabels uint64) error {
 	fileOffset := uint64(fileIndex) * fileNumLabels
 	fileTargetPosition := fileOffset + fileNumLabels
 	batchSize := init.cfg.ComputeBatchSize
 
 	// Initialize the labels file writer.
-	writer, err := persistence.NewLabelsWriter(init.cfg.DataDir, fileIndex, init.cfg.LabelSize)
+	writer, err := persistence.NewLabelsWriter(init.cfg.DataDir, fileIndex, init.cfg.BitsPerLabel)
 	if err != nil {
 		return err
 	}
@@ -263,7 +280,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, fileNum
 	if numLabelsWritten > 0 {
 		if numLabelsWritten == fileNumLabels {
 			init.logger.Info("initialization: file #%v already initialized; number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileOffset)
-			init.updateProgress(float64(fileTargetPosition) / float64(init.cfg.NumLabels))
+			init.updateProgress(float64(fileTargetPosition) / float64(numLabels))
 			return nil
 		}
 
@@ -272,7 +289,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, fileNum
 			if err := writer.Truncate(fileNumLabels); err != nil {
 				return err
 			}
-			init.updateProgress(float64(fileTargetPosition) / float64(init.cfg.NumLabels))
+			init.updateProgress(float64(fileTargetPosition) / float64(numLabels))
 			return nil
 		}
 
@@ -317,7 +334,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, fileNum
 			// Calculate labels of the batch position range.
 			startPosition := fileOffset + currentPosition
 			endPosition := startPosition + uint64(batchSize) - 1
-			output, err := oracle.WorkOracle(computeProviderID, init.id, startPosition, endPosition, uint32(init.cfg.LabelSize))
+			output, err := oracle.WorkOracle(computeProviderID, init.id, startPosition, endPosition, uint32(init.cfg.BitsPerLabel))
 			if err != nil {
 				computeErr <- err
 				return
@@ -325,7 +342,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, fileNum
 			outputChan <- output
 			currentPosition += uint64(batchSize)
 
-			init.updateProgress(float64(fileOffset+currentPosition) / float64(init.cfg.NumLabels))
+			init.updateProgress(float64(fileOffset+currentPosition) / float64(numLabels))
 		}
 	}()
 
@@ -388,11 +405,20 @@ func (init *Initializer) VerifyMetadata() error {
 		}
 	}
 
-	if init.cfg.LabelSize != metadata.LabelSize {
+	if init.cfg.BitsPerLabel != metadata.BitsPerLabel {
 		return ConfigMismatchError{
-			Param:    "LabelSize",
-			Expected: fmt.Sprintf("%d", init.cfg.LabelSize),
-			Found:    fmt.Sprintf("%d", metadata.LabelSize),
+			Param:    "BitsPerLabel",
+			Expected: fmt.Sprintf("%d", init.cfg.BitsPerLabel),
+			Found:    fmt.Sprintf("%d", metadata.BitsPerLabel),
+			Datadir:  init.cfg.DataDir,
+		}
+	}
+
+	if init.cfg.LabelsPerUnit != metadata.LabelsPerUnit {
+		return ConfigMismatchError{
+			Param:    "LabelsPerUnit",
+			Expected: fmt.Sprintf("%d", init.cfg.LabelsPerUnit),
+			Found:    fmt.Sprintf("%d", metadata.LabelsPerUnit),
 			Datadir:  init.cfg.DataDir,
 		}
 	}
@@ -406,12 +432,12 @@ func (init *Initializer) VerifyMetadata() error {
 		}
 	}
 
-	// `NumLabels` alternation isn't supported (yet) for `NumFiles` > 1.
-	if init.cfg.NumLabels != metadata.NumLabels && init.cfg.NumFiles > 1 {
+	// `NumUnits` alternation isn't supported (yet) for `NumFiles` > 1.
+	if init.cfg.NumUnits != metadata.NumUnits && init.cfg.NumFiles > 1 {
 		return ConfigMismatchError{
-			Param:    "NumLabels",
-			Expected: fmt.Sprintf("%d", init.cfg.NumLabels),
-			Found:    fmt.Sprintf("%d", metadata.NumLabels),
+			Param:    "NumUnits",
+			Expected: fmt.Sprintf("%d", init.cfg.NumUnits),
+			Found:    fmt.Sprintf("%d", metadata.NumUnits),
 			Datadir:  init.cfg.DataDir,
 		}
 	}
@@ -420,6 +446,15 @@ func (init *Initializer) VerifyMetadata() error {
 }
 
 func (init *Initializer) NumLabelsWritten() (uint64, error) {
+	numBytesWritten, err := init.NumBytesWritten()
+	if err != nil {
+		return 0, err
+	}
+
+	return shared.NumLabels(numBytesWritten, init.cfg.BitsPerLabel), nil
+}
+
+func (init *Initializer) NumBytesWritten() (uint64, error) {
 	files, err := ioutil.ReadDir(init.cfg.DataDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -444,7 +479,7 @@ func (init *Initializer) NumLabelsWritten() (uint64, error) {
 		bytesWritten += uint64(file.Size())
 	}
 
-	return shared.NumLabels(bytesWritten, init.cfg.LabelSize), nil
+	return bytesWritten, nil
 }
 
 func (init *Initializer) SaveMetadata() error {
@@ -453,7 +488,13 @@ func (init *Initializer) SaveMetadata() error {
 		return fmt.Errorf("dir creation failure: %v", err)
 	}
 
-	data, err := json.Marshal(metadata{ID: init.id, NumLabels: init.cfg.NumLabels, NumFiles: init.cfg.NumFiles, LabelSize: init.cfg.LabelSize})
+	data, err := json.Marshal(metadata{
+		ID:            init.id,
+		BitsPerLabel:  init.cfg.BitsPerLabel,
+		LabelsPerUnit: init.cfg.LabelsPerUnit,
+		NumUnits:      init.cfg.NumUnits,
+		NumFiles:      init.cfg.NumFiles,
+	})
 	if err != nil {
 		return fmt.Errorf("serialization failure: %v", err)
 	}

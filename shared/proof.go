@@ -43,10 +43,11 @@ func (p *Proof) Decode(data []byte) error {
 }
 
 type ProofMetadata struct {
-	ID        []byte
-	Challenge Challenge
-	NumLabels uint64
-	LabelSize uint
-	K1        uint
-	K2        uint
+	ID            []byte
+	Challenge     Challenge
+	BitsPerLabel  uint
+	LabelsPerUnit uint
+	NumUnits      uint
+	K1            uint
+	K2            uint
 }

@@ -18,8 +18,8 @@ type Reader interface {
 // NewLabelsReader returns a new labels reader from the initialization files.
 // If the initialization was split into multiple files, they will be grouped
 // into one unified reader.
-func NewLabelsReader(datadir string, labelSize uint) (Reader, error) {
-	readers, err := GetReaders(datadir, labelSize)
+func NewLabelsReader(datadir string, bitsPerLabel uint) (Reader, error) {
+	readers, err := GetReaders(datadir, bitsPerLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func NewLabelsReader(datadir string, labelSize uint) (Reader, error) {
 	return Group(readers)
 }
 
-func GetReaders(datadir string, labelSize uint) ([]Reader, error) {
+func GetReaders(datadir string, bitsPerLabel uint) ([]Reader, error) {
 	files, err := ioutil.ReadDir(datadir)
 	if err != nil {
 		return nil, fmt.Errorf("initialization directory not found: %v", err)
@@ -53,7 +53,7 @@ func GetReaders(datadir string, labelSize uint) ([]Reader, error) {
 	// Initialize readers.
 	var readers []Reader
 	for _, file := range initFiles {
-		reader, err := NewFileReader(filepath.Join(datadir, file.Name()), labelSize)
+		reader, err := NewFileReader(filepath.Join(datadir, file.Name()), bitsPerLabel)
 		if err != nil {
 			return nil, err
 		}
@@ -63,11 +63,11 @@ func GetReaders(datadir string, labelSize uint) ([]Reader, error) {
 	return readers, nil
 }
 
-func NewLabelsWriter(datadir string, index int, labelSize uint) (*FileWriter, error) {
+func NewLabelsWriter(datadir string, index int, bitsPerLabel uint) (*FileWriter, error) {
 	if err := os.MkdirAll(datadir, shared.OwnerReadWriteExec); err != nil {
 		return nil, err
 	}
 
 	filename := filepath.Join(datadir, shared.InitFileName(index))
-	return NewFileWriter(filename, labelSize)
+	return NewFileWriter(filename, bitsPerLabel)
 }

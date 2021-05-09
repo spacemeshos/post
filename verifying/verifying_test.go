@@ -78,7 +78,7 @@ func TestLabelsCorrectness(t *testing.T) {
 	id := make([]byte, 32)
 	datadir, _ := ioutil.TempDir("", "post-test")
 
-	for labelSize := uint32(config.MinLabelSize); labelSize <= config.MaxLabelSize; labelSize++ {
+	for labelSize := uint32(config.MinBitsPerLabel); labelSize <= config.MaxBitsPerLabel; labelSize++ {
 		if *debug {
 			fmt.Printf("label size: %v\n", labelSize)
 		}

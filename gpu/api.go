@@ -19,9 +19,9 @@ func (p *ComputeProvider) Benchmark() (int, error) {
 	options := uint32(0)
 	hashLenBits := uint32(8)
 	startPosition := uint64(1)
-	endPosition := uint64(1 << 20)
+	endPosition := uint64(1 << 17)
 	if p.Model == "CPU" {
-		endPosition = uint64(1 << 15)
+		endPosition = uint64(1 << 14)
 	}
 
 	_, hashesPerSec, err := ScryptPositions(p.ID, id, salt, startPosition, endPosition, hashLenBits, options)
@@ -36,7 +36,7 @@ func Providers() []ComputeProvider {
 	return cGetProviders()
 }
 
-func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, labelSize uint32, options uint32) ([]byte, int, error) {
+func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, bitsPerLabel uint32, options uint32) ([]byte, int, error) {
 	if len(id) != 32 {
 		return nil, 0, fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(id))
 	}
@@ -45,9 +45,9 @@ func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPositio
 		return nil, 0, fmt.Errorf("invalid `salt` length; expected: 32, given: %v", len(salt))
 	}
 
-	if labelSize < config.MinLabelSize || labelSize > config.MaxLabelSize {
-		return nil, 0, fmt.Errorf("invalid `labelSize`; expected: %d-%d, given: %v",
-			config.MinLabelSize, config.MaxLabelSize, labelSize)
+	if bitsPerLabel < config.MinBitsPerLabel || bitsPerLabel > config.MaxBitsPerLabel {
+		return nil, 0, fmt.Errorf("invalid `bitsPerLabel`; expected: %d-%d, given: %v",
+			config.MinBitsPerLabel, config.MaxBitsPerLabel, bitsPerLabel)
 	}
 
 	// Wait for the stop flag clearance for avoiding a race condition which can
@@ -66,7 +66,7 @@ func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPositio
 	}
 
 	const n, r, p = 512, 1, 1
-	output, hashesPerSec, retVal := cScryptPositions(providerId, id, salt, startPosition, endPosition, labelSize, options, n, r, p)
+	output, hashesPerSec, retVal := cScryptPositions(providerId, id, salt, startPosition, endPosition, bitsPerLabel, options, n, r, p)
 	switch retVal {
 	case 0:
 		return output, hashesPerSec, nil
