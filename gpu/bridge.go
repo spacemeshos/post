@@ -69,7 +69,7 @@ func (s StopResult) String() string {
 	}
 }
 
-func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, labelSize uint32, options uint32, n, r, p uint32) ([]byte, int, int) {
+func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, labelSize uint32, options uint32, n, r, p uint32) ([]byte, uint64, int, int) {
 	mtx.Lock()
 	defer mtx.Unlock()
 
@@ -87,6 +87,9 @@ func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPositi
 	cN := C.uint(n)
 	cR := C.uint(r)
 	cP := C.uint(p)
+	d := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} // TODO: fix
+	cD := (*C.uchar)(GoBytes(d).CBytesClone().data)
+	var cIdxSolution C.uint64_t
 	var cHashesComputed C.uint64_t
 	var cHashesPerSec C.uint64_t
 
@@ -108,14 +111,17 @@ func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPositi
 		cN,
 		cR,
 		cP,
+		cD,
+		&cIdxSolution,
 		&cHashesComputed,
 		&cHashesPerSec,
 	)
 
 	// Output size could be smaller than anticipated if `C.stop` was called while `C.scryptPositions` was blocking.
 	outputSize = shared.DataSize(uint64(cHashesComputed), uint(labelSize))
+	output := cBytesCloneToGoBytes(cOut, int(outputSize))
 
-	return cBytesCloneToGoBytes(cOut, int(outputSize)), int(cHashesPerSec), int(retVal)
+	return output, uint64(cIdxSolution), int(cHashesPerSec), int(retVal)
 }
 
 func cGetProviders() []ComputeProvider {

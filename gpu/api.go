@@ -16,7 +16,7 @@ type ComputeProvider struct {
 func (p *ComputeProvider) Benchmark() (int, error) {
 	id := make([]byte, 32)
 	salt := make([]byte, 32)
-	options := uint32(0)
+	options := uint32(1)
 	hashLenBits := uint32(8)
 	startPosition := uint64(1)
 	endPosition := uint64(1 << 17)
@@ -24,29 +24,35 @@ func (p *ComputeProvider) Benchmark() (int, error) {
 		endPosition = uint64(1 << 14)
 	}
 
-	_, hashesPerSec, err := ScryptPositions(p.ID, id, salt, startPosition, endPosition, hashLenBits, options)
+	res, err := ScryptPositions(p.ID, id, salt, startPosition, endPosition, hashLenBits, options)
 	if err != nil {
 		return 0, err
 	}
 
-	return hashesPerSec, nil
+	return res.HashesPerSec, nil
 }
 
 func Providers() []ComputeProvider {
 	return cGetProviders()
 }
 
-func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, bitsPerLabel uint32, options uint32) ([]byte, int, error) {
+type ScryptPositionsResult struct {
+	Output       []byte
+	IdxSolution  uint64
+	HashesPerSec int
+}
+
+func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, bitsPerLabel uint32, options uint32) (*ScryptPositionsResult, error) {
 	if len(id) != 32 {
-		return nil, 0, fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(id))
+		return nil, fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(id))
 	}
 
 	if len(salt) != 32 {
-		return nil, 0, fmt.Errorf("invalid `salt` length; expected: 32, given: %v", len(salt))
+		return nil, fmt.Errorf("invalid `salt` length; expected: 32, given: %v", len(salt))
 	}
 
 	if bitsPerLabel < config.MinBitsPerLabel || bitsPerLabel > config.MaxBitsPerLabel {
-		return nil, 0, fmt.Errorf("invalid `bitsPerLabel`; expected: %d-%d, given: %v",
+		return nil, fmt.Errorf("invalid `bitsPerLabel`; expected: %d-%d, given: %v",
 			config.MinBitsPerLabel, config.MaxBitsPerLabel, bitsPerLabel)
 	}
 
@@ -60,18 +66,31 @@ func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPositio
 			break
 		}
 		if i == 20 {
-			return nil, 0, errors.New("stop flag clearance timeout")
+			return nil, errors.New("stop flag clearance timeout")
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 
 	const n, r, p = 512, 1, 1
-	output, hashesPerSec, retVal := cScryptPositions(providerId, id, salt, startPosition, endPosition, bitsPerLabel, options, n, r, p)
+	output, idxSolution, hashesPerSec, retVal := cScryptPositions(providerId, id, salt, startPosition, endPosition, bitsPerLabel, options, n, r, p)
+
 	switch retVal {
+	case 1:
+		panic("pow solution found") // TODO: handle
 	case 0:
-		return output, hashesPerSec, nil
+		return &ScryptPositionsResult{output, idxSolution, hashesPerSec}, nil
 	case -1:
-		return nil, 0, fmt.Errorf("invalid provider id: %v", providerId)
+		return nil, fmt.Errorf("gpu-post error")
+	case -2:
+		return nil, fmt.Errorf("gpu-post error: timeout")
+	case -3:
+		return nil, fmt.Errorf("gpu-post error: already stopped")
+	case -4:
+		return nil, fmt.Errorf("gpu-post error: canceled")
+	case -5:
+		return nil, fmt.Errorf("gpu-post error: no compute options")
+	case -6:
+		return nil, fmt.Errorf("gpu-post error: invalid param")
 	default:
 		panic("unreachable")
 	}

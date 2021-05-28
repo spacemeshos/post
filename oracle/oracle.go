@@ -13,24 +13,31 @@ type (
 
 func WorkOracle(computeProviderId uint, id []byte, startPosition, endPosition uint64, bitsPerLabel uint32) ([]byte, error) {
 	salt := make([]byte, 32) // TODO(moshababo): apply salt
-	options := uint32(0)
-	output, _, err := gpu.ScryptPositions(computeProviderId, id, salt, startPosition, endPosition, bitsPerLabel, options)
-	return output, err
+	options := uint32(1)
+
+	res, err := gpu.ScryptPositions(computeProviderId, id, salt, startPosition, endPosition, bitsPerLabel, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Output, nil
 }
 
 func WorkOracleOne(cpuProviderID uint, id []byte, position uint64, bitsPerLabel uint32) []byte {
 	salt := make([]byte, 32) // TODO(moshababo): apply salt
 	options := uint32(0)
-	output, _, _ := gpu.ScryptPositions(cpuProviderID, id, salt, position, position, bitsPerLabel, options)
-	return output
+
+	res, _ := gpu.ScryptPositions(cpuProviderID, id, salt, position, position, bitsPerLabel, options)
+	return res.Output
 
 	/*
 		// A template for an alternative Go implementation:
+
 		input := make([]byte, len(id)+binary.Size(position))
 		copy(input, id)
 		binary.LittleEndian.PutUint64(input[len(id):], position)
 		output := scrypt(input)
-		return output[:labelSize/8] // Must also include the last (labelSize%8) bits as an additional byte.
+		return output[:labelSize/8] // Must also include the last (bitsPerLabel%8) bits as an additional byte.
 	*/
 }
 
