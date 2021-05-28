@@ -37,8 +37,8 @@ const (
 	DefaultBitsPerLabel  = 8
 	DefaultLabelsPerUnit = 1 << 20
 
-	DefaultK1 = 1 << 10
-	DefaultK2 = 100
+	DefaultK1 = 2000
+	DefaultK2 = 1800
 )
 
 var (
@@ -51,7 +51,6 @@ type Config struct {
 	ComputeBatchSize uint   `mapstructure:"post-compute-batch-size"`
 
 	// Protocol params.
-	NumUnits      uint // REMOVE!!
 	BitsPerLabel  uint
 	LabelsPerUnit uint
 	MinNumUnits   uint
