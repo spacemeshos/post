@@ -1,7 +1,7 @@
 package shared
 
 import (
-	"github.com/spacemeshos/post/bitstream"
+	"github.com/spacemeshos/bitstream"
 	"io"
 )
 
