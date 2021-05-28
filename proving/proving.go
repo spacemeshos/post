@@ -54,13 +54,19 @@ func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, err
 		return nil, nil, err
 	}
 
+	metadata, err := p.LoadMetadata()
+	if err != nil {
+		return nil, nil, err
+	}
+	numLabels := uint64(metadata.NumUnits * p.cfg.LabelsPerUnit)
+
 	for i := 0; i < MaxIterations; i++ {
 		startNonce := uint32(i) * NumNoncesPerIteration
 		endNonce := startNonce + NumNoncesPerIteration - 1
 
 		p.logger.Debug("proving: starting iteration %d; startNonce: %v, endNonce: %v, challenge: %x", i+1, startNonce, endNonce, challenge)
 
-		goodNonceResult, err := p.tryNonces(challenge, startNonce, endNonce)
+		goodNonceResult, err := p.tryNonces(numLabels, challenge, startNonce, endNonce)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -77,7 +83,7 @@ func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, err
 				Challenge:     challenge,
 				BitsPerLabel:  p.cfg.BitsPerLabel,
 				LabelsPerUnit: p.cfg.LabelsPerUnit,
-				NumUnits:      p.cfg.NumUnits,
+				NumUnits:      metadata.NumUnits,
 				K1:            p.cfg.K1,
 				K2:            p.cfg.K2,
 			}
@@ -98,15 +104,28 @@ func (p *Prover) VerifyGenerateProofAllowed() error {
 		return err
 	}
 
-	if err := init.VerifyMetadata(); err != nil {
+	m, err := init.LoadMetadata()
+	if err != nil {
 		return err
 	}
 
-	return init.VerifyCompleted()
+	if err := init.VerifyMetadata(m); err != nil {
+		return err
+	}
+
+	return init.VerifyCompleted(m.NumUnits)
 }
 
-func (p *Prover) tryNonce(ctx context.Context, ch Challenge, nonce uint32, readerChan <-chan []byte, difficulty uint64) ([]byte, error) {
-	var numLabels = uint64(p.cfg.NumUnits) * uint64(p.cfg.LabelsPerUnit)
+func (p *Prover) LoadMetadata() (*initialization.Metadata, error) {
+	init, err := initialization.NewInitializer(p.cfg, p.id)
+	if err != nil {
+		return nil, err
+	}
+
+	return init.LoadMetadata()
+}
+
+func (p *Prover) tryNonce(ctx context.Context, numLabels uint64, ch Challenge, nonce uint32, readerChan <-chan []byte, difficulty uint64) ([]byte, error) {
 	var bitsPerIndex = uint(shared.NumBits(numLabels))
 	var buf = bytes.NewBuffer(make([]byte, shared.Size(bitsPerIndex, p.cfg.K2))[0:0])
 	var gsWriter = shared.NewGranSpecificWriter(buf, bitsPerIndex)
@@ -147,8 +166,7 @@ func (p *Prover) tryNonce(ctx context.Context, ch Challenge, nonce uint32, reade
 	}
 }
 
-func (p *Prover) tryNonces(challenge Challenge, startNonce, endNonce uint32) (*nonceResult, error) {
-	var numLabels = uint64(p.cfg.NumUnits) * uint64(p.cfg.LabelsPerUnit)
+func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, endNonce uint32) (*nonceResult, error) {
 	var difficulty = shared.ProvingDifficulty(numLabels, uint64(p.cfg.K1))
 
 	reader, err := persistence.NewLabelsReader(p.cfg.DataDir, p.cfg.BitsPerLabel)
@@ -195,7 +213,7 @@ func (p *Prover) tryNonces(challenge Challenge, startNonce, endNonce uint32) (*n
 		i := i
 		go func() {
 			nonce := startNonce + i
-			indices, err = p.tryNonce(ctx, challenge, nonce, workersChans[i], difficulty)
+			indices, err = p.tryNonce(ctx, numLabels, challenge, nonce, workersChans[i], difficulty)
 			resultsChan <- nonceResult{nonce, indices, err}
 		}()
 	}

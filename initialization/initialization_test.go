@@ -47,7 +47,7 @@ func TestInitialize(t *testing.T) {
 
 	go func() {
 		var prev float64
-		for p := range init.Progress() {
+		for p := range init.SessionNumLabelsWrittenChan() {
 			r.True(p > prev)
 			prev = p
 
@@ -82,7 +82,7 @@ func TestInitialize_Repeated(t *testing.T) {
 
 	go func() {
 		var prev float64
-		for p := range init.Progress() {
+		for p := range init.SessionNumLabelsWrittenChan() {
 			req.True(p > prev)
 			prev = p
 
@@ -104,7 +104,7 @@ func TestInitialize_Repeated(t *testing.T) {
 
 	go func() {
 		var prev float64
-		for p := range init.Progress() {
+		for p := range init.SessionNumLabelsWrittenChan() {
 			req.True(p > prev)
 			prev = p
 
@@ -139,7 +139,7 @@ func TestInitialize_AlterNumLabels_Increase(t *testing.T) {
 
 	go func() {
 		var prev float64
-		for p := range init.Progress() {
+		for p := range init.SessionNumLabelsWrittenChan() {
 			req.True(p > prev)
 			prev = p
 
@@ -163,7 +163,7 @@ func TestInitialize_AlterNumLabels_Increase(t *testing.T) {
 
 	go func() {
 		var prev float64
-		for p := range init.Progress() {
+		for p := range init.SessionNumLabelsWrittenChan() {
 			req.True(p > prev)
 			prev = p
 
@@ -198,7 +198,7 @@ func TestInitialize_AlterNumLabels_Decrease(t *testing.T) {
 
 	go func() {
 		var prev float64
-		for p := range init.Progress() {
+		for p := range init.SessionNumLabelsWrittenChan() {
 			req.True(p > prev)
 			prev = p
 
@@ -222,7 +222,7 @@ func TestInitialize_AlterNumLabels_Decrease(t *testing.T) {
 
 	go func() {
 		var prev float64
-		for p := range init.Progress() {
+		for p := range init.SessionNumLabelsWrittenChan() {
 			req.True(p > prev)
 			prev = p
 
@@ -326,33 +326,33 @@ func TestNumLabelsWritten(t *testing.T) {
 	req.NoError(err)
 
 	// Check initial state.
-	numLabelsWritten, err := init.NumLabelsWritten()
+	numLabelsWritten, err := init.DiskNumLabelsWritten()
 	req.NoError(err)
 	req.Equal(uint64(0), numLabelsWritten)
 
 	// Initialize.
 	err = init.Initialize(CPUProviderID())
 	req.NoError(err)
-	numLabelsWritten, err = init.NumLabelsWritten()
+	numLabelsWritten, err = init.DiskNumLabelsWritten()
 	req.NoError(err)
 	req.Equal(cfg.NumLabels, numLabelsWritten)
 
 	// Initialize repeated.
 	err = init.Initialize(CPUProviderID())
 	req.NoError(err)
-	numLabelsWritten, err = init.NumLabelsWritten()
+	numLabelsWritten, err = init.DiskNumLabelsWritten()
 	req.NoError(err)
 	req.Equal(cfg.NumLabels, numLabelsWritten)
 
 	// Initialize repeated, using a new instance.
 	init, err = NewInitializer(&cfg, id)
 	req.NoError(err)
-	numLabelsWritten, err = init.NumLabelsWritten()
+	numLabelsWritten, err = init.DiskNumLabelsWritten()
 	req.NoError(err)
 	req.Equal(cfg.NumLabels, numLabelsWritten)
 	err = init.Initialize(CPUProviderID())
 	req.NoError(err)
-	numLabelsWritten, err = init.NumLabelsWritten()
+	numLabelsWritten, err = init.DiskNumLabelsWritten()
 	req.NoError(err)
 	req.Equal(cfg.NumLabels, numLabelsWritten)
 
@@ -447,7 +447,7 @@ func TestStop(t *testing.T) {
 	}()
 	var prev float64
 	go func() {
-		for p := range init.Progress() {
+		for p := range init.SessionNumLabelsWrittenChan() {
 			req.True(p > prev)
 			prev = p
 
@@ -463,7 +463,7 @@ func TestStop(t *testing.T) {
 
 	// Continue the initialization to completion.
 	go func() {
-		for p := range init.Progress() {
+		for p := range init.SessionNumLabelsWrittenChan() {
 			req.True(p > prev)
 			prev = p
 

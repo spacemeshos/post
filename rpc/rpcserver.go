@@ -207,7 +207,7 @@ func (r *rpcServer) GetState(ctx context.Context, in *api.GetStateRequest) (*api
 	}
 	init.SetLogger(r.logger)
 
-	numLabelsWritten, err := init.NumLabelsWritten()
+	numLabelsWritten, err := init.DiskNumLabelsWritten()
 	if err != nil {
 		return nil, err
 	}

@@ -76,15 +76,18 @@ func cpuProvider(providers []ComputeProvider) ComputeProvider {
 }
 
 type Initializer struct {
-	cfg *Config
-	id  []byte
+	cfg      *Config
+	id       []byte
+	numUnits uint
 
 	initializing bool
 	mtx          sync.Mutex
 
-	progressChan chan float64
-	stopChan     chan struct{}
-	doneChan     chan struct{}
+	numLabelsWritten     uint64
+	numLabelsWrittenChan chan uint64
+
+	stopChan chan struct{}
+	doneChan chan struct{}
 
 	logger Logger
 }
@@ -107,7 +110,7 @@ func NewInitializer(cfg *Config, id []byte) (*Initializer, error) {
 
 // Initialize is the process in which the prover commits to store some data, by having its storage filled with
 // pseudo-random data with respect to a specific id. This data is the result of a computationally-expensive operation.
-func (init *Initializer) Initialize(computeProviderID uint) error {
+func (init *Initializer) Initialize(computeProviderID uint, numUnits uint) error {
 	init.mtx.Lock()
 	if init.initializing {
 		init.mtx.Unlock()
@@ -116,21 +119,27 @@ func (init *Initializer) Initialize(computeProviderID uint) error {
 	init.stopChan = make(chan struct{})
 	init.doneChan = make(chan struct{})
 	init.initializing = true
+	init.numUnits = numUnits
 	init.mtx.Unlock()
+
 	defer func() {
 		init.initializing = false
 		close(init.doneChan)
 
-		if init.progressChan != nil {
-			close(init.progressChan)
-			init.progressChan = nil
+		if init.numLabelsWrittenChan != nil {
+			close(init.numLabelsWrittenChan)
+			init.numLabelsWrittenChan = nil
 		}
 	}()
 
-	if numLabelsWritten, err := init.NumLabelsWritten(); err != nil {
+	if numLabelsWritten, err := init.DiskNumLabelsWritten(); err != nil {
 		return err
 	} else if numLabelsWritten > 0 {
-		if err := init.VerifyMetadata(); err != nil {
+		m, err := init.LoadMetadata()
+		if err != nil {
+			return err
+		}
+		if err := init.VerifyMetadata(m); err != nil {
 			return err
 		}
 	}
@@ -139,11 +148,11 @@ func (init *Initializer) Initialize(computeProviderID uint) error {
 		return err
 	}
 
-	numLabels := uint64(init.cfg.NumUnits) * uint64(init.cfg.LabelsPerUnit)
+	numLabels := uint64(init.numUnits) * uint64(init.cfg.LabelsPerUnit)
 	fileNumLabels := numLabels / uint64(init.cfg.NumFiles)
 
 	init.logger.Info("initialization: starting to write %v file(s); number of units: %v, number of labels per unit: %v, number of bits per label: %v, compute batch size: %v, datadir: %v",
-		init.cfg.NumFiles, init.cfg.NumUnits, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel, init.cfg.ComputeBatchSize, init.cfg.DataDir)
+		init.cfg.NumFiles, init.numUnits, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel, init.cfg.ComputeBatchSize, init.cfg.DataDir)
 
 	for i := 0; i < int(init.cfg.NumFiles); i++ {
 		if err := init.initFile(computeProviderID, i, numLabels, fileNumLabels); err != nil {
@@ -173,11 +182,15 @@ func (init *Initializer) Stop() error {
 	return nil
 }
 
-func (init *Initializer) Progress() <-chan float64 {
-	if init.progressChan == nil {
-		init.progressChan = make(chan float64, 1024)
+func (init *Initializer) SessionNumLabelsWrittenChan() <-chan uint64 {
+	if init.numLabelsWrittenChan == nil {
+		init.numLabelsWrittenChan = make(chan uint64, 1024)
 	}
-	return init.progressChan
+	return init.numLabelsWrittenChan
+}
+
+func (init *Initializer) SessionNumLabelsWritten() uint64 {
+	return init.numLabelsWritten
 }
 
 func (init *Initializer) Reset() error {
@@ -207,7 +220,7 @@ func (init *Initializer) Reset() error {
 }
 
 func (init *Initializer) Started() (bool, error) {
-	numLabelsWritten, err := init.NumLabelsWritten()
+	numLabelsWritten, err := init.DiskNumLabelsWritten()
 	if err != nil {
 		return false, err
 	}
@@ -215,13 +228,13 @@ func (init *Initializer) Started() (bool, error) {
 	return numLabelsWritten > 0, nil
 }
 
-func (init *Initializer) Completed() (bool, error) {
-	numLabelsWritten, err := init.NumLabelsWritten()
+func (init *Initializer) Completed(numUnits uint) (bool, error) {
+	numLabelsWritten, err := init.DiskNumLabelsWritten()
 	if err != nil {
 		return false, err
 	}
 
-	target := uint64(init.cfg.NumUnits) * uint64(init.cfg.LabelsPerUnit)
+	target := uint64(numUnits) * uint64(init.cfg.LabelsPerUnit)
 	return numLabelsWritten == target, nil
 }
 
@@ -237,8 +250,8 @@ func (init *Initializer) VerifyStarted() error {
 	return nil
 }
 
-func (init *Initializer) VerifyNotCompleted() error {
-	completed, err := init.Completed()
+func (init *Initializer) VerifyNotCompleted(numUnits uint) error {
+	completed, err := init.Completed(numUnits)
 	if err != nil {
 		return err
 	}
@@ -249,8 +262,8 @@ func (init *Initializer) VerifyNotCompleted() error {
 	return nil
 }
 
-func (init *Initializer) VerifyCompleted() error {
-	completed, err := init.Completed()
+func (init *Initializer) VerifyCompleted(numUnits uint) error {
+	completed, err := init.Completed(numUnits)
 	if err != nil {
 		return err
 	}
@@ -280,7 +293,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 	if numLabelsWritten > 0 {
 		if numLabelsWritten == fileNumLabels {
 			init.logger.Info("initialization: file #%v already initialized; number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileOffset)
-			init.updateProgress(float64(fileTargetPosition) / float64(numLabels))
+			init.updateSessionNumLabelsWritten(fileTargetPosition)
 			return nil
 		}
 
@@ -289,7 +302,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 			if err := writer.Truncate(fileNumLabels); err != nil {
 				return err
 			}
-			init.updateProgress(float64(fileTargetPosition) / float64(numLabels))
+			init.updateSessionNumLabelsWritten(fileTargetPosition)
 			return nil
 		}
 
@@ -342,7 +355,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 			outputChan <- output
 			currentPosition += uint64(batchSize)
 
-			init.updateProgress(float64(fileOffset+currentPosition) / float64(numLabels))
+			init.updateSessionNumLabelsWritten(fileOffset + currentPosition)
 		}
 	}()
 
@@ -384,60 +397,58 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 	return nil
 }
 
-func (init *Initializer) updateProgress(pct float64) {
-	if init.progressChan != nil {
-		init.progressChan <- pct
+func (init *Initializer) updateSessionNumLabelsWritten(numLabelsWritten uint64) {
+	init.numLabelsWritten = numLabelsWritten
+
+	if init.numLabelsWrittenChan != nil {
+		init.numLabelsWrittenChan <- numLabelsWritten
 	}
+
 }
 
-func (init *Initializer) VerifyMetadata() error {
-	metadata, err := init.LoadMetadata()
-	if err != nil {
-		return err
-	}
-
-	if bytes.Compare(init.id, metadata.ID) != 0 {
+func (init *Initializer) VerifyMetadata(m *Metadata) error {
+	if bytes.Compare(init.id, m.ID) != 0 {
 		return ConfigMismatchError{
 			Param:    "ID",
 			Expected: fmt.Sprintf("%x", init.id),
-			Found:    fmt.Sprintf("%x", metadata.ID),
+			Found:    fmt.Sprintf("%x", m.ID),
 			Datadir:  init.cfg.DataDir,
 		}
 	}
 
-	if init.cfg.BitsPerLabel != metadata.BitsPerLabel {
+	if init.cfg.BitsPerLabel != m.BitsPerLabel {
 		return ConfigMismatchError{
 			Param:    "BitsPerLabel",
 			Expected: fmt.Sprintf("%d", init.cfg.BitsPerLabel),
-			Found:    fmt.Sprintf("%d", metadata.BitsPerLabel),
+			Found:    fmt.Sprintf("%d", m.BitsPerLabel),
 			Datadir:  init.cfg.DataDir,
 		}
 	}
 
-	if init.cfg.LabelsPerUnit != metadata.LabelsPerUnit {
+	if init.cfg.LabelsPerUnit != m.LabelsPerUnit {
 		return ConfigMismatchError{
 			Param:    "LabelsPerUnit",
 			Expected: fmt.Sprintf("%d", init.cfg.LabelsPerUnit),
-			Found:    fmt.Sprintf("%d", metadata.LabelsPerUnit),
+			Found:    fmt.Sprintf("%d", m.LabelsPerUnit),
 			Datadir:  init.cfg.DataDir,
 		}
 	}
 
-	if init.cfg.NumFiles != metadata.NumFiles {
+	if init.cfg.NumFiles != m.NumFiles {
 		return ConfigMismatchError{
 			Param:    "NumFiles",
 			Expected: fmt.Sprintf("%d", init.cfg.NumFiles),
-			Found:    fmt.Sprintf("%d", metadata.NumFiles),
+			Found:    fmt.Sprintf("%d", m.NumFiles),
 			Datadir:  init.cfg.DataDir,
 		}
 	}
 
 	// `NumUnits` alternation isn't supported (yet) for `NumFiles` > 1.
-	if init.cfg.NumUnits != metadata.NumUnits && init.cfg.NumFiles > 1 {
+	if init.numUnits != m.NumUnits && init.cfg.NumFiles > 1 {
 		return ConfigMismatchError{
 			Param:    "NumUnits",
-			Expected: fmt.Sprintf("%d", init.cfg.NumUnits),
-			Found:    fmt.Sprintf("%d", metadata.NumUnits),
+			Expected: fmt.Sprintf("%d", init.numUnits),
+			Found:    fmt.Sprintf("%d", m.NumUnits),
 			Datadir:  init.cfg.DataDir,
 		}
 	}
@@ -445,8 +456,8 @@ func (init *Initializer) VerifyMetadata() error {
 	return nil
 }
 
-func (init *Initializer) NumLabelsWritten() (uint64, error) {
-	numBytesWritten, err := init.NumBytesWritten()
+func (init *Initializer) DiskNumLabelsWritten() (uint64, error) {
+	numBytesWritten, err := init.DiskNumBytesWritten()
 	if err != nil {
 		return 0, err
 	}
@@ -454,7 +465,7 @@ func (init *Initializer) NumLabelsWritten() (uint64, error) {
 	return shared.NumLabels(numBytesWritten, init.cfg.BitsPerLabel), nil
 }
 
-func (init *Initializer) NumBytesWritten() (uint64, error) {
+func (init *Initializer) DiskNumBytesWritten() (uint64, error) {
 	files, err := ioutil.ReadDir(init.cfg.DataDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -488,11 +499,11 @@ func (init *Initializer) SaveMetadata() error {
 		return fmt.Errorf("dir creation failure: %v", err)
 	}
 
-	data, err := json.Marshal(metadata{
+	data, err := json.Marshal(Metadata{
 		ID:            init.id,
 		BitsPerLabel:  init.cfg.BitsPerLabel,
 		LabelsPerUnit: init.cfg.LabelsPerUnit,
-		NumUnits:      init.cfg.NumUnits,
+		NumUnits:      init.numUnits,
 		NumFiles:      init.cfg.NumFiles,
 	})
 	if err != nil {
@@ -507,7 +518,7 @@ func (init *Initializer) SaveMetadata() error {
 	return nil
 }
 
-func (init *Initializer) LoadMetadata() (*metadata, error) {
+func (init *Initializer) LoadMetadata() (*Metadata, error) {
 	filename := filepath.Join(init.cfg.DataDir, metadataFileName)
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -517,7 +528,7 @@ func (init *Initializer) LoadMetadata() (*metadata, error) {
 		return nil, fmt.Errorf("read file failure: %v", err)
 	}
 
-	metadata := metadata{}
+	metadata := Metadata{}
 	if err := json.Unmarshal(data, &metadata); err != nil {
 		return nil, err
 	}
