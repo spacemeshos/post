@@ -1,5 +1,8 @@
 package integration
 
+// NOTE: PoST RPC server is currently disabled.
+
+/*
 import (
 	"fmt"
 	"os/exec"
@@ -51,3 +54,4 @@ func postExecutablePath(baseDir string) (string, error) {
 	executablePath = outputPath
 	return executablePath, nil
 }
+*/

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/gpu"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
 	smlog "github.com/spacemeshos/smutil/log"
@@ -12,53 +13,55 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
 
 var (
-	id  = make([]byte, 32)
-	cfg = config.DefaultConfig()
+	id   = make([]byte, 32)
+	cfg  config.Config
+	opts config.InitOpts
 
 	log   = flag.Bool("log", false, "")
 	debug = flag.Bool("debug", false, "")
 )
 
 func TestMain(m *testing.M) {
-	cfg.DataDir, _ = ioutil.TempDir("", "post-test")
+	cfg = config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts = config.DefaultInitOpts()
+	opts.DataDir, _ = ioutil.TempDir("", "post-test")
+	opts.NumUnits = cfg.MinNumUnits
+	opts.NumFiles = 2
+	opts.ComputeProviderID = CPUProviderID()
 
 	res := m.Run()
 	os.Exit(res)
 }
 
+func TestCPUProviderExists(t *testing.T) {
+	r := require.New(t)
+
+	p := cpuProvider(providers)
+	r.Equal("CPU", p.Model)
+	r.Equal(gpu.ComputeAPIClassCPU, p.ComputeAPI)
+}
+
 func TestInitialize(t *testing.T) {
 	r := require.New(t)
 
-	cfg := *cfg
-	cfg.NumLabels = 1 << 12
-	cfg.NumFiles = 2
-	cfg.LabelSize = 8
-
-	init, err := NewInitializer(&cfg, id)
+	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
 	if *log {
 		init.SetLogger(smlog.AppLog)
 	}
 
-	go func() {
-		var prev float64
-		for p := range init.SessionNumLabelsWrittenChan() {
-			r.True(p > prev)
-			prev = p
-
-			if *debug {
-				fmt.Printf("progress: %v\n", p)
-			}
-		}
-		r.Equal(float64(1), prev)
-	}()
-	err = init.Initialize(CPUProviderID())
+	doneChan := assertNumLabelsWrittenChan(init, r)
+	err = init.Initialize()
 	r.NoError(err)
+	<-doneChan
 
 	// Cleanup.
 	err = init.Reset()
@@ -66,295 +69,223 @@ func TestInitialize(t *testing.T) {
 }
 
 func TestInitialize_Repeated(t *testing.T) {
-	req := require.New(t)
+	r := require.New(t)
 
-	cfg := *cfg
-	cfg.NumLabels = 1 << 12
-	cfg.NumFiles = 2
-	cfg.ComputeBatchSize = 1 << 10
-	cfg.LabelSize = 8
-
-	init, err := NewInitializer(&cfg, id)
-	req.NoError(err)
+	init, err := NewInitializer(cfg, opts, id)
+	r.NoError(err)
 	if *log {
 		init.SetLogger(smlog.AppLog)
 	}
 
-	go func() {
-		var prev float64
-		for p := range init.SessionNumLabelsWrittenChan() {
-			req.True(p > prev)
-			prev = p
+	doneChan := assertNumLabelsWrittenChan(init, r)
+	err = init.Initialize()
+	r.NoError(err)
+	<-doneChan
 
-			if *debug {
-				fmt.Printf("progress: %v\n", p)
-			}
-		}
-		req.Equal(float64(1), prev)
-	}()
-	err = init.Initialize(CPUProviderID())
-	req.NoError(err)
-
-	// Initialize again using the same config.
-	init, err = NewInitializer(&cfg, id)
-	req.NoError(err)
+	// Initialize again using the same config & opts.
+	init, err = NewInitializer(cfg, opts, id)
+	r.NoError(err)
 	if *log {
 		init.SetLogger(smlog.AppLog)
 	}
 
-	go func() {
-		var prev float64
-		for p := range init.SessionNumLabelsWrittenChan() {
-			req.True(p > prev)
-			prev = p
-
-			if *debug {
-				fmt.Printf("progress: %v\n", p)
-			}
-		}
-		req.Equal(float64(1), prev)
-	}()
-	err = init.Initialize(CPUProviderID())
-	req.NoError(err)
+	doneChan = assertNumLabelsWrittenChan(init, r)
+	err = init.Initialize()
+	r.NoError(err)
+	<-doneChan
 
 	// Cleanup.
 	err = init.Reset()
-	req.NoError(err)
+	r.NoError(err)
 }
 
-func TestInitialize_AlterNumLabels_Increase(t *testing.T) {
-	req := require.New(t)
+func TestInitialize_NumUnits_Increase(t *testing.T) {
+	r := require.New(t)
 
-	cfg := *cfg
-	cfg.NumLabels = 1 << 12
-	cfg.NumFiles = 1
-	cfg.ComputeBatchSize = 1 << 10
-	cfg.LabelSize = 8
+	newOpts := opts
+	newOpts.NumFiles = 1
 
-	init, err := NewInitializer(&cfg, id)
-	req.NoError(err)
+	init, err := NewInitializer(cfg, newOpts, id)
+	r.NoError(err)
 	if *log {
 		init.SetLogger(smlog.AppLog)
 	}
 
-	go func() {
-		var prev float64
-		for p := range init.SessionNumLabelsWrittenChan() {
-			req.True(p > prev)
-			prev = p
+	doneChan := assertNumLabelsWrittenChan(init, r)
+	err = init.Initialize()
+	r.NoError(err)
+	<-doneChan
 
-			if *debug {
-				fmt.Printf("progress: %v\n", p)
-			}
-		}
-		req.Equal(float64(1), prev)
-	}()
-	err = init.Initialize(CPUProviderID())
-	req.NoError(err)
+	// Increase `opts.NumUnits`.
+	newOpts.NumUnits++
 
-	// Increase the number of labels.
-	cfg.NumLabels = cfg.NumLabels << 1
-
-	init, err = NewInitializer(&cfg, id)
-	req.NoError(err)
+	init, err = NewInitializer(cfg, newOpts, id)
+	r.NoError(err)
 	if *log {
 		init.SetLogger(smlog.AppLog)
 	}
 
-	go func() {
-		var prev float64
-		for p := range init.SessionNumLabelsWrittenChan() {
-			req.True(p > prev)
-			prev = p
-
-			if *debug {
-				fmt.Printf("progress: %v\n", p)
-			}
-		}
-		req.Equal(float64(1), prev)
-	}()
-	err = init.Initialize(CPUProviderID())
-	req.NoError(err)
+	doneChan = assertNumLabelsWrittenChan(init, r)
+	err = init.Initialize()
+	r.NoError(err)
+	<-doneChan
 
 	// Cleanup.
 	err = init.Reset()
-	req.NoError(err)
+	r.NoError(err)
 }
 
-func TestInitialize_AlterNumLabels_Decrease(t *testing.T) {
-	req := require.New(t)
+func TestInitialize_NumUnits_Decrease(t *testing.T) {
+	r := require.New(t)
 
-	cfg := *cfg
-	cfg.NumLabels = 1 << 12
-	cfg.NumFiles = 1
-	cfg.ComputeBatchSize = 1 << 10
-	cfg.LabelSize = 8
+	newOpts := opts
+	newOpts.NumUnits++
+	newOpts.NumFiles = 1
 
-	init, err := NewInitializer(&cfg, id)
-	req.NoError(err)
+	init, err := NewInitializer(cfg, newOpts, id)
+	r.NoError(err)
 	if *log {
 		init.SetLogger(smlog.AppLog)
 	}
 
-	go func() {
-		var prev float64
-		for p := range init.SessionNumLabelsWrittenChan() {
-			req.True(p > prev)
-			prev = p
+	doneChan := assertNumLabelsWrittenChan(init, r)
+	err = init.Initialize()
+	r.NoError(err)
+	<-doneChan
 
-			if *debug {
-				fmt.Printf("progress: %v\n", p)
-			}
-		}
-		req.Equal(float64(1), prev)
-	}()
-	err = init.Initialize(CPUProviderID())
-	req.NoError(err)
+	// Decrease `opts.NumUnits`.
+	newOpts.NumUnits--
 
-	// Decrease the number of labels.
-	cfg.NumLabels = cfg.NumLabels >> 1
-
-	init, err = NewInitializer(&cfg, id)
-	req.NoError(err)
+	init, err = NewInitializer(cfg, newOpts, id)
+	r.NoError(err)
 	if *log {
 		init.SetLogger(smlog.AppLog)
 	}
 
-	go func() {
-		var prev float64
-		for p := range init.SessionNumLabelsWrittenChan() {
-			req.True(p > prev)
-			prev = p
-
-			if *debug {
-				fmt.Printf("progress: %v\n", p)
-			}
-		}
-		req.Equal(float64(1), prev)
-	}()
-	err = init.Initialize(CPUProviderID())
-	req.NoError(err)
+	doneChan = assertNumLabelsWrittenChan(init, r)
+	err = init.Initialize()
+	r.NoError(err)
+	<-doneChan
 
 	// Cleanup.
 	err = init.Reset()
-	req.NoError(err)
+	r.NoError(err)
 }
 
-func TestInitialize_AlterNumLabels_MultipleFiles(t *testing.T) {
-	req := require.New(t)
+func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
+	r := require.New(t)
 
-	cfg := *cfg
-	cfg.NumLabels = 1 << 12
-	cfg.NumFiles = 2
+	newOpts := opts
+	newOpts.NumUnits++
+	newOpts.NumFiles = 2
 
-	init, err := NewInitializer(&cfg, id)
-	req.NoError(err)
-	err = init.Initialize(CPUProviderID())
-	req.NoError(err)
+	init, err := NewInitializer(cfg, newOpts, id)
+	r.NoError(err)
+	if *log {
+		init.SetLogger(smlog.AppLog)
+	}
 
-	prevNumLabels := cfg.NumLabels
+	doneChan := assertNumLabelsWrittenChan(init, r)
+	err = init.Initialize()
+	r.NoError(err)
+	<-doneChan
 
-	// Increase the number of labels.
-	cfg.NumLabels = prevNumLabels << 1
-	init, err = NewInitializer(&cfg, id)
-	req.NoError(err)
-	err = init.Initialize(CPUProviderID())
+	prevNumUnits := newOpts.NumUnits
+
+	// Increase `opts.NumUnits` while `opts.NumFiles` > 1.
+	newOpts.NumUnits = prevNumUnits + 1
+	init, err = NewInitializer(cfg, opts, id)
+	r.NoError(err)
+	err = init.Initialize()
 	errConfigMismatch, ok := err.(ConfigMismatchError)
-	req.True(ok)
-	req.Equal("NumLabels", errConfigMismatch.Param)
+	r.True(ok)
+	r.Equal("NumUnits", errConfigMismatch.Param)
 
-	// Decrease the number of labels.
-	cfg.NumLabels = prevNumLabels >> 1
-	init, err = NewInitializer(&cfg, id)
-	req.NoError(err)
-	err = init.Initialize(CPUProviderID())
+	// Decrease `opts.NumUnits` while `opts.NumFiles` > 1.
+	newOpts.NumUnits = prevNumUnits - 1
+	init, err = NewInitializer(cfg, opts, id)
+	r.NoError(err)
+	err = init.Initialize()
 	errConfigMismatch, ok = err.(ConfigMismatchError)
-	req.True(ok)
-	req.Equal("NumLabels", errConfigMismatch.Param)
+	r.True(ok)
+	r.Equal("NumUnits", errConfigMismatch.Param)
 
 	// Cleanup.
 	err = init.Reset()
-	req.NoError(err)
+	r.NoError(err)
 }
 
 func TestInitialize_MultipleFiles(t *testing.T) {
-	req := require.New(t)
+	r := require.New(t)
 
-	cfg := *cfg
-	cfg.NumLabels = 1 << 12
-	cfg.LabelSize = 8
-	cfg.NumFiles = 1
+	init, err := NewInitializer(cfg, opts, id)
+	r.NoError(err)
+	err = init.Initialize()
+	r.NoError(err)
 
-	init, err := NewInitializer(&cfg, id)
-	req.NoError(err)
-	err = init.Initialize(CPUProviderID())
-	req.NoError(err)
-	oneFileData, err := initData(cfg.DataDir, cfg.LabelSize)
-	req.NoError(err)
+	oneFileData, err := initData(opts.DataDir, cfg.BitsPerLabel)
+	r.NoError(err)
 
 	// Cleanup.
 	err = init.Reset()
-	req.NoError(err)
+	r.NoError(err)
 
 	for numFiles := uint(2); numFiles <= 16; numFiles <<= 1 {
-		cfg := cfg
-		cfg.NumFiles = numFiles
+		opts := opts
+		opts.NumFiles = numFiles
 
-		init, err := NewInitializer(&cfg, id)
-		req.NoError(err)
-		err = init.Initialize(CPUProviderID())
-		req.NoError(err)
-		multipleFilesData, err := initData(cfg.DataDir, cfg.LabelSize)
-		req.NoError(err)
+		init, err := NewInitializer(cfg, opts, id)
+		r.NoError(err)
+		err = init.Initialize()
+		r.NoError(err)
 
-		req.Equal(multipleFilesData, oneFileData)
+		multipleFilesData, err := initData(opts.DataDir, cfg.BitsPerLabel)
+		r.NoError(err)
+
+		r.Equal(multipleFilesData, oneFileData)
 
 		// Cleanup.
 		err = init.Reset()
-		req.NoError(err)
+		r.NoError(err)
 	}
 }
 
 func TestNumLabelsWritten(t *testing.T) {
 	req := require.New(t)
 
-	cfg := *cfg
-	cfg.NumLabels = 1 << 12
-	cfg.NumFiles = 2
-
-	init, err := NewInitializer(&cfg, id)
+	init, err := NewInitializer(cfg, opts, id)
 	req.NoError(err)
 
 	// Check initial state.
-	numLabelsWritten, err := init.DiskNumLabelsWritten()
+	numLabelsWritten, err := init.diskState.NumLabelsWritten()
 	req.NoError(err)
 	req.Equal(uint64(0), numLabelsWritten)
 
 	// Initialize.
-	err = init.Initialize(CPUProviderID())
+	err = init.Initialize()
 	req.NoError(err)
-	numLabelsWritten, err = init.DiskNumLabelsWritten()
+	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	req.NoError(err)
-	req.Equal(cfg.NumLabels, numLabelsWritten)
+	req.Equal(uint64(opts.NumUnits*cfg.LabelsPerUnit), numLabelsWritten)
 
 	// Initialize repeated.
-	err = init.Initialize(CPUProviderID())
+	err = init.Initialize()
 	req.NoError(err)
-	numLabelsWritten, err = init.DiskNumLabelsWritten()
+	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	req.NoError(err)
-	req.Equal(cfg.NumLabels, numLabelsWritten)
+	req.Equal(uint64(opts.NumUnits*cfg.LabelsPerUnit), numLabelsWritten)
 
 	// Initialize repeated, using a new instance.
-	init, err = NewInitializer(&cfg, id)
+	init, err = NewInitializer(cfg, opts, id)
 	req.NoError(err)
-	numLabelsWritten, err = init.DiskNumLabelsWritten()
+	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	req.NoError(err)
-	req.Equal(cfg.NumLabels, numLabelsWritten)
-	err = init.Initialize(CPUProviderID())
+	req.Equal(uint64(opts.NumUnits*cfg.LabelsPerUnit), numLabelsWritten)
+	err = init.Initialize()
 	req.NoError(err)
-	numLabelsWritten, err = init.DiskNumLabelsWritten()
+	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	req.NoError(err)
-	req.Equal(cfg.NumLabels, numLabelsWritten)
+	req.Equal(uint64(opts.NumUnits*cfg.LabelsPerUnit), numLabelsWritten)
 
 	// Cleanup.
 	err = init.Reset()
@@ -362,132 +293,143 @@ func TestNumLabelsWritten(t *testing.T) {
 }
 
 func TestValidateMetadata(t *testing.T) {
-	req := require.New(t)
+	r := require.New(t)
 
-	cfg := *cfg
-	cfg.NumLabels = 1 << 12
-	cfg.NumFiles = 2
+	init, err := NewInitializer(cfg, opts, id)
+	r.NoError(err)
 
-	init, err := NewInitializer(&cfg, id)
-	req.NoError(err)
+	m, err := init.loadMetadata()
+	r.Equal(ErrStateMetadataFileMissing, err)
 
-	err = init.VerifyMetadata()
-	req.Equal(ErrStateMetadataFileMissing, err)
+	err = init.Initialize()
+	r.NoError(err)
+	m, err = init.loadMetadata()
+	r.NoError(err)
+	err = init.verifyMetadata(m)
+	r.NoError(err)
 
-	err = init.Initialize(CPUProviderID())
-	req.NoError(err)
-
-	err = init.VerifyMetadata()
-	req.NoError(err)
-
-	// Attempt to initialize with different `id`.
+	// Attempt to initialize with different `ID`.
 	newID := make([]byte, 32)
 	copy(newID, id)
 	newID[0] = newID[0] + 1
-	init, err = NewInitializer(&cfg, newID)
-	req.NoError(err)
-	err = init.Initialize(CPUProviderID())
+	init, err = NewInitializer(cfg, opts, newID)
+	r.NoError(err)
+	err = init.Initialize()
 	errConfigMismatch, ok := err.(ConfigMismatchError)
-	req.True(ok)
-	req.Equal("ID", errConfigMismatch.Param)
+	r.True(ok)
+	r.Equal("ID", errConfigMismatch.Param)
 
-	// Attempt to initialize with different `labelSize`.
+	// Attempt to initialize with different `cfg.BitsPerLabel`.
 	newCfg := cfg
-	newCfg.LabelSize = cfg.LabelSize + 1
-	init, err = NewInitializer(&newCfg, id)
-	req.NoError(err)
-	err = init.Initialize(CPUProviderID())
+	newCfg.BitsPerLabel = cfg.BitsPerLabel + 1
+	init, err = NewInitializer(newCfg, opts, id)
+	r.NoError(err)
+	err = init.Initialize()
 	errConfigMismatch, ok = err.(ConfigMismatchError)
-	req.True(ok)
-	req.Equal("LabelSize", errConfigMismatch.Param)
+	r.True(ok)
+	r.Equal("BitsPerLabel", errConfigMismatch.Param)
 
-	// Attempt to initialize with different `numFiles`.
-	newCfg = cfg
-	newCfg.NumFiles = cfg.NumFiles << 1
-	init, err = NewInitializer(&newCfg, id)
-	req.NoError(err)
-	err = init.Initialize(CPUProviderID())
+	// Attempt to initialize with different `opts.NumFiles`.
+	newOpts := opts
+	newOpts.NumFiles++
+	init, err = NewInitializer(cfg, newOpts, id)
+	r.NoError(err)
+	err = init.Initialize()
 	errConfigMismatch, ok = err.(ConfigMismatchError)
-	req.True(ok)
-	req.Equal("NumFiles", errConfigMismatch.Param)
+	r.True(ok)
+	r.Equal("NumFiles", errConfigMismatch.Param)
 
-	// Attempt to initialize with different `numLabels` while `numFiles` > 1.
-	newCfg = cfg
-	newCfg.NumLabels = newCfg.NumLabels << 1
-	init, err = NewInitializer(&newCfg, id)
-	req.NoError(err)
-	err = init.Initialize(CPUProviderID())
+	// Attempt to initialize with different `opts.NumUnits` while `opts.NumFiles` > 1.
+	newOpts = opts
+	newOpts.NumUnits++
+	init, err = NewInitializer(cfg, newOpts, id)
+	r.NoError(err)
+	err = init.Initialize()
 	errConfigMismatch, ok = err.(ConfigMismatchError)
-	req.True(ok)
-	req.Equal("NumLabels", errConfigMismatch.Param)
+	r.True(ok)
+	r.Equal("NumUnits", errConfigMismatch.Param)
 
 	// Cleanup.
 	err = init.Reset()
-	req.NoError(err)
+	r.NoError(err)
 }
 
 func TestStop(t *testing.T) {
-	req := require.New(t)
+	r := require.New(t)
 
-	cfg := *cfg
-	cfg.NumLabels = 1 << 15
-	cfg.LabelSize = 8
+	newOpts := opts
+	newOpts.NumUnits = 5
 
-	init, err := NewInitializer(&cfg, id)
-	req.NoError(err)
+	init, err := NewInitializer(cfg, newOpts, id)
+	r.NoError(err)
 	if *log {
 		init.SetLogger(smlog.AppLog)
 	}
 
 	// Start initialization and stop it after a short while.
+	var wg sync.WaitGroup
+	wg.Add(2)
 	go func() {
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 		err := init.Stop()
-		req.NoError(err)
+		r.NoError(err)
+		wg.Done()
 	}()
-	var prev float64
+	var prev uint64
 	go func() {
 		for p := range init.SessionNumLabelsWrittenChan() {
-			req.True(p > prev)
+			r.True(p > prev)
 			prev = p
 
 			if *debug {
-				fmt.Printf("progress: %v\n", p)
+				fmt.Printf("num labels written: %v\n", p)
 			}
 		}
-		req.True(float64(1) > prev)
-		req.True(float64(0) < prev)
+		r.True(init.Started())
+		r.False(init.Completed())
+		wg.Done()
 	}()
-	err = init.Initialize(CPUProviderID())
-	req.Equal(ErrStopped, err)
+	err = init.Initialize()
+	r.Equal(ErrStopped, err)
+	wg.Wait()
 
 	// Continue the initialization to completion.
-	go func() {
-		for p := range init.SessionNumLabelsWrittenChan() {
-			req.True(p > prev)
-			prev = p
-
-			if *debug {
-				fmt.Printf("progress: %v\n", p)
-			}
-		}
-		req.Equal(float64(1), prev)
-	}()
-	err = init.Initialize(CPUProviderID())
-	req.NoError(err)
+	doneChan := assertNumLabelsWrittenChan(init, r)
+	err = init.Initialize()
+	r.NoError(err)
+	<-doneChan
 
 	// Cleanup.
 	err = init.Reset()
-	req.NoError(err)
+	r.NoError(err)
 }
 
-func initData(datadir string, labelSize uint) ([]byte, error) {
-	reader, err := persistence.NewLabelsReader(datadir, labelSize)
+func assertNumLabelsWrittenChan(init *Initializer, r *require.Assertions) chan struct{} {
+	doneChan := make(chan struct{})
+	go func() {
+		var prev uint64
+		for p := range init.SessionNumLabelsWrittenChan() {
+			r.True(p > prev)
+			prev = p
+
+			if *debug {
+				fmt.Printf("num labels written: %v\n", p)
+			}
+		}
+		r.True(init.Completed())
+		close(doneChan)
+	}()
+
+	return doneChan
+}
+
+func initData(datadir string, bitsPerLabel uint) ([]byte, error) {
+	reader, err := persistence.NewLabelsReader(datadir, bitsPerLabel)
 	if err != nil {
 		return nil, err
 	}
 
-	gsReader := shared.NewGranSpecificReader(reader, labelSize)
+	gsReader := shared.NewGranSpecificReader(reader, bitsPerLabel)
 	writer := bytes.NewBuffer(nil)
 	for {
 		b, err := gsReader.ReadNext()

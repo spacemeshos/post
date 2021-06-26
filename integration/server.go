@@ -1,5 +1,9 @@
 package integration
 
+// NOTE: PoST RPC server is currently disabled.
+
+/*
+
 import (
 	"bytes"
 	"fmt"
@@ -164,3 +168,4 @@ func (s *server) stop() error {
 func (s *server) cleanup() error {
 	return os.RemoveAll(s.cfg.baseDir)
 }
+*/

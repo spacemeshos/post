@@ -1,44 +1,38 @@
 package config
 
 import (
-	//"fmt"
-	//"github.com/spacemeshos/post/shared"
+	"fmt"
+	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/smutil"
 	"path/filepath"
 )
 
 const (
-	// BitsPerLabel value is determined by the protocol.
-	MaxBitsPerLabel = 256
-	MinBitsPerLabel = 1
+	DefaultDataDirName = "data"
 
-	// LabelsPerUnit value is determined by the protocol.
-	MaxLabelsPerUnit = 1 << 20
-	MinLabelsPerUnit = 32
+	DefaultNumFiles = 1
 
-	// NumUnits value is seleted by the user.
-	MaxNumUnits = 10
-	MinNumUnits = 1
-
-	// NumFiles value is seleted by the user.
-	MaxNumFiles = 256
-	MinNumFiles = 1
-
-	//MaxNumLabels     = 1 << 50
-	//MinFileNumLabels = 32
-)
-
-const (
-	DefaultDataDirName      = "data"
-	DefaultNumFiles         = 1
+	// DefaultComputeBatchSize value must be divisible by 8, to guarantee that writing to disk
+	// and file truncating is byte-granular regardless of `BitsPerLabel` value.
 	DefaultComputeBatchSize = 1 << 14
 
 	// 1MB per unit. Temporary value.
 	DefaultBitsPerLabel  = 8
 	DefaultLabelsPerUnit = 1 << 20
 
+	DefaultMaxNumUnits = 10
+	DefaultMinNumUnits = 1
+
 	DefaultK1 = 2000
 	DefaultK2 = 1800
+)
+
+const (
+	MaxBitsPerLabel = 256
+	MinBitsPerLabel = 1
+
+	MaxNumFiles = 32
+	MinNumFiles = 1
 )
 
 var (
@@ -46,88 +40,87 @@ var (
 )
 
 type Config struct {
-	DataDir          string `mapstructure:"post-datadir"`
-	NumFiles         uint   `mapstructure:"post-numfiles"` // Remove? should be only in initoptions.
-	ComputeBatchSize uint   `mapstructure:"post-compute-batch-size"`
-
-	// Protocol params.
 	BitsPerLabel  uint
 	LabelsPerUnit uint
 	MinNumUnits   uint
 	MaxNumUnits   uint
-
-	K1 uint `mapstructure:"post-k1"`
-	K2 uint `mapstructure:"post-k2"`
+	K1            uint
+	K2            uint
 }
 
-// TODO(moshababo): add tests for all cases
-func (cfg *Config) Validate() error {
-	//if cfg.NumLabels > MaxNumLabels {
-	//	return fmt.Errorf("invalid `NumLabels`; expected: <= %d, given: %d", MaxNumLabels, cfg.NumLabels)
-	//}
-	//
-	//if !shared.IsPowerOfTwo(uint64(cfg.NumFiles)) {
-	//	return fmt.Errorf("invalid `NumFiles`; expected: a power of 2, given: %d", cfg.NumFiles)
-	//}
-	//
-	//if cfg.NumFiles > MaxNumFiles {
-	//	return fmt.Errorf("invalid `NumFiles`; expected: <= %d, given: %d", MaxNumFiles, cfg.NumFiles)
-	//}
-	//
-	//if cfg.NumFiles < MinNumFiles {
-	//	return fmt.Errorf("invalid `NumFiles`; expected: >= %d, given: %d", MinNumFiles, cfg.NumFiles)
-	//}
-	//
-	//if cfg.BitsPerLabel > MaxBitsPerLabel {
-	//	return fmt.Errorf("invalid `BitsPerLabel`; expected: <= %d, given: %d", MaxBitsPerLabel, cfg.LabelSize)
-	//}
-	//
-	//if cfg.BitsPerLabel < MinBitsPerLabel {
-	//	return fmt.Errorf("invalid `BitsPerLabel`; expected: >= %d, given: %d", MinBitsPerLabel, cfg.LabelSize)
-	//}
-	//
-	//if cfg.NumLabels%uint64(cfg.NumFiles) != 0 {
-	//	return fmt.Errorf("invalid `NumLabels`; expected: evenly divisible by `NumFiles` (%v), given: %d", cfg.NumFiles, cfg.NumLabels)
-	//}
-	//
-	//fileNumLabels := cfg.NumLabels / uint64(cfg.NumFiles)
-	//if fileNumLabels < MinFileNumLabels {
-	//	return fmt.Errorf("invalid file number of labels; expected: >= %d, given: %d", MinFileNumLabels, fileNumLabels)
-	//}
-	//
-	//// Divisibility by 8 will guarantee that writing to disk, and in addition file truncating,
-	//// is byte-granular, regardless of LabelSize.
-	//if cfg.ComputeBatchSize%8 != 0 {
-	//	return fmt.Errorf("invalid `ComputeBatchSize`; expected: evenly divisible by 8, given: %d", cfg.ComputeBatchSize)
-	//}
-	//lastComputeBatchSize := fileNumLabels % uint64(cfg.ComputeBatchSize)
-	//if lastComputeBatchSize%8 != 0 {
-	//	return fmt.Errorf("invalid last batch size; expected: evenly divisible by 8, given: %d", lastComputeBatchSize)
-	//}
-	//if fileNumLabels%8 != 0 {
-	//	return fmt.Errorf("invalid file number of labels; expected: evenly divisible by 8, given: %d", fileNumLabels)
-	//}
-	//
-	//if res := shared.Uint64MulOverflow(cfg.NumLabels, uint64(cfg.K1)); res {
-	//	return fmt.Errorf("uint64 overflow: `NumLabels` (%v) multipled by K1 (%v) exceeds the range allowed by uint64",
-	//		cfg.NumLabels, cfg.K1)
-	//}
-
-	return nil
-}
-
-func DefaultConfig() *Config {
-	return &Config{
-		DataDir:          DefaultDataDir,
-		NumFiles:         DefaultNumFiles,
-		ComputeBatchSize: DefaultComputeBatchSize,
-
+func DefaultConfig() Config {
+	return Config{
 		BitsPerLabel:  DefaultBitsPerLabel,
 		LabelsPerUnit: DefaultLabelsPerUnit,
-		MaxNumUnits:   MaxNumUnits,
-		MinNumUnits:   MinNumUnits,
-
-		K1: DefaultK1,
-		K2: DefaultK2,
+		MaxNumUnits:   DefaultMaxNumUnits,
+		MinNumUnits:   DefaultMinNumUnits,
+		K1:            DefaultK1,
+		K2:            DefaultK2,
 	}
+}
+
+type InitOpts struct {
+	DataDir           string
+	NumUnits          uint
+	NumFiles          uint
+	ComputeProviderID int
+	Throttle          bool
+}
+
+// BestProviderID can be used for selecting the most performant provider
+// based on a short benchmarking session.
+const BestProviderID = -1
+
+func DefaultInitOpts() InitOpts {
+	return InitOpts{
+		DataDir:           DefaultDataDir,
+		NumUnits:          DefaultMinNumUnits + 1,
+		NumFiles:          DefaultNumFiles,
+		ComputeProviderID: BestProviderID,
+		Throttle:          false,
+	}
+}
+
+func Validate(cfg Config, opts InitOpts) error {
+	if opts.NumUnits < cfg.MinNumUnits {
+		return fmt.Errorf("invalid `opts.NumUnits`; expected: >= %d, given: %d", cfg.MinNumUnits, opts.NumUnits)
+	}
+
+	if opts.NumUnits > cfg.MaxNumUnits {
+		return fmt.Errorf("invalid `opts.NumUnits`; expected: <= %d, given: %d", cfg.MaxNumUnits, opts.NumUnits)
+	}
+
+	if opts.NumFiles > MaxNumFiles {
+		return fmt.Errorf("invalid `opts.NumFiles`; expected: <= %d, given: %d", MaxNumFiles, opts.NumFiles)
+	}
+
+	if opts.NumFiles < MinNumFiles {
+		return fmt.Errorf("invalid `opts.NumFiles`; expected: >= %d, given: %d", MinNumFiles, opts.NumFiles)
+	}
+
+	if cfg.BitsPerLabel > MaxBitsPerLabel {
+		return fmt.Errorf("invalid `cfg.BitsPerLabel`; expected: <= %d, given: %d", MaxBitsPerLabel, cfg.BitsPerLabel)
+	}
+
+	if cfg.BitsPerLabel < MinBitsPerLabel {
+		return fmt.Errorf("invalid `cfg.BitsPerLabel`; expected: >= %d, given: %d", MinBitsPerLabel, cfg.BitsPerLabel)
+	}
+
+	if res := shared.Uint64MulOverflow(uint64(cfg.LabelsPerUnit), uint64(opts.NumUnits)); res {
+		return fmt.Errorf("uint64 overflow: `cfg.LabelsPerUnit` (%v) * `opts.NumUnits` (%v) exceeds the range allowed by uint64",
+			cfg.LabelsPerUnit, opts.NumUnits)
+	}
+
+	numLabels := cfg.LabelsPerUnit * opts.NumUnits
+
+	if numLabels%opts.NumFiles != 0 {
+		return fmt.Errorf("invalid `cfg.LabelsPerUnit` & `opts.NumUnits`; expected: `cfg.LabelsPerUnit` * `opts.NumUnits` to be evenly divisible by `opts.NumFiles` (%v), given: %d", opts.NumFiles, numLabels)
+	}
+
+	if res := shared.Uint64MulOverflow(uint64(numLabels), uint64(cfg.K1)); res {
+		return fmt.Errorf("uint64 overflow: `cfg.LabelsPerUnit` * `opts.NumUnits` (%v) * `cfg.K1` (%v) exceeds the range allowed by uint64",
+			numLabels, cfg.K1)
+	}
+
+	return nil
 }

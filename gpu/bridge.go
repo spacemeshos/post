@@ -11,7 +11,7 @@ import (
 	"unsafe"
 )
 
-// mtx is a mutual exclusion lock for serializing calls to libgpu.
+// mtx is a mutual exclusion lock for serializing calls to gpu-post lib.
 // If not applied, concurrent calls are expected to cause a crash.
 var mtx sync.Mutex
 
@@ -87,8 +87,8 @@ func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPositi
 	cN := C.uint(n)
 	cR := C.uint(r)
 	cP := C.uint(p)
-	d := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} // TODO: fix
-	cD := (*C.uchar)(GoBytes(d).CBytesClone().data)
+	cD := (*C.uchar)(C.calloc(32, 1))
+
 	var cIdxSolution C.uint64_t
 	var cHashesComputed C.uint64_t
 	var cHashesPerSec C.uint64_t
@@ -97,6 +97,8 @@ func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPositi
 		cFree(unsafe.Pointer(cId))
 		cFree(unsafe.Pointer(cSalt))
 		cFree(unsafe.Pointer(cOut))
+		cFree(unsafe.Pointer(cD))
+
 	}()
 
 	retVal := C.scryptPositions(

@@ -1,5 +1,9 @@
 package rpc
 
+// NOTE: PoST RPC server is currently disabled.
+
+/*
+
 import (
 	"encoding/hex"
 	"errors"
@@ -262,3 +266,4 @@ func (r *rpcServer) removeInitializing(id []byte) {
 	idHex := hex.EncodeToString(id)
 	delete(r.initializing, idHex)
 }
+*/

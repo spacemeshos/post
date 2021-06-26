@@ -1,5 +1,8 @@
 package server
 
+// NOTE: PoST RPC server is currently disabled.
+
+/*
 import (
 	"fmt"
 	"github.com/spacemeshos/post/config"
@@ -207,3 +210,4 @@ func ensureCLIFlags(cmd *cobra.Command, cfg *Config) {
 		}
 	})
 }
+*/

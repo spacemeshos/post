@@ -13,10 +13,13 @@ type ComputeProvider struct {
 	ComputeAPI ComputeAPIClass
 }
 
-func (p *ComputeProvider) Benchmark() (int, error) {
+func Providers() []ComputeProvider {
+	return cGetProviders()
+}
+
+func Benchmark(p ComputeProvider) (int, error) {
 	id := make([]byte, 32)
 	salt := make([]byte, 32)
-	options := uint32(1)
 	hashLenBits := uint32(8)
 	startPosition := uint64(1)
 	endPosition := uint64(1 << 17)
@@ -24,7 +27,7 @@ func (p *ComputeProvider) Benchmark() (int, error) {
 		endPosition = uint64(1 << 14)
 	}
 
-	res, err := ScryptPositions(p.ID, id, salt, startPosition, endPosition, hashLenBits, options)
+	res, err := ScryptPositions(p.ID, id, salt, startPosition, endPosition, hashLenBits)
 	if err != nil {
 		return 0, err
 	}
@@ -32,17 +35,14 @@ func (p *ComputeProvider) Benchmark() (int, error) {
 	return res.HashesPerSec, nil
 }
 
-func Providers() []ComputeProvider {
-	return cGetProviders()
-}
-
 type ScryptPositionsResult struct {
 	Output       []byte
 	IdxSolution  uint64
 	HashesPerSec int
+	Stopped      bool
 }
 
-func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, bitsPerLabel uint32, options uint32) (*ScryptPositionsResult, error) {
+func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, bitsPerLabel uint32) (*ScryptPositionsResult, error) {
 	if len(id) != 32 {
 		return nil, fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(id))
 	}
@@ -72,13 +72,15 @@ func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPositio
 	}
 
 	const n, r, p = 512, 1, 1
+	const options = 1 // COMPUTE_LEAFS on, COMPUTE_POW off.
+
 	output, idxSolution, hashesPerSec, retVal := cScryptPositions(providerId, id, salt, startPosition, endPosition, bitsPerLabel, options, n, r, p)
 
 	switch retVal {
 	case 1:
 		panic("pow solution found") // TODO: handle
 	case 0:
-		return &ScryptPositionsResult{output, idxSolution, hashesPerSec}, nil
+		return &ScryptPositionsResult{output, idxSolution, hashesPerSec, false}, nil
 	case -1:
 		return nil, fmt.Errorf("gpu-post error")
 	case -2:
@@ -86,7 +88,7 @@ func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPositio
 	case -3:
 		return nil, fmt.Errorf("gpu-post error: already stopped")
 	case -4:
-		return nil, fmt.Errorf("gpu-post error: canceled")
+		return &ScryptPositionsResult{output, idxSolution, hashesPerSec, true}, nil
 	case -5:
 		return nil, fmt.Errorf("gpu-post error: no compute options")
 	case -6:

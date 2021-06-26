@@ -1,5 +1,8 @@
 package main
 
+// NOTE: bench util is outdated and currently disabled.
+
+/*
 import (
 	"code.cloudfoundry.org/bytefmt"
 	"encoding/csv"
@@ -279,3 +282,4 @@ func getMetadata(cfg *Config, disktype string, fstype string, desc string) []kv 
 
 	return m
 }
+*/

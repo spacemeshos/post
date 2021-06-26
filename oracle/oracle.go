@@ -13,9 +13,8 @@ type (
 
 func WorkOracle(computeProviderId uint, id []byte, startPosition, endPosition uint64, bitsPerLabel uint32) ([]byte, error) {
 	salt := make([]byte, 32) // TODO(moshababo): apply salt
-	options := uint32(1)
 
-	res, err := gpu.ScryptPositions(computeProviderId, id, salt, startPosition, endPosition, bitsPerLabel, options)
+	res, err := gpu.ScryptPositions(computeProviderId, id, salt, startPosition, endPosition, bitsPerLabel)
 	if err != nil {
 		return nil, err
 	}
@@ -25,9 +24,12 @@ func WorkOracle(computeProviderId uint, id []byte, startPosition, endPosition ui
 
 func WorkOracleOne(cpuProviderID uint, id []byte, position uint64, bitsPerLabel uint32) []byte {
 	salt := make([]byte, 32) // TODO(moshababo): apply salt
-	options := uint32(0)
 
-	res, _ := gpu.ScryptPositions(cpuProviderID, id, salt, position, position, bitsPerLabel, options)
+	res, err := gpu.ScryptPositions(cpuProviderID, id, salt, position, position, bitsPerLabel)
+	if err != nil {
+		panic(err)
+	}
+
 	return res.Output
 
 	/*

@@ -1,5 +1,8 @@
 package main
 
+// NOTE: PoST RPC server is currently disabled.
+
+/*
 import (
 	"context"
 	"github.com/spacemeshos/post/config"
@@ -200,3 +203,4 @@ func newHarness(assert *require.Assertions, cfg *config.Config) *integration.Har
 
 	return h
 }
+*/

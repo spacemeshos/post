@@ -20,18 +20,25 @@ var (
 	id = make([]byte, 32)
 	ch = make(proving.Challenge, 32)
 
-	cfg           = config.DefaultConfig()
-	CPUProviderID = initialization.CPUProviderID()
+	cfg  config.Config
+	opts config.InitOpts
 
 	debug = flag.Bool("debug", false, "")
 
 	NewInitializer = initialization.NewInitializer
 	NewProver      = proving.NewProver
+	CPUProviderID  = initialization.CPUProviderID
 )
 
 func TestMain(m *testing.M) {
-	cfg.DataDir, _ = ioutil.TempDir("", "post-test")
-	cfg.NumLabels = 1 << 12
+	cfg = config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts = config.DefaultInitOpts()
+	opts.DataDir, _ = ioutil.TempDir("", "post-test")
+	opts.NumUnits = cfg.MinNumUnits
+	opts.NumFiles = 2
+	opts.ComputeProviderID = CPUProviderID()
 
 	res := m.Run()
 	os.Exit(res)
@@ -40,12 +47,12 @@ func TestMain(m *testing.M) {
 func TestVerify(t *testing.T) {
 	req := require.New(t)
 
-	init, err := NewInitializer(cfg, id)
+	init, err := NewInitializer(cfg, opts, id)
 	req.NoError(err)
-	err = init.Initialize(CPUProviderID)
+	err = init.Initialize()
 	req.NoError(err)
 
-	p, err := NewProver(cfg, id)
+	p, err := NewProver(cfg, opts.DataDir, id)
 	req.NoError(err)
 	proof, proofMetadata, err := p.GenerateProof(ch)
 	req.NoError(err)
@@ -78,21 +85,21 @@ func TestLabelsCorrectness(t *testing.T) {
 	id := make([]byte, 32)
 	datadir, _ := ioutil.TempDir("", "post-test")
 
-	for labelSize := uint32(config.MinBitsPerLabel); labelSize <= config.MaxBitsPerLabel; labelSize++ {
+	for bitsPerLabel := uint32(config.MinBitsPerLabel); bitsPerLabel <= config.MaxBitsPerLabel; bitsPerLabel++ {
 		if *debug {
-			fmt.Printf("label size: %v\n", labelSize)
+			fmt.Printf("bitsPerLabel: %v\n", bitsPerLabel)
 		}
 
 		// Write.
 		for i := 0; i < numFiles; i++ {
-			writer, err := persistence.NewLabelsWriter(datadir, i, uint(labelSize))
+			writer, err := persistence.NewLabelsWriter(datadir, i, uint(bitsPerLabel))
 			req.NoError(err)
 			for j := 0; j < numFileBatches; j++ {
 				numBatch := i*numFileBatches + j
 				startPosition := uint64(numBatch * batchSize)
 				endPosition := startPosition + uint64(batchSize) - 1
 
-				labels, err := oracle.WorkOracle(2, id, startPosition, endPosition, labelSize)
+				labels, err := oracle.WorkOracle(uint(CPUProviderID()), id, startPosition, endPosition, bitsPerLabel)
 				req.NoError(err)
 				err = writer.Write(labels)
 				req.NoError(err)
@@ -103,8 +110,8 @@ func TestLabelsCorrectness(t *testing.T) {
 		}
 
 		// Read.
-		reader, err := persistence.NewLabelsReader(datadir, uint(labelSize))
-		gsReader := shared.NewGranSpecificReader(reader, uint(labelSize))
+		reader, err := persistence.NewLabelsReader(datadir, uint(bitsPerLabel))
+		gsReader := shared.NewGranSpecificReader(reader, uint(bitsPerLabel))
 		req.NoError(err)
 		var position uint64
 		for {
@@ -118,8 +125,8 @@ func TestLabelsCorrectness(t *testing.T) {
 			}
 
 			// Verify correctness.
-			labelCompute := oracle.WorkOracleOne(CPUProviderID, id, position, labelSize)
-			req.Equal(labelCompute, label, fmt.Sprintf("position: %v, labelSize: %v", position, labelSize))
+			labelCompute := oracle.WorkOracleOne(uint(CPUProviderID()), id, position, bitsPerLabel)
+			req.Equal(labelCompute, label, fmt.Sprintf("position: %v, bitsPerLabel: %v", position, bitsPerLabel))
 
 			position++
 		}
@@ -128,239 +135,3 @@ func TestLabelsCorrectness(t *testing.T) {
 		_ = os.RemoveAll(datadir)
 	}
 }
-
-//func TestValidate2(t *testing.T) {
-//	r := require.New(t)
-//
-//	newCfg := *cfg
-//	newCfg.Difficulty = 6
-//
-//	init, err := NewInitializer(&newCfg, id)
-//	r.NoError(err)
-//	proof, err := init.Initialize()
-//	r.NoError(err)
-//
-//	v, err := NewValidator(&newCfg)
-//	r.NoError(err)
-//	err = v.Verify(id, proof)
-//	r.Nil(err)
-//
-//	testGenerateProof(r, id, &newCfg)
-//
-//	err = init.Reset()
-//	r.NoError(err)
-//}
-//
-//func TestValidate3(t *testing.T) {
-//	r := require.New(t)
-//
-//	newCfg := *cfg
-//	newCfg.Difficulty = 7
-//
-//	init, err := NewInitializer(&newCfg, id)
-//	r.NoError(err)
-//	proof, err := init.Initialize()
-//	r.NoError(err)
-//
-//	v, err := NewValidator(&newCfg)
-//	r.NoError(err)
-//	err = v.Verify(id, proof)
-//	r.Nil(err)
-//
-//	testGenerateProof(r, id, &newCfg)
-//
-//	err = init.Reset()
-//	r.NoError(err)
-//}
-//
-//func TestValidate4(t *testing.T) {
-//	r := require.New(t)
-//
-//	newCfg := *cfg
-//	newCfg.Difficulty = 8
-//
-//	init, err := NewInitializer(&newCfg, id)
-//	r.NoError(err)
-//	proof, err := init.Initialize()
-//	r.NoError(err)
-//
-//	v, err := NewValidator(&newCfg)
-//	r.NoError(err)
-//	err = v.Verify(id, proof)
-//	r.Nil(err)
-//
-//	testGenerateProof(r, id, &newCfg)
-//
-//	err = init.Reset()
-//	r.NoError(err)
-//}
-//
-//func TestValidateBadDifficulty(t *testing.T) {
-//	r := require.New(t)
-//
-//	newCfg := *cfg
-//	newCfg.Difficulty = 4
-//
-//	v, err := NewValidator(&newCfg)
-//	r.Nil(v)
-//	r.EqualError(err, fmt.Sprintf("difficulty must be between 5 and 8 (received %d)", newCfg.Difficulty))
-//}
-//
-
-//
-//func TestGenerateProofFailure(t *testing.T) {
-//	r := require.New(t)
-//
-//	newCfg := *cfg
-//	newCfg.Difficulty = 6
-//
-//	init, err := NewInitializer(cfg, id)
-//	r.NoError(err)
-//	_, err = init.Initialize()
-//	r.NoError(err)
-//
-//	p, err := NewProver(&newCfg, id)
-//	r.NoError(err)
-//	proof, err := p.GenerateProof(challenge)
-//	r.EqualError(err, "proof generation failed: initialization state error: config mismatch")
-//	r.Empty(proof)
-//
-//	err = init.Reset()
-//	r.NoError(err)
-//}
-//
-//func TestValidateFail(t *testing.T) {
-//	r := require.New(t)
-//
-//	init, err := NewInitializer(cfg, id)
-//	r.NoError(err)
-//	proof, err := init.Initialize()
-//	r.NoError(err)
-//
-//	wrongIdentity := append([]byte{0}, id[1:]...)
-//
-//	v, err := NewValidator(cfg)
-//	r.NoError(err)
-//	err = v.Verify(wrongIdentity, proof)
-//	r.EqualError(err, "validation failed: label at index 91 should be 01101111, but found 00011101")
-//
-//	err = init.Reset()
-//	r.NoError(err)
-//}
-//
-//func TestValidateFail2(t *testing.T) {
-//	r := require.New(t)
-//
-//	init, err := NewInitializer(cfg, id)
-//	r.NoError(err)
-//	proof, err := init.Initialize()
-//	r.NoError(err)
-//
-//	proof.Challenge = []byte{1}
-//
-//	v, err := NewValidator(cfg)
-//	r.NoError(err)
-//	err = v.Verify(id, proof)
-//	r.EqualError(err, "validation failed: merkle root mismatch")
-//
-//	err = init.Reset()
-//	r.NoError(err)
-//}
-//
-//func TestValidateFail3(t *testing.T) {
-//	r := require.New(t)
-//
-//	init, err := NewInitializer(cfg, id)
-//	r.NoError(err)
-//	proof, err := init.Initialize()
-//	r.NoError(err)
-//
-//	proof.ProvenLeaves[0] = append([]byte{}, proof.ProvenLeaves[0]...)
-//	proof.ProvenLeaves[0][0] += 1
-//
-//	v, err := NewValidator(cfg)
-//	r.NoError(err)
-//	err = v.Verify(id, proof)
-//	r.EqualError(err, "validation failed: merkle root mismatch")
-//
-//	err = init.Reset()
-//	r.NoError(err)
-//}
-//
-//func TestValidateFail4(t *testing.T) {
-//	r := require.New(t)
-//
-//	init, err := NewInitializer(cfg, id)
-//	r.NoError(err)
-//	proof, err := init.Initialize()
-//	r.NoError(err)
-//
-//	proof.ProvenLeaves = proof.ProvenLeaves[1:]
-//
-//	v, err := NewValidator(cfg)
-//	r.NoError(err)
-//	err = v.Verify(id, proof)
-//	r.EqualError(err, "validation failed: number of derived leaf indices (4) doesn't match number of included proven leaves (3)")
-//
-//	err = init.Reset()
-//	r.NoError(err)
-//}
-//
-//func TestValidateFail5(t *testing.T) {
-//	r := require.New(t)
-//
-//	init, err := NewInitializer(cfg, id)
-//	r.NoError(err)
-//	proof, err := init.Initialize()
-//	r.NoError(err)
-//
-//	proof.ProofNodes[0] = append([]byte{}, proof.ProofNodes[0]...)
-//	proof.ProofNodes[0][0] += 1
-//
-//	v, err := NewValidator(cfg)
-//	r.NoError(err)
-//	err = v.Verify(id, proof)
-//	r.EqualError(err, "validation failed: merkle root mismatch")
-//
-//	err = init.Reset()
-//	r.NoError(err)
-//}
-//
-//func TestValidateFail6(t *testing.T) {
-//	r := require.New(t)
-//
-//	init, err := NewInitializer(cfg, id)
-//	r.NoError(err)
-//	proof, err := init.Initialize()
-//	r.NoError(err)
-//
-//	proof.ProofNodes = proof.ProofNodes[1:]
-//
-//	v, err := NewValidator(cfg)
-//	r.NoError(err)
-//	err = v.Verify(id, proof)
-//	r.EqualError(err, "validation failed: merkle root mismatch")
-//
-//	err = init.Reset()
-//	r.NoError(err)
-//}
-//
-//func TestValidateFail7(t *testing.T) {
-//	r := require.New(t)
-//
-//	init, err := NewInitializer(cfg, id)
-//	r.NoError(err)
-//	proof, err := init.Initialize()
-//	r.NoError(err)
-//
-//	proof.MerkleRoot = append([]byte{}, proof.MerkleRoot...)
-//	proof.MerkleRoot[0] += 1
-//
-//	v, err := NewValidator(cfg)
-//	r.NoError(err)
-//	err = v.Verify(id, proof)
-//	r.EqualError(err, "validation failed: merkle root mismatch")
-//
-//	err = init.Reset()
-//	r.NoError(err)
-//}

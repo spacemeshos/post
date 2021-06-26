@@ -1,5 +1,8 @@
 package main
 
+// NOTE: init util is outdated and currently disabled.
+
+/*
 import (
 	"encoding/hex"
 	"flag"
@@ -102,3 +105,4 @@ func saveKey(key []byte) {
 		log.Fatalf("write to disk failure: %v", err)
 	}
 }
+*/
