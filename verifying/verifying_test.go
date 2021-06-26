@@ -67,8 +67,8 @@ func TestVerify(t *testing.T) {
 
 // TestLabelsCorrectness tests, for variation of label sizes, the correctness of
 // reading labels from disk (written in multiple files) when compared to a single label compute.
-// It is covers the following components: labels compute lib (oracle pkg), labels writer (persistence pkg),
-// labels reader (persistence pkg), and the granularity-specific reader (shared pkg).
+// It is covers the following components: labels compute lib (package: oracle), labels writer (package: persistence),
+// labels reader (package: persistence), and the granularity-specific reader (package: shared).
 // it proceeds as follows:
 // 1. Compute labels, in batches, and write them into multiple files (prover).
 // 2. Read the sequence of labels from the files according to the specified label size (prover),

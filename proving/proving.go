@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	MaxIterations         = 10 // TODO(moshababo): update the recommended value
 	NumNoncesPerIteration = 10 // TODO(moshababo): update the recommended value
+	MaxNumIterations      = 10 // TODO(moshababo): update the recommended value
 )
 
 type (
@@ -54,8 +54,7 @@ func NewProver(cfg Config, datadir string, id []byte) (*Prover, error) {
 }
 
 // GenerateProof (analogous to the PoST protocol Execution phase) receives a challenge that cannot be predicted,
-// and reads the entire PoST data to generate a proof in response to the challenge to prove that
-// the prover data exists at the time of invocation.
+// and reads the entire PoST data to generate a proof in response to the challenge to prove that the prover data exists at the time of invocation.
 // Generating a proof can be repeated arbitrarily many times without repeating the PoST protocol Initialization phase;
 // thus despite the initialization essentially serving as a PoW, the amortized computational complexity can be made arbitrarily small.
 func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, error) {
@@ -70,7 +69,7 @@ func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, err
 
 	numLabels := uint64(m.NumUnits * p.cfg.LabelsPerUnit)
 
-	for i := 0; i < MaxIterations; i++ {
+	for i := 0; i < MaxNumIterations; i++ {
 		startNonce := uint32(i) * NumNoncesPerIteration
 		endNonce := startNonce + NumNoncesPerIteration - 1
 
@@ -101,7 +100,7 @@ func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, err
 		}
 	}
 
-	return nil, nil, fmt.Errorf("failed to generate proof; tried %v iterations, %v nonces each", MaxIterations, NumNoncesPerIteration)
+	return nil, nil, fmt.Errorf("failed to generate proof; tried %v iterations, %v nonces each", MaxNumIterations, NumNoncesPerIteration)
 }
 
 func (p *Prover) SetLogger(logger Logger) {
@@ -218,6 +217,12 @@ func (p *Prover) tryNonce(ctx context.Context, numLabels uint64, ch Challenge, n
 	}
 }
 
+type nonceResult struct {
+	nonce   uint32
+	indices []byte
+	err     error
+}
+
 func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, endNonce uint32) (*nonceResult, error) {
 	var difficulty = shared.ProvingDifficulty(numLabels, uint64(p.cfg.K1))
 
@@ -271,7 +276,7 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 	}
 
 	// Drain the workers results chan.
-	var solutionNonce *nonceResult
+	var solutionNonceResult *nonceResult
 	for i := uint32(0); i < numWorkers; i++ {
 		res := <-resultsChan
 		if res.err != nil {
@@ -282,7 +287,7 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 
 			// There might be multiple successful nonces due to race condition with the cancellation,
 			// but this is not a problem. We'll use the last one to arrive.
-			solutionNonce = &res
+			solutionNonceResult = &res
 		}
 	}
 
@@ -294,11 +299,5 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 	default:
 	}
 
-	return solutionNonce, nil
-}
-
-type nonceResult struct {
-	nonce   uint32
-	indices []byte
-	err     error
+	return solutionNonceResult, nil
 }

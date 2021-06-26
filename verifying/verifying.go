@@ -19,8 +19,8 @@ var (
 	FastOracle    = oracle.FastOracle
 )
 
-// Verify ensures the validity of the given proof. It returns nil if the proof is valid or an error describing the
-// failure, otherwise.
+// Verify ensures the validity of a proof in respect to its metadata.
+// It returns nil if the proof is valid or an error describing the failure, otherwise.
 func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 	if len(m.ID) != 32 {
 		return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(m.ID))

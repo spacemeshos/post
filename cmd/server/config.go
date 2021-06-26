@@ -62,7 +62,7 @@ func defaultServerConfig() *ServerConfig {
 }
 
 func loadConfig(cmd *cobra.Command) (*Config, error) {
-	// ReadData in default config if passed as param using viper.
+	// Read in default config if passed as param using viper.
 	fileLocation := smutil.GetCanonicalPath(viper.GetString("config"))
 	vip := viper.New()
 

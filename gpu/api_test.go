@@ -116,7 +116,7 @@ func TestStop(t *testing.T) {
 			r.NotNil(res.Output)
 			r.True(res.Stopped)
 
-			// `output` size is expected be smaller than expected due to `Stop` call.
+			// `res.Output` size is expected be smaller than expected due to `Stop` call.
 			expectedOutputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(hashLenBits))
 			r.True(len(res.Output) > 0)
 			r.True(len(res.Output) < int(expectedOutputSize))
@@ -168,7 +168,7 @@ func TestStop_SameThread(t *testing.T) {
 		r.NotNil(res.Output)
 		r.True(res.Stopped)
 
-		// `output` size is expected be smaller than expected due to `Stop` call.
+		// `res.Output` size is expected be smaller than expected due to `Stop` call.
 		outputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(hashLenBits))
 		r.True(len(res.Output) > 0)
 		r.True(len(res.Output) < int(outputSize))
