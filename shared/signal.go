@@ -1,5 +1,8 @@
 package shared
 
+// NOTE: PoST RPC server is currently disabled.
+
+/*
 import (
 	"os"
 	"os/signal"
@@ -87,3 +90,4 @@ func (s *Signal) RequestShutdown() {
 func (s *Signal) ShutdownChannel() <-chan struct{} {
 	return s.shutdownChannel
 }
+*/

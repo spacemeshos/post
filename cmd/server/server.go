@@ -1,5 +1,8 @@
 package server
 
+// NOTE: PoST RPC server is currently disabled.
+
+/*
 import (
 	"context"
 	"fmt"
@@ -152,3 +155,4 @@ func loggerInterceptor(logger shared.Logger) func(ctx context.Context, req inter
 		return resp, err
 	}
 }
+*/

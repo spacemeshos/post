@@ -4,35 +4,35 @@ import (
 	"fmt"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/smutil"
-	"math"
 	"path/filepath"
 )
 
 const (
-	// In bytes. 1 peta-byte of storage.
-	// This would protect against number of labels uint64 overflow as well,
-	// since the number of labels per byte can be 8 at most (3 extra bit shifts).
-	MaxSpace = 1 << 50
-
-	MaxNumFiles = 256
-	MinFileSize = 32
-)
-
-const (
-	DefaultDataDirName          = "data"
-	DefaultLabelsLogRate        = 5000000
-	DefaultMaxFilesParallelism  = 1
-	DefaultMaxInFileParallelism = 6
-	DefaultMaxReadParallelism   = 6
+	DefaultDataDirName = "data"
 
 	DefaultNumFiles = 1
 
-	// 1MB space. Temporary value.
-	DefaultNumLabels = 1 << 17
-	DefaultLabelSize = 8
+	// DefaultComputeBatchSize value must be divisible by 8, to guarantee that writing to disk
+	// and file truncating is byte-granular regardless of `BitsPerLabel` value.
+	DefaultComputeBatchSize = 1 << 14
 
-	DefaultK1 = 1 << 15
-	DefaultK2 = 100
+	// 1KB per unit. Temporary value.
+	DefaultBitsPerLabel  = 8
+	DefaultLabelsPerUnit = 1 << 10
+
+	DefaultMaxNumUnits = 10
+	DefaultMinNumUnits = 1
+
+	DefaultK1 = 2000
+	DefaultK2 = 1800
+)
+
+const (
+	MaxBitsPerLabel = 256
+	MinBitsPerLabel = 1
+
+	MaxNumFiles = 32
+	MinNumFiles = 1
 )
 
 var (
@@ -40,88 +40,87 @@ var (
 )
 
 type Config struct {
-	DataDir                        string `mapstructure:"post-datadir"`
-	LabelsLogRate                  uint64 `mapstructure:"post-lograte"`
-	MaxWriteFilesParallelism       uint   `mapstructure:"post-parallel-files"`
-	MaxWriteInFileParallelism      uint   `mapstructure:"post-parallel-infile"`
-	MaxReadFilesParallelism        uint   `mapstructure:"post-parallel-read"`
-	DisableSpaceAvailabilityChecks bool   `mapstructure:"post-disable-space-checks"`
-
-	// Protocol params.
-	NumLabels uint64 `mapstructure:"post-numlabels"`
-	LabelSize uint   `mapstructure:"post-labelsize"`
-	K1        uint   `mapstructure:"post-k1"`
-	K2        uint   `mapstructure:"post-k2"`
-
-	NumFiles uint `mapstructure:"post-numfiles"`
+	BitsPerLabel  uint
+	LabelsPerUnit uint
+	MinNumUnits   uint
+	MaxNumUnits   uint
+	K1            uint
+	K2            uint
 }
 
-func (cfg *Config) Validate() error {
-	if cfg.NumLabels == 0 {
-		return fmt.Errorf("invalid NumLabels; expected: > 0, given: 0")
+func DefaultConfig() Config {
+	return Config{
+		BitsPerLabel:  DefaultBitsPerLabel,
+		LabelsPerUnit: DefaultLabelsPerUnit,
+		MaxNumUnits:   DefaultMaxNumUnits,
+		MinNumUnits:   DefaultMinNumUnits,
+		K1:            DefaultK1,
+		K2:            DefaultK2,
+	}
+}
+
+type InitOpts struct {
+	DataDir           string
+	NumUnits          uint
+	NumFiles          uint
+	ComputeProviderID int
+	Throttle          bool
+}
+
+// BestProviderID can be used for selecting the most performant provider
+// based on a short benchmarking session.
+const BestProviderID = -1
+
+func DefaultInitOpts() InitOpts {
+	return InitOpts{
+		DataDir:           DefaultDataDir,
+		NumUnits:          DefaultMinNumUnits + 1,
+		NumFiles:          DefaultNumFiles,
+		ComputeProviderID: BestProviderID,
+		Throttle:          false,
+	}
+}
+
+func Validate(cfg Config, opts InitOpts) error {
+	if opts.NumUnits < cfg.MinNumUnits {
+		return fmt.Errorf("invalid `opts.NumUnits`; expected: >= %d, given: %d", cfg.MinNumUnits, opts.NumUnits)
 	}
 
-	if res := uint64MulOverflow(cfg.NumLabels, uint64(cfg.K1)); res {
-		return fmt.Errorf("uint64 overflow: NumLabels (%v) multipled by K1 (%v) exceeds the range allowed by uint64",
-			cfg.NumLabels, cfg.K1)
+	if opts.NumUnits > cfg.MaxNumUnits {
+		return fmt.Errorf("invalid `opts.NumUnits`; expected: <= %d, given: %d", cfg.MaxNumUnits, opts.NumUnits)
 	}
 
-	space := cfg.Space()
-	if space > MaxSpace {
-		return fmt.Errorf("invalid space; expected: < %d, actual: %d", MaxSpace, space)
+	if opts.NumFiles > MaxNumFiles {
+		return fmt.Errorf("invalid `opts.NumFiles`; expected: <= %d, given: %d", MaxNumFiles, opts.NumFiles)
 	}
 
-	if !shared.IsPowerOfTwo(uint64(cfg.NumFiles)) {
-		return fmt.Errorf("invalid NumFiles; expected: a power of 2, given: %d", cfg.NumFiles)
+	if opts.NumFiles < MinNumFiles {
+		return fmt.Errorf("invalid `opts.NumFiles`; expected: >= %d, given: %d", MinNumFiles, opts.NumFiles)
 	}
 
-	if cfg.NumFiles > MaxNumFiles {
-		return fmt.Errorf("invalid NumFiles; expected: < %d, given: %d", MaxNumFiles, cfg.NumFiles)
+	if cfg.BitsPerLabel > MaxBitsPerLabel {
+		return fmt.Errorf("invalid `cfg.BitsPerLabel`; expected: <= %d, given: %d", MaxBitsPerLabel, cfg.BitsPerLabel)
 	}
 
-	fileSize := space / uint64(cfg.NumFiles)
-	if fileSize < MinFileSize {
-		return fmt.Errorf("invalid file size; expected: > %d, actual: %d", MinFileSize, fileSize)
+	if cfg.BitsPerLabel < MinBitsPerLabel {
+		return fmt.Errorf("invalid `cfg.BitsPerLabel`; expected: >= %d, given: %d", MinBitsPerLabel, cfg.BitsPerLabel)
+	}
+
+	if res := shared.Uint64MulOverflow(uint64(cfg.LabelsPerUnit), uint64(opts.NumUnits)); res {
+		return fmt.Errorf("uint64 overflow: `cfg.LabelsPerUnit` (%v) * `opts.NumUnits` (%v) exceeds the range allowed by uint64",
+			cfg.LabelsPerUnit, opts.NumUnits)
+	}
+
+	numLabels := cfg.LabelsPerUnit * opts.NumUnits
+
+	if numLabels%opts.NumFiles != 0 {
+		return fmt.Errorf("invalid `cfg.LabelsPerUnit` & `opts.NumUnits`; expected: `cfg.LabelsPerUnit` * `opts.NumUnits` to be evenly divisible by `opts.NumFiles` (%v), given: %d", opts.NumFiles, numLabels)
+	}
+
+	if res := shared.Uint64MulOverflow(uint64(numLabels), uint64(cfg.K1)); res {
+		return fmt.Errorf("uint64 overflow: `cfg.LabelsPerUnit` * `opts.NumUnits` (%v) * `cfg.K1` (%v) exceeds the range allowed by uint64",
+			numLabels, cfg.K1)
 	}
 
 	return nil
-}
-
-func (cfg *Config) Space() uint64 {
-	return cfg.NumLabels * uint64(cfg.LabelSize)
-}
-
-func (cfg *Config) ProvingDifficulty() uint64 {
-	maxTarget := uint64(math.MaxUint64)
-	K1 := uint64(cfg.K1)
-
-	x := maxTarget / cfg.NumLabels
-	y := maxTarget % cfg.NumLabels
-	return x*K1 + (y*K1)/cfg.NumLabels
-}
-
-func DefaultConfig() *Config {
-	return &Config{
-		DataDir:                        DefaultDataDir,
-		LabelsLogRate:                  DefaultLabelsLogRate,
-		MaxWriteFilesParallelism:       DefaultMaxFilesParallelism,
-		MaxWriteInFileParallelism:      DefaultMaxInFileParallelism,
-		MaxReadFilesParallelism:        DefaultMaxReadParallelism,
-		DisableSpaceAvailabilityChecks: true, // TODO: permanently remove the checks if they are not reliable.
-
-		LabelSize: DefaultLabelSize,
-		NumLabels: DefaultNumLabels,
-		K1:        DefaultK1,
-		K2:        DefaultK2,
-
-		NumFiles: DefaultNumFiles,
-	}
-}
-
-func uint64MulOverflow(a, b uint64) bool {
-	if a == 0 || b == 0 {
-		return false
-	}
-	c := a * b
-	return c/b != a
 }

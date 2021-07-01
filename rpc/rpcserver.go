@@ -1,5 +1,9 @@
 package rpc
 
+// NOTE: PoST RPC server is currently disabled.
+
+/*
+
 import (
 	"encoding/hex"
 	"errors"
@@ -62,7 +66,7 @@ func (r *rpcServer) Initialize(ctx context.Context, in *api.InitializeRequest) (
 	}
 
 	init.SetLogger(r.logger)
-	if err := init.Initialize(); err != nil {
+	if err := init.Initialize(initialization.CPUProviderID()); err != nil {
 		return nil, err
 	}
 
@@ -87,7 +91,7 @@ func (r *rpcServer) InitializeAsync(ctx context.Context, in *api.InitializeAsync
 
 		init, _ := initialization.NewInitializer(r.cfg, in.Id)
 		init.SetLogger(r.logger)
-		if err := init.Initialize(); err != nil {
+		if err := init.Initialize(initialization.CPUProviderID()); err != nil {
 			r.logger.Error("initialization failure: %v", err)
 			return
 		}
@@ -102,19 +106,30 @@ func (r *rpcServer) Execute(ctx context.Context, in *api.ExecuteRequest) (*api.E
 		return nil, err
 	}
 	prover.SetLogger(r.logger)
-	proof, err := prover.GenerateProof(in.Challenge)
+	proof, proofMetadata, err := prover.GenerateProof(in.Challenge)
 	if err != nil {
 		return nil, err
 	}
 
-	data := proof.Encode()
-
-	err = shared.PersistProof(r.cfg.DataDir, in.Id, in.Challenge, proof.Encode())
+	err = shared.PersistProof(r.cfg.DataDir, proof, proofMetadata)
 	if err != nil {
 		return nil, err
 	}
 
-	return &api.ExecuteResponse{Proof: &api.Proof{Data: data}}, nil
+	return &api.ExecuteResponse{
+		Proof: &api.Proof{
+			Nonce:   proof.Nonce,
+			Indices: proof.Indices,
+		},
+		ProofMetadata: &api.ProofMetadata{
+			Id:        proofMetadata.ID,
+			Challenge: proofMetadata.Challenge,
+			NumLabels: proofMetadata.NumLabels,
+			LabelSize: uint32(proofMetadata.LabelSize),
+			K1:        uint32(proofMetadata.K1),
+			K2:        uint32(proofMetadata.K2),
+		},
+	}, nil
 }
 
 func (r *rpcServer) ExecuteAsync(ctx context.Context, in *api.ExecuteAsyncRequest) (*api.ExecuteAsyncResponse, error) {
@@ -129,13 +144,13 @@ func (r *rpcServer) ExecuteAsync(ctx context.Context, in *api.ExecuteAsyncReques
 	go func() {
 		prover, _ := proving.NewProver(r.cfg, in.Id)
 		prover.SetLogger(r.logger)
-		proof, err := prover.GenerateProof(in.Challenge)
+		proof, proofMetadata, err := prover.GenerateProof(in.Challenge)
 		if err != nil {
 			r.logger.Error("execution failure: %v", err)
 			return
 		}
 
-		err = shared.PersistProof(r.cfg.DataDir, in.Id, in.Challenge, proof.Encode())
+		err = shared.PersistProof(r.cfg.DataDir, proof, proofMetadata)
 		if err != nil {
 			r.logger.Error("proof persisting failure: %v", err)
 			return
@@ -146,12 +161,24 @@ func (r *rpcServer) ExecuteAsync(ctx context.Context, in *api.ExecuteAsyncReques
 }
 
 func (r *rpcServer) GetProof(ctx context.Context, in *api.GetProofRequest) (*api.GetProofResponse, error) {
-	data, err := shared.FetchProof(r.cfg.DataDir, in.Id, in.Challenge)
+	proof, proofMetadata, err := shared.FetchProof(r.cfg.DataDir, in.Challenge)
 	if err != nil {
 		return nil, err
 	}
 
-	return &api.GetProofResponse{Proof: &api.Proof{Data: data}}, nil
+	return &api.GetProofResponse{
+		Proof: &api.Proof{
+			Nonce:   proof.Nonce,
+			Indices: proof.Indices,
+		},
+		ProofMetadata: &api.ProofMetadata{
+			Challenge: proofMetadata.Challenge,
+			NumLabels: proofMetadata.NumLabels,
+			LabelSize: uint32(proofMetadata.LabelSize),
+			K1:        uint32(proofMetadata.K1),
+			K2:        uint32(proofMetadata.K2),
+		},
+	}, nil
 }
 
 func (r *rpcServer) Reset(ctx context.Context, in *api.ResetRequest) (*api.ResetResponse, error) {
@@ -183,15 +210,20 @@ func (r *rpcServer) GetState(ctx context.Context, in *api.GetStateRequest) (*api
 		return nil, err
 	}
 	init.SetLogger(r.logger)
-	state, requiredSpace, err := init.State()
+
+	numLabelsWritten, err := init.DiskNumLabelsWritten()
 	if err != nil {
 		return nil, err
 	}
-
-	return &api.GetStateResponse{
-		State:         api.GetStateResponse_State(state - 1), // native state starts at 0, wire state at 1
-		RequiredSpace: requiredSpace,
-	}, nil
+	var state api.GetStateResponse_State
+	if numLabelsWritten == 0 {
+		state = api.GetStateResponse_NotStarted // zero value.
+	} else if numLabelsWritten < r.cfg.NumLabels {
+		state = api.GetStateResponse_Stopped
+	} else {
+		state = api.GetStateResponse_Completed
+	}
+	return &api.GetStateResponse{State: state, NumLabelsWritten: numLabelsWritten}, nil
 }
 
 func (r *rpcServer) GetInfo(ctx context.Context, in *api.GetInfoRequest) (*api.GetInfoResponse, error) {
@@ -234,3 +266,4 @@ func (r *rpcServer) removeInitializing(id []byte) {
 	idHex := hex.EncodeToString(id)
 	delete(r.initializing, idHex)
 }
+*/

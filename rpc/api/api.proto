@@ -1,8 +1,6 @@
 syntax = "proto3";
-
-import "google/api/annotations.proto";
-
 package api;
+import "google/api/annotations.proto";
 
 service Post {
     rpc Initialize (InitializeRequest) returns (InitializeResponse) {
@@ -20,7 +18,7 @@ service Post {
     }
 
     rpc Execute (ExecuteRequest) returns (ExecuteResponse) {
-             option (google.api.http) = {
+        option (google.api.http) = {
             post: "/v1/execute",
             body: "*",
         };
@@ -35,7 +33,7 @@ service Post {
 
     rpc GetProof (GetProofRequest) returns (GetProofResponse) {
         option (google.api.http) = {
-            get: "/v1/proof/{id}/{challenge}"
+            get: "/v1/proof/{challenge}"
         };
     }
 
@@ -67,16 +65,17 @@ service Post {
 }
 
 message InitializeRequest {
-     bytes id = 1 [json_name = "id"];
+    bytes id = 1 [json_name = "id"];
 }
 
-message InitializeResponse {}
+message InitializeResponse {
+}
 
 message InitializeAsyncRequest {
     bytes id = 1 [json_name = "id"];
 }
 
-message InitializeAsyncResponse{
+message InitializeAsyncResponse {
 }
 
 message ExecuteRequest {
@@ -86,6 +85,7 @@ message ExecuteRequest {
 
 message ExecuteResponse {
     Proof proof = 1 [json_name = "proof"];
+    ProofMetadata proof_metadata = 2 [json_name = "proof_metadata"];
 }
 
 message ExecuteAsyncRequest {
@@ -97,12 +97,12 @@ message ExecuteAsyncResponse {
 }
 
 message GetProofRequest {
-    bytes id = 1 [json_name = "id"];
-    bytes challenge = 2 [json_name = "challenge"];
+    bytes challenge = 1 [json_name = "challenge"];
 }
 
 message GetProofResponse {
     Proof proof = 1 [json_name = "proof"];
+    ProofMetadata proof_metadata = 2 [json_name = "proof_metadata"];
 }
 
 message ResetRequest {
@@ -120,11 +120,11 @@ message GetStateResponse {
     enum State {
         NotStarted = 0;
         Completed = 1;
-        Crashed = 2;
+        Stopped = 2;
         Initializing = 3;
     }
     State state = 1 [json_name = "state"];
-    uint64 requiredSpace = 2 [json_name = "required_space"];
+    uint64 num_labels_written = 2 [json_name = "num_labels_written"];
 }
 
 message GetInfoRequest {
@@ -143,7 +143,17 @@ message ShutdownResponse {
 }
 
 message Proof {
-    bytes data = 1 [json_name = "data"];
+    uint32 nonce = 1 [json_name = "nonce"];
+    bytes indices = 2 [json_name = "indices"];
+}
+
+message ProofMetadata {
+    bytes id = 1 [json_name = "challenge"];
+    bytes challenge = 2 [json_name = "challenge"];
+    uint64 num_labels = 3 [json_name = "num_labels"];
+    uint32 label_size = 4 [json_name = "label_size"];
+    uint32 k1 = 5 [json_name = "k1"];
+    uint32 k2 = 6 [json_name = "k2"];
 }
 
 message Config {

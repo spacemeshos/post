@@ -1,5 +1,8 @@
 package main
 
+// NOTE: init util is outdated and currently disabled.
+
+/*
 import (
 	"encoding/hex"
 	"flag"
@@ -8,7 +11,7 @@ import (
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
-	"github.com/spacemeshos/post/validation"
+	"github.com/spacemeshos/post/verifying"
 	smlog "github.com/spacemeshos/smutil/log"
 	"io/ioutil"
 	"log"
@@ -64,7 +67,7 @@ func main() {
 		}
 	}
 
-	if err := init.Initialize(); err != nil {
+	if err := init.Initialize(initialization.CPUProviderID()); err != nil {
 		if err == shared.ErrInitCompleted {
 			log.Print(err)
 			return
@@ -77,33 +80,29 @@ func main() {
 		log.Fatal(err)
 	}
 	prover.SetLogger(smlog.AppLog)
-	proof, err := prover.GenerateProof(shared.ZeroChallenge)
+	proof, proofMetadata, err := prover.GenerateProof(shared.ZeroChallenge)
 	if err != nil {
 		log.Fatalf("failed to generate proof: %v", err)
 	}
 
-	validator, err := validation.NewValidator(cfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := validator.Validate(id, proof); err != nil {
+	if err := verifying.Verify(proof, proofMetadata); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := shared.PersistProof(cfg.DataDir, id, proof.Challenge, proof.Encode()); err != nil {
+	if err := shared.PersistProof(cfg.DataDir, proof, proofMetadata); err != nil {
 		log.Fatalf("failed to persist proof: %v", err)
 	}
 }
 
 func saveKey(key []byte) {
-	dir := shared.GetInitDir(cfg.DataDir, id)
-	err := os.MkdirAll(dir, shared.OwnerReadWriteExec)
+	err := os.MkdirAll(cfg.DataDir, shared.OwnerReadWriteExec)
 	if err != nil && !os.IsExist(err) {
 		log.Fatalf("dir creation failure: %v", err)
 	}
 
-	err = ioutil.WriteFile(filepath.Join(dir, "key.bin"), key, shared.OwnerReadWrite)
+	err = ioutil.WriteFile(filepath.Join(cfg.DataDir, "key.bin"), key, shared.OwnerReadWrite)
 	if err != nil {
 		log.Fatalf("write to disk failure: %v", err)
 	}
 }
+*/

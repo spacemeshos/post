@@ -1,12 +1,15 @@
 package main
 
+// NOTE: PoST RPC server is currently disabled.
+
+/*
 import (
 	"context"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/integration"
 	"github.com/spacemeshos/post/rpc/api"
 	"github.com/spacemeshos/post/shared"
-	"github.com/spacemeshos/post/validation"
+	"github.com/spacemeshos/post/verifying"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
@@ -27,14 +30,14 @@ var testCases = []*harnessTestCase{
 
 var (
 	cfg = config.DefaultConfig()
-	id  = []byte("deadbeef")
+	id  = make([]byte, 32)
 )
 
 func TestHarness(t *testing.T) {
 	assert := require.New(t)
 
 	cfg := *cfg
-	cfg.NumLabels = 1 << 22
+	cfg.NumLabels = 1 << 15
 	cfg.LabelSize = 8
 	cfg.NumFiles = 4
 	assert.NoError(cfg.Validate())
@@ -75,17 +78,21 @@ func testInitialize(h *integration.Harness, assert *require.Assertions, ctx cont
 	resProof, err := h.Execute(ctx, &api.ExecuteRequest{Id: id, Challenge: shared.ZeroChallenge})
 	assert.NoError(err)
 
-	proof := shared.Proof{}
-	err = proof.Decode(resProof.Proof.Data)
-	assert.NoError(err)
+	proof := &shared.Proof{
+		Nonce:   resProof.Proof.Nonce,
+		Indices: resProof.Proof.Indices,
+	}
+	proofMetadata := &shared.ProofMetadata{
+		ID:        resProof.ProofMetadata.Id,
+		Challenge: resProof.ProofMetadata.Challenge,
+		NumLabels: resProof.ProofMetadata.NumLabels,
+		LabelSize: uint(resProof.ProofMetadata.LabelSize),
+		K1:        uint(resProof.ProofMetadata.K1),
+		K2:        uint(resProof.ProofMetadata.K2),
+	}
 
-	v, err := validation.NewValidator(cfg)
+	err = verifying.Verify(proof, proofMetadata)
 	assert.NoError(err)
-	err = v.Validate(id, &proof)
-	assert.NoError(err)
-
-	_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
-	assert.EqualError(err, "rpc error: code = Unknown desc = already completed")
 
 	_, err = h.Reset(ctx, &api.ResetRequest{Id: id})
 	assert.NoError(err)
@@ -110,30 +117,31 @@ func TestHarness_CrashRecovery(t *testing.T) {
 	ctx, _ := context.WithTimeout(context.Background(), time.Duration(30*time.Second))
 
 	cfg := *cfg
-	cfg.NumLabels = 1 << 25
+	cfg.NumLabels = 1 << 16
 	cfg.LabelSize = 8
 	cfg.NumFiles = 4
-	cfg.MaxWriteFilesParallelism = 2
-	cfg.MaxWriteInFileParallelism = 2
 
 	h := newHarness(assert, &cfg)
 
+	defer func() {
+		err := h.TearDown(false)
+		assert.NoError(err, "failed to tear down harness")
+	}()
 	// Verify the initialization state.
 	resState, err := h.GetState(ctx, &api.GetStateRequest{Id: id})
 	assert.NoError(err)
 	assert.Equal("NotStarted", resState.State.String())
-	assert.Equal(cfg.Space(), resState.RequiredSpace)
+	assert.Equal(uint64(0), resState.NumLabelsWritten)
 
 	// Start initializing, and wait a short time, so completion won't be reached.
 	_, err = h.InitializeAsync(ctx, &api.InitializeAsyncRequest{Id: id})
 	assert.NoError(err)
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// Verify the initialization state.
 	resState, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
 	assert.NoError(err)
 	assert.Equal("Initializing", resState.State.String())
-	assert.Equal(uint64(0), resState.RequiredSpace)
 
 	// Kill the post server, stopping the initialization process ungracefully.
 	err = h.TearDown(false)
@@ -145,10 +153,9 @@ func TestHarness_CrashRecovery(t *testing.T) {
 	h = newHarness(assert, &diffCfg)
 
 	// Verify that initialization recovery is not allowed.
-	_, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
-	assert.EqualError(err, "rpc error: code = Unknown desc = config mismatch")
 	_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
-	assert.EqualError(err, "rpc error: code = Unknown desc = config mismatch")
+	assert.Error(err)
+	assert.Contains(err.Error(), "rpc error: code = Unknown desc = `NumFiles` config mismatch")
 	err = h.TearDown(false)
 	assert.NoError(err, "failed to tear down harness")
 
@@ -162,22 +169,19 @@ func TestHarness_CrashRecovery(t *testing.T) {
 	// Verify the initialization state.
 	resState, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
 	assert.NoError(err)
-	assert.Equal("Crashed", resState.State.String())
-	assert.True(resState.RequiredSpace < cfg.Space())
-	assert.True(resState.RequiredSpace > 0)
+	assert.Equal("Stopped", resState.State.String())
+	assert.True(resState.NumLabelsWritten > 0)
+	assert.True(resState.NumLabelsWritten < cfg.NumLabels)
 
 	// Complete the initialization procedure.
 	_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
 	assert.NoError(err)
 
 	// Verify the initialization state.
-	_, err = h.Initialize(ctx, &api.InitializeRequest{Id: id})
-	assert.EqualError(err, "rpc error: code = Unknown desc = already completed")
-
 	resState, err = h.GetState(ctx, &api.GetStateRequest{Id: id})
 	assert.NoError(err)
 	assert.Equal("Completed", resState.State.String())
-	assert.Equal(uint64(0), resState.RequiredSpace)
+	assert.Equal(cfg.NumLabels, resState.NumLabelsWritten)
 }
 
 func newHarness(assert *require.Assertions, cfg *config.Config) *integration.Harness {
@@ -199,3 +203,4 @@ func newHarness(assert *require.Assertions, cfg *config.Config) *integration.Har
 
 	return h
 }
+*/

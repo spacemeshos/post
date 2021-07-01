@@ -4,10 +4,6 @@
     "title": "api.proto",
     "version": "version not set"
   },
-  "schemes": [
-    "http",
-    "https"
-  ],
   "consumes": [
     "application/json"
   ],
@@ -17,12 +13,18 @@
   "paths": {
     "/v1/execute": {
       "post": {
-        "operationId": "Execute",
+        "operationId": "Post_Execute",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/apiExecuteResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -43,12 +45,18 @@
     },
     "/v1/executeasync": {
       "post": {
-        "operationId": "ExecuteAsync",
+        "operationId": "Post_ExecuteAsync",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/apiExecuteAsyncResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -69,12 +77,18 @@
     },
     "/v1/info": {
       "get": {
-        "operationId": "GetInfo",
+        "operationId": "Post_GetInfo",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/apiGetInfoResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -85,12 +99,18 @@
     },
     "/v1/initialize": {
       "post": {
-        "operationId": "Initialize",
+        "operationId": "Post_Initialize",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/apiInitializeResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -111,12 +131,18 @@
     },
     "/v1/initializeasync": {
       "post": {
-        "operationId": "InitializeAsync",
+        "operationId": "Post_InitializeAsync",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/apiInitializeAsyncResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -135,25 +161,24 @@
         ]
       }
     },
-    "/v1/proof/{id}/{challenge}": {
+    "/v1/proof/{challenge}": {
       "get": {
-        "operationId": "GetProof",
+        "operationId": "Post_GetProof",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/apiGetProofResponse"
             }
+          },
+          "default": {
+            "description": "An unexpected error response",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
           }
         },
         "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string",
-            "format": "byte"
-          },
           {
             "name": "challenge",
             "in": "path",
@@ -169,12 +194,18 @@
     },
     "/v1/reset": {
       "post": {
-        "operationId": "Reset",
+        "operationId": "Post_Reset",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/apiResetResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -195,12 +226,18 @@
     },
     "/v1/shutdown": {
       "post": {
-        "operationId": "Shutdown",
+        "operationId": "Post_Shutdown",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/apiShutdownResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -211,12 +248,18 @@
     },
     "/v1/state/{id}": {
       "get": {
-        "operationId": "GetState",
+        "operationId": "Post_GetState",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/apiGetStateResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -298,6 +341,9 @@
       "properties": {
         "proof": {
           "$ref": "#/definitions/apiProof"
+        },
+        "proof_metadata": {
+          "$ref": "#/definitions/apiProofMetadata"
         }
       }
     },
@@ -320,6 +366,9 @@
       "properties": {
         "proof": {
           "$ref": "#/definitions/apiProof"
+        },
+        "proof_metadata": {
+          "$ref": "#/definitions/apiProofMetadata"
         }
       }
     },
@@ -329,7 +378,7 @@
         "state": {
           "$ref": "#/definitions/apiGetStateResponseState"
         },
-        "requiredSpace": {
+        "num_labels_written": {
           "type": "string",
           "format": "uint64"
         }
@@ -340,7 +389,7 @@
       "enum": [
         "NotStarted",
         "Completed",
-        "Crashed",
+        "Stopped",
         "Initializing"
       ],
       "default": "NotStarted"
@@ -372,9 +421,42 @@
     "apiProof": {
       "type": "object",
       "properties": {
-        "data": {
+        "nonce": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "indices": {
           "type": "string",
           "format": "byte"
+        }
+      }
+    },
+    "apiProofMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "byte"
+        },
+        "challenge": {
+          "type": "string",
+          "format": "byte"
+        },
+        "num_labels": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "label_size": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "k1": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "k2": {
+          "type": "integer",
+          "format": "int64"
         }
       }
     },
@@ -407,6 +489,39 @@
           "type": "array",
           "items": {
             "type": "string"
+          }
+        }
+      }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "type_url": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string",
+          "format": "byte"
+        }
+      }
+    },
+    "runtimeError": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string"
+        },
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/protobufAny"
           }
         }
       }

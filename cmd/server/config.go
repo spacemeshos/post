@@ -1,5 +1,8 @@
 package server
 
+// NOTE: PoST RPC server is currently disabled.
+
+/*
 import (
 	"fmt"
 	"github.com/spacemeshos/post/config"
@@ -135,36 +138,22 @@ func setFlags(cmd *cobra.Command, cfg *Config) {
 		cfg.ServerCfg.RESTListener, "The interface/port/socket to listen for REST connections")
 
 	// POST config.
-
-	flags.Uint64Var(&cfg.PostCfg.NumLabels, "post-numlabels",
-		cfg.PostCfg.NumLabels, "") // TODO: add desc
-
-	flags.UintVar(&cfg.PostCfg.LabelSize, "post-labelsize",
-		cfg.PostCfg.LabelSize, "") // TODO: add desc
-
-	flags.UintVar(&cfg.PostCfg.K1, "post-k1",
-		cfg.PostCfg.K1, "") // TODO: add desc
-
-	flags.UintVar(&cfg.PostCfg.K2, "post-k2",
-		cfg.PostCfg.K2, "") // TODO: add desc
+	// TODO(moshababo): add usage desc
 
 	flags.UintVar(&cfg.PostCfg.NumFiles, "post-numfiles",
-		cfg.PostCfg.NumFiles, "Number of files")
+		cfg.PostCfg.NumFiles, "")
 
-	flags.Uint64Var(&cfg.PostCfg.LabelsLogRate, "post-lograte",
-		cfg.PostCfg.LabelsLogRate, "Labels construction progress log rate")
+	flags.Uint64Var(&cfg.PostCfg.NumLabels, "post-numlabels",
+		cfg.PostCfg.NumLabels, "")
 
-	flags.UintVar(&cfg.PostCfg.MaxWriteFilesParallelism, "post-parallel-files",
-		cfg.PostCfg.MaxWriteFilesParallelism, "Max degree of files write parallelism")
+	flags.UintVar(&cfg.PostCfg.LabelSize, "post-labelsize",
+		cfg.PostCfg.LabelSize, "")
 
-	flags.UintVar(&cfg.PostCfg.MaxWriteInFileParallelism, "post-parallel-infile",
-		cfg.PostCfg.MaxWriteInFileParallelism, "Max degree of cpu work parallelism per file write")
+	flags.UintVar(&cfg.PostCfg.K1, "post-k1",
+		cfg.PostCfg.K1, "")
 
-	flags.UintVar(&cfg.PostCfg.MaxReadFilesParallelism, "post-parallel-read",
-		cfg.PostCfg.MaxReadFilesParallelism, "Max degree of files read parallelism")
-
-	flags.BoolVar(&cfg.PostCfg.DisableSpaceAvailabilityChecks, "post-disable-space-checks",
-		false, "Whether to disable disk space availability checks done in the initialization phase")
+	flags.UintVar(&cfg.PostCfg.K2, "post-k2",
+		cfg.PostCfg.K2, "")
 
 	err := viper.BindPFlags(flags)
 	if err != nil {
@@ -221,3 +210,4 @@ func ensureCLIFlags(cmd *cobra.Command, cfg *Config) {
 		}
 	})
 }
+*/

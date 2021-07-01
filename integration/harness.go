@@ -1,5 +1,8 @@
 package integration
 
+// NOTE: PoST RPC server is currently disabled.
+
+/*
 import (
 	"context"
 	"fmt"
@@ -92,3 +95,4 @@ func baseDir() (string, error) {
 	err := os.MkdirAll(baseDir, 0755)
 	return baseDir, err
 }
+*/
