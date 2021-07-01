@@ -139,7 +139,7 @@ func (init *Initializer) Initialize() error {
 	fileNumLabels := numLabels / uint64(init.opts.NumFiles)
 
 	init.logger.Info("initialization: starting to write %v file(s); number of units: %v, number of labels per unit: %v, number of bits per label: %v, datadir: %v",
-		init.opts.NumFiles, init.opts.NumUnits, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel, init.cfg, init.opts.DataDir)
+		init.opts.NumFiles, init.opts.NumUnits, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel, init.opts.DataDir)
 
 	for i := 0; i < int(init.opts.NumFiles); i++ {
 		if err := init.initFile(uint(init.opts.ComputeProviderID), i, numLabels, fileNumLabels); err != nil {
