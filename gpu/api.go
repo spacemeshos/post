@@ -94,7 +94,7 @@ func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPositio
 	case -6:
 		return nil, fmt.Errorf("gpu-post error: invalid param")
 	default:
-		panic("unreachable")
+		panic(fmt.Sprintf("unreachable reVal %d",retVal))
 	}
 }
 
