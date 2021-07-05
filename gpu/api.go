@@ -93,8 +93,10 @@ func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPositio
 		return nil, fmt.Errorf("gpu-post error: no compute options")
 	case -6:
 		return nil, fmt.Errorf("gpu-post error: invalid param")
+	case -7:
+		return nil, fmt.Errorf("gpu-post error: invalid provider")
 	default:
-		panic("unreachable")
+		panic(fmt.Sprintf("unreachable reVal %d", retVal))
 	}
 }
 
