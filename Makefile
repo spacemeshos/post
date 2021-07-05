@@ -1,9 +1,23 @@
+export CGO_ENABLED := 1
 CGO_LDFLAGS_EXT = -Wl,-rpath,$(PROJ_DIR)build
 include Makefile.Inc
+
 test: get-gpu-setup
 	go test ./gpu -v
+.PHONY: test
+
+compile-test: get-gpu-setup
+	go test ./gpu -v -c -o $(BIN_DIR)test$(EXE)
+.PHONY: compile-test
+
+ifeq ($(HOST_OS),$(filter $(HOST_OS),linux darwin))
+compile-windows-test:
+	CC=x86_64-w64-mingw32-gcc $(MAKE) GOOS=windows GOARCH=amd64 BIN_DIR=$(PROJ_DIR)build/ compile-test
+endif
+.PHONY: compile-windows-test
 
 build: $(BIN_DIR)post$(EXE) #$(BIN_DIR)spacemesh-init$(EXE)
+.PHONY: build
 
 $(BIN_DIR)post$(EXE): get-gpu-setup
 	go build -o $@ .
