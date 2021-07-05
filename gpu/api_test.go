@@ -87,7 +87,7 @@ func TestScryptPositions_InvalidProviderId(t *testing.T) {
 
 	invalidProviderId := uint(1 << 10)
 	res, err := ScryptPositions(invalidProviderId, id, salt, 1, 1, 8)
-	req.EqualError(err, fmt.Sprintf("gpu-post error: invalid param"))
+	req.EqualError(err, fmt.Sprintf("gpu-post error: invalid provider"))
 	req.Nil(res)
 }
 
@@ -154,7 +154,7 @@ func TestStop_SameThread(t *testing.T) {
 	providers := Providers()
 	for _, p := range providers {
 		go func() {
-			time.Sleep(1 * time.Second)
+			time.Sleep(100 * time.Millisecond)
 			res := cStop(10000)
 			r.Equal(StopResultOk, res)
 		}()
@@ -166,7 +166,7 @@ func TestStop_SameThread(t *testing.T) {
 		r.NoError(err)
 		r.NotNil(res)
 		r.NotNil(res.Output)
-		r.True(res.Stopped)
+		r.True(res.Stopped,"provider %v", p)
 
 		// `res.Output` size is expected be smaller than expected due to `Stop` call.
 		outputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(hashLenBits))
