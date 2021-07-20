@@ -7,7 +7,7 @@ export GOARCH
 export GOARM
 export BIN_DIR
 
-CGO_TEST_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,$(BIN_DIR)
+CGO_TEST_LDFLAGS = $(CGO_LDFLAGS) -Wl,-rpath,$(BIN_DIR)
 
 ifeq ($(OS),Windows_NT)
   HOST_OS := windows
@@ -27,8 +27,10 @@ else
   TEMP := /tmp
   ifeq ($(GOOS),darwin)
 	  platform := macos
+	  CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,@loader_path
   else
       platform := linux
+	  CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,$$ORIGIN
   endif
 endif
 
