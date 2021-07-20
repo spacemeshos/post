@@ -7,6 +7,8 @@ export GOARCH
 export GOARM
 export BIN_DIR
 
+CGO_TEST_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,$(BIN_DIR)
+
 ifeq ($(OS),Windows_NT)
   HOST_OS := windows
 else
@@ -59,3 +61,10 @@ $(BIN_DIR)$(BINARY):
 
 get-gpu-setup: $(PROJ_DIR)$(GPU_SETUP_ZIP) $(BINDIR_GPU_SETUP_LIBS)
 .PHONY: get-gpu-setup
+
+SUBDIRS_LVL1 := $(foreach X,$(wildcard $(dir $(PROJ_DIR))/*/.), $(lastword $(subst /, ,$(dir $(X)))))
+SUBDIRS_LVL2 := $(foreach X,$(SUBDIRS_LVL1),$X $(foreach Y, $(wildcard $(X)/*/.), $(X)-$(lastword $(subst /, ,$(dir $(Y))))))
+# defines test-* tartets from subdirs level 1 and 2
+$(foreach X, $(SUBDIRS_LVL2), test-$(X)): get-gpu-setup
+	cd $(subst -,/,$(patsubst test-%,%,$@)) && CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -v
+.PHONY: $(foreach X, $(SUBDIRS_LVL2), test-$(X))

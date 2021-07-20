@@ -2,11 +2,11 @@ export CGO_ENABLED := 1
 include Makefile.Inc
 
 test: get-gpu-setup
-	go test ./gpu -v
+	CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -v ./...
 .PHONY: test
 
 compile-test: get-gpu-setup
-	go test ./gpu -v -c -o $(BIN_DIR)test$(EXE)
+	CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -v -c -o $(BIN_DIR)test$(EXE) ./...
 .PHONY: compile-test
 
 ifeq ($(HOST_OS),$(filter $(HOST_OS),linux darwin))
@@ -19,10 +19,10 @@ build: $(BIN_DIR)post$(EXE) #$(BIN_DIR)spacemesh-init$(EXE)
 .PHONY: build
 
 $(BIN_DIR)post$(EXE): get-gpu-setup
-	go build -o $@ --tags no_ext_rpath .
+	go build -o $@ .
 
 $(BIN_DIR)spacemesh-init$(EXE): get-gpu-setup
-	cd cmd/init && go build -o $@ --tags no_ext_rpath .
+	cd cmd/init && go build -o $@ .
 
 SHA = $(shell git rev-parse --short HEAD)
 BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
