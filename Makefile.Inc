@@ -1,7 +1,7 @@
 PROJ_DIR := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 BIN_DIR ?= $(PROJ_DIR)build/
 
-export CGO_LDFLAGS := -L$(BIN_DIR) -Wl,-rpath,$$ORIGIN $(CGO_LDFLAGS_EXT)
+export CGO_LDFLAGS := -L$(BIN_DIR)
 export GOOS
 export GOARCH
 export GOARM
