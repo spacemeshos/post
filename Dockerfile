@@ -13,11 +13,6 @@ RUN bash -c "for i in {1..9}; do mkdir -p /usr/share/man/man\$i; done" \
     ca-certificates \
     tzdata \
     locales \
-    # -- trubleshuting tookit ---
-    # bash \
-    # curl \
-    # procps \
-    # net-tools \
     # -- it allows to start with nvidia-docker runtime --
     # libnvidia-compute-390 \
  && apt-get clean \

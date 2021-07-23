@@ -26,11 +26,12 @@ ifeq ($(GOOS),windows)
 else
   TEMP := /tmp
   ifeq ($(GOOS),darwin)
-	  platform := macos
-	  CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,@loader_path
+    platform := macos
+    CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,@loader_path
+  	ULIMIT := ulimit -n 9999;
   else
-      platform := linux
-	  CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,$$ORIGIN
+    platform := linux
+    CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,$$ORIGIN
   endif
 endif
 
@@ -64,9 +65,34 @@ $(BIN_DIR)$(BINARY):
 get-gpu-setup: $(PROJ_DIR)$(GPU_SETUP_ZIP) $(BINDIR_GPU_SETUP_LIBS)
 .PHONY: get-gpu-setup
 
-SUBDIRS_LVL1 := $(foreach X,$(wildcard $(dir $(PROJ_DIR))/*/.), $(lastword $(subst /, ,$(dir $(X)))))
-SUBDIRS_LVL2 := $(foreach X,$(SUBDIRS_LVL1),$X $(foreach Y, $(wildcard $(X)/*/.), $(X)-$(lastword $(subst /, ,$(dir $(Y))))))
-# defines test-* tartets from subdirs level 1 and 2
-$(foreach X, $(SUBDIRS_LVL2), test-$(X)): get-gpu-setup
-	cd $(subst -,/,$(patsubst test-%,%,$@)) && CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -v
-.PHONY: $(foreach X, $(SUBDIRS_LVL2), test-$(X))
+SUBDIRS_LVL1 := $(foreach X,$(wildcard $(dir $(PROJ_DIR))*/.), $(lastword $(subst /, ,$(dir $(X)))))
+SUBDIRS_ONLY := $(sort \
+	$(foreach X,$(SUBDIRS_LVL1),\
+		$(foreach Y, $(wildcard $(X)/*_test.go), test-$(X)) ))
+SUBDIRS_ALL := $(sort \
+	$(foreach X,$(SUBDIRS_LVL1),\
+		$(foreach Y, $(wildcard $(X)/*/*_test.go), test-$(X)-all ) \
+		$(foreach Y, $(wildcard $(X)/*_test.go), test-$(X)-all ) ))
+SUBDIRS_LVL2 := $(sort \
+	$(foreach X,$(SUBDIRS_LVL1),\
+		$(foreach Y, $(wildcard $(X)/*/*_test.go), test-$(X)-$(lastword $(subst /, ,$(dir $(Y))) ))))
+
+# defines test-* targets from subdirs level 1 and 2
+$(SUBDIRS_ONLY): get-gpu-setup
+	$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -v ./$(@:test-%=%)
+$(SUBDIRS_LVL2): get-gpu-setup
+	$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -v ./$(subst -,/,$(@:test-%=%))/...
+$(SUBDIRS_ALL): get-gpu-setup
+	$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -v ./$(@:test-%-all=%)/...
+
+print-test-targets:
+	@for i in test-all test-tidy test-fmt \
+		$(sort \
+			$(SUBDIRS_LVL2) \
+			$(foreach X, $(SUBDIRS_ALL), $(if $(filter $(SUBDIRS_ONLY),$(X:%-all=%)), \
+				$(X:%-all=%)[-all],\
+				$(X)))); \
+	do echo $$i; \
+	done
+.PHONY: $(SUBDIRS_ALL) $(SUBDIRS_LVL2) $(SUBDIRS_ONLY) print-test-targets
+

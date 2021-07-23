@@ -1,10 +1,35 @@
 name: CI
 
-on:  [push, pull_request]
+env:
+  go-version: '1.15.13'
+
+on:
+  push:
+  pull_request:
 
 jobs:
-  build:
+  quicktests:
+    runs-on: ubuntu-latest
+    if: !always()
+    # should not take more than 2-3 mins
+    timeout-minutes: 5
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: set up go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.go-version }}
+      - name: fmt, tidy, lint
+        run: |
+          make install
+          make test-tidy
+          make test-fmt
+          make lint
+  unittests:
     runs-on: ${{ matrix.os }}
+    needs:
+      #- quicktests
     strategy:
       fail-fast: false
       matrix:
@@ -15,6 +40,6 @@ jobs:
       - name: set up go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.15.3'
-      - name: test gpu
-        run: make test
+          go-version: ${{ env.go-version }}
+      - name: unit tests
+        run: make test-all
