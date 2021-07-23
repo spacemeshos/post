@@ -8,28 +8,36 @@ on:
   pull_request:
 
 jobs:
+
   quicktests:
+    env:
+      execute: 'false'
     runs-on: ubuntu-latest
-    if: !always()
-    # should not take more than 2-3 mins
     timeout-minutes: 5
     steps:
       - name: checkout
+        if: env.execute == 'true'
         uses: actions/checkout@v2
       - name: set up go
+        if: env.execute == 'true'
         uses: actions/setup-go@v2
         with:
           go-version: ${{ env.go-version }}
       - name: fmt, tidy, lint
+        if: env.execute == 'true'
         run: |
           make install
           make test-tidy
           make test-fmt
           make lint
+      - name: Mark the job as succeeded
+        if: env.execute == 'false'
+        run: exit 0
+
   unittests:
     runs-on: ${{ matrix.os }}
     needs:
-      #- quicktests
+      - quicktests
     strategy:
       fail-fast: false
       matrix:
