@@ -3,7 +3,6 @@ package proving
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
@@ -25,12 +24,14 @@ type (
 	Logger              = shared.Logger
 	Challenge           = shared.Challenge
 	ConfigMismatchError = shared.ConfigMismatchError
-	Metadata            = initialization.Metadata
-	DiskState           = initialization.DiskState
+
+	Metadata  = initialization.Metadata
+	DiskState = initialization.DiskState
 )
 
 var (
 	FastOracle = oracle.FastOracle
+	UInt64LE   = shared.UInt64LE
 )
 
 type Prover struct {
@@ -195,7 +196,7 @@ func (p *Prover) tryNonce(ctx context.Context, numLabels uint64, ch Challenge, n
 
 			// Convert the fast oracle output's leading 64 bits to a number,
 			// so that it could be used to perform math comparisons.
-			hashNum := binary.LittleEndian.Uint64(hash[:])
+			hashNum := UInt64LE(hash[:])
 
 			// Check the difficulty requirement.
 			if hashNum <= difficulty {

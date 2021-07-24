@@ -2,7 +2,6 @@ package verifying
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
@@ -17,6 +16,7 @@ type (
 var (
 	WorkOracleOne = oracle.WorkOracleOne
 	FastOracle    = oracle.FastOracle
+	UInt64LE      = shared.UInt64LE
 )
 
 // Verify ensures the validity of a proof in respect to its metadata.
@@ -50,7 +50,7 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 
 		label := WorkOracleOne(uint(initialization.CPUProviderID()), m.ID, index, uint32(m.BitsPerLabel))
 		hash := FastOracle(m.Challenge, p.Nonce, label)
-		hashNum := binary.LittleEndian.Uint64(hash[:])
+		hashNum := UInt64LE(hash[:])
 		if hashNum > difficulty {
 			return fmt.Errorf("fast oracle output is above the threshold; index: %d, label: %x, hash: %x, hashNum: %d, difficulty: %d",
 				index, label, hash, hashNum, difficulty)

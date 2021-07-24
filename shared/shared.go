@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"encoding/binary"
 	"math"
 	"os"
 )
@@ -70,4 +71,8 @@ func UintBE(b []byte) uint64 {
 		v |= uint64(b[i])
 	}
 	return v
+}
+
+func UInt64LE(b []byte) uint64 {
+	return binary.LittleEndian.Uint64(b)
 }
