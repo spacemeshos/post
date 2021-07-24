@@ -24,6 +24,7 @@ var (
 	opts config.InitOpts
 
 	debug = flag.Bool("debug", false, "")
+	long  = flag.Bool("long", false, "")
 
 	NewInitializer = initialization.NewInitializer
 	NewProver      = proving.NewProver
@@ -75,8 +76,8 @@ func TestVerify(t *testing.T) {
 //    and ensure that each one equals a single label compute (verifier).
 func TestLabelsCorrectness(t *testing.T) {
 	req := require.New(t)
-	if testing.Short() {
-		t.Skip()
+	if !*long {
+		t.Skip("long test")
 	}
 
 	numFiles := 2

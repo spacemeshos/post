@@ -331,7 +331,7 @@ func TestValidateMetadata(t *testing.T) {
 
 	// Attempt to initialize with different `opts.NumFiles`.
 	newOpts := opts
-	newOpts.NumFiles++
+	newOpts.NumFiles = 4
 	init, err = NewInitializer(cfg, newOpts, id)
 	r.NoError(err)
 	err = init.Initialize()
@@ -358,7 +358,7 @@ func TestStop(t *testing.T) {
 	r := require.New(t)
 
 	newOpts := opts
-	newOpts.NumUnits = 5
+	newOpts.NumUnits = 10
 
 	init, err := NewInitializer(cfg, newOpts, id)
 	r.NoError(err)
