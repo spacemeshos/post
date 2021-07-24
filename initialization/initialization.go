@@ -33,31 +33,12 @@ var (
 	ErrStateMetadataFileMissing     = errors.New("metadata file is missing")
 )
 
-var (
-	providers     []ComputeProvider
-	cpuProviderID int
-)
-
-func init() {
-	providers = gpu.Providers()
-	cpuProviderID = int(cpuProvider(providers).ID)
-}
-
 func Providers() []ComputeProvider {
-	return providers
+	return gpu.Providers()
 }
 
 func CPUProviderID() int {
-	return cpuProviderID
-}
-
-func cpuProvider(providers []ComputeProvider) ComputeProvider {
-	for _, p := range providers {
-		if p.Model == "CPU" {
-			return p
-		}
-	}
-	panic("unreachable")
+	return gpu.CPUProviderID()
 }
 
 type Initializer struct {

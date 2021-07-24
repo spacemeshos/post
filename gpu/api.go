@@ -13,8 +13,31 @@ type ComputeProvider struct {
 	ComputeAPI ComputeAPIClass
 }
 
+var (
+	providers     []ComputeProvider
+	cpuProviderID int
+)
+
+func init() {
+	providers = cGetProviders()
+	cpuProviderID = int(filterCPUProvider(providers).ID)
+}
+
 func Providers() []ComputeProvider {
-	return cGetProviders()
+	return providers
+}
+
+func CPUProviderID() int {
+	return cpuProviderID
+}
+
+func filterCPUProvider(providers []ComputeProvider) ComputeProvider {
+	for _, p := range providers {
+		if p.Model == "CPU" {
+			return p
+		}
+	}
+	panic("unreachable")
 }
 
 func Benchmark(p ComputeProvider) (int, error) {

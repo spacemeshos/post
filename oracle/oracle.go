@@ -22,15 +22,14 @@ func WorkOracle(computeProviderId uint, id []byte, startPosition, endPosition ui
 	return res.Output, nil
 }
 
-func WorkOracleOne(cpuProviderID uint, id []byte, position uint64, bitsPerLabel uint32) []byte {
-	salt := make([]byte, 32) // TODO(moshababo): apply salt
-
-	res, err := gpu.ScryptPositions(cpuProviderID, id, salt, position, position, bitsPerLabel)
+func WorkOracleOne(id []byte, position uint64, bitsPerLabel uint32) []byte {
+	cpuProviderID := uint(gpu.CPUProviderID())
+	output, err := WorkOracle(cpuProviderID, id, position, position, bitsPerLabel)
 	if err != nil {
 		panic(err)
 	}
 
-	return res.Output
+	return output
 
 	/*
 		// A template for an alternative Go implementation:
