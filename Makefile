@@ -20,27 +20,6 @@ install: get-gpu-setup
 	GO111MODULE=off go get golang.org/x/lint/golint
 .PHONY: install
 
-build: $(BIN_DIR)post$(EXE) #$(BIN_DIR)spacemesh-init$(EXE)
-.PHONY: build
-
-$(BIN_DIR)post$(EXE): get-gpu-setup
-	go build -o $@ .
-
-$(BIN_DIR)spacemesh-init$(EXE): get-gpu-setup
-	cd cmd/init && go build -o $@ .
-
-SHA = $(shell git rev-parse --short HEAD)
-BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
-DOCKER_IMAGE := post:$(BRANCH)
-
-ifeq ($(BRANCH),$(filter $(BRANCH),staging trying))
-  DOCKER_IMAGE = $(DOCKER_IMAGE_REPO):$(SHA)
-endif
-
-dockerbuild-go:
-	docker build -t $(DOCKER_IMAGE) .
-.PHONY: dockerbuild-go
-
 test-tidy:
 	# Working directory must be clean, or this test would be destructive
 	git diff --quiet || (echo "\033[0;31mWorking directory not clean!\033[0m" && git --no-pager diff && exit 1)
