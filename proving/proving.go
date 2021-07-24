@@ -177,7 +177,7 @@ func (p *Prover) verifyMetadata(m *Metadata) error {
 }
 
 func (p *Prover) tryNonce(ctx context.Context, numLabels uint64, ch Challenge, nonce uint32, readerChan <-chan []byte, difficulty uint64) ([]byte, error) {
-	var bitsPerIndex = uint(shared.NumBits(numLabels))
+	var bitsPerIndex = uint(shared.BinaryRepresentationMinBits(numLabels))
 	var buf = bytes.NewBuffer(make([]byte, shared.Size(bitsPerIndex, p.cfg.K2))[0:0])
 	var gsWriter = shared.NewGranSpecificWriter(buf, bitsPerIndex)
 	var index uint64

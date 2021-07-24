@@ -79,7 +79,7 @@ func TestProver_GenerateProof(t *testing.T) {
 		r.Equal(cfg.K2, proofMetaData.K2)
 
 		numLabels := uint64(cfg.LabelsPerUnit * numUnits)
-		indexBitSize := uint(shared.NumBits(numLabels))
+		indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
 		r.Equal(shared.Size(indexBitSize, p.cfg.K2), uint(len(proof.Indices)))
 
 		if *debug {

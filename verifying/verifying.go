@@ -27,15 +27,15 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 	}
 
 	var numLabels = uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
-	var indexBitSize = uint(shared.NumBits(numLabels))
-	var expectedSize = shared.Size(indexBitSize, m.K2)
+	var bitsPerIndex = uint(shared.BinaryRepresentationMinBits(numLabels))
+	var expectedSize = shared.Size(bitsPerIndex, m.K2)
 	if expectedSize != uint(len(p.Indices)) {
 		return fmt.Errorf("invalid indices set size; expected %d, given: %d", expectedSize, len(p.Indices))
 	}
 
 	difficulty := shared.ProvingDifficulty(numLabels, uint64(m.K1))
 	buf := bytes.NewBuffer(p.Indices)
-	gsReader := shared.NewGranSpecificReader(buf, indexBitSize)
+	gsReader := shared.NewGranSpecificReader(buf, bitsPerIndex)
 	indicesSet := make(map[uint64]bool, m.K2)
 
 	for i := uint(0); i < m.K2; i++ {

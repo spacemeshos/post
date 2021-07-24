@@ -42,7 +42,7 @@ func Uint64MulOverflow(a, b uint64) bool {
 	return c/b != a
 }
 
-func NumBits(val uint64) int {
+func BinaryRepresentationMinBits(val uint64) int {
 	return int(math.Log2(float64(val))) + 1
 }
 
