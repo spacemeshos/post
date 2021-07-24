@@ -237,7 +237,7 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 
 	workersChans := make([]chan []byte, numWorkers)
 	for i := range workersChans {
-		workersChans[i] = make(chan []byte, 1000) // TODO(moshababo): use numLabels/2 size instead? need just enough buffer to circulate between the two routines
+		workersChans[i] = make(chan []byte, 1024)
 	}
 	resultsChan := make(chan nonceResult, numWorkers)
 	errChan := make(chan error, numWorkers)
