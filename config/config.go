@@ -16,9 +16,9 @@ const (
 	// and file truncating is byte-granular regardless of `BitsPerLabel` value.
 	DefaultComputeBatchSize = 1 << 14
 
-	// 1KB per unit. Temporary value.
+	// 2KB per unit. Temporary value.
 	DefaultBitsPerLabel  = 8
-	DefaultLabelsPerUnit = 1 << 10
+	DefaultLabelsPerUnit = 2048
 
 	DefaultMaxNumUnits = 10
 	DefaultMinNumUnits = 1

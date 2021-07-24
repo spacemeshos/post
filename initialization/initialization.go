@@ -237,30 +237,6 @@ func (init *Initializer) VerifyStarted() error {
 	return nil
 }
 
-func (init *Initializer) VerifyNotCompleted() error {
-	ok, err := init.Completed()
-	if err != nil {
-		return err
-	}
-	if ok == true {
-		return shared.ErrInitCompleted
-	}
-
-	return nil
-}
-
-func (init *Initializer) VerifyCompleted() error {
-	completed, err := init.Completed()
-	if err != nil {
-		return err
-	}
-	if completed == false {
-		return shared.ErrInitNotCompleted
-	}
-
-	return nil
-}
-
 func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabels uint64, fileNumLabels uint64) error {
 	fileOffset := uint64(fileIndex) * fileNumLabels
 	fileTargetPosition := fileOffset + fileNumLabels
