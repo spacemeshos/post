@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/spacemeshos/post/config"
-	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/oracle"
 	"github.com/spacemeshos/post/shared"
 )
@@ -48,7 +47,7 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 		}
 		indicesSet[index] = true
 
-		label := WorkOracleOne(uint(initialization.CPUProviderID()), m.ID, index, uint32(m.BitsPerLabel))
+		label := WorkOracleOne(m.ID, index, uint32(m.BitsPerLabel))
 		hash := FastOracle(m.Challenge, p.Nonce, label)
 		hashNum := UInt64LE(hash[:])
 		if hashNum > difficulty {

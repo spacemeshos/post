@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/spacemeshos/post/config"
-	"github.com/spacemeshos/post/gpu"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
 	smlog "github.com/spacemeshos/smutil/log"
@@ -39,14 +38,6 @@ func TestMain(m *testing.M) {
 
 	res := m.Run()
 	os.Exit(res)
-}
-
-func TestCPUProviderExists(t *testing.T) {
-	r := require.New(t)
-
-	p := cpuProvider(providers)
-	r.Equal("CPU", p.Model)
-	r.Equal(gpu.ComputeAPIClassCPU, p.ComputeAPI)
 }
 
 func TestInitialize(t *testing.T) {

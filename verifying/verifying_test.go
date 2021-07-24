@@ -126,7 +126,7 @@ func TestLabelsCorrectness(t *testing.T) {
 			}
 
 			// Verify correctness.
-			labelCompute := oracle.WorkOracleOne(uint(CPUProviderID()), id, position, bitsPerLabel)
+			labelCompute := oracle.WorkOracleOne(id, position, bitsPerLabel)
 			req.Equal(labelCompute, label, fmt.Sprintf("position: %v, bitsPerLabel: %v", position, bitsPerLabel))
 
 			position++

@@ -18,6 +18,14 @@ var (
 	long  = flag.Bool("long", false, "")
 )
 
+func TestCPUProviderExists(t *testing.T) {
+	r := require.New(t)
+
+	p := filterCPUProvider(providers)
+	r.Equal("CPU", p.Model)
+	r.Equal(ComputeAPIClassCPU, p.ComputeAPI)
+}
+
 // TestScryptPositions is an output correctness sanity test. It doesn't cover many cases.
 func TestScryptPositions(t *testing.T) {
 	r := require.New(t)
@@ -166,7 +174,7 @@ func TestStop_SameThread(t *testing.T) {
 		r.NoError(err)
 		r.NotNil(res)
 		r.NotNil(res.Output)
-		r.True(res.Stopped,"provider %v", p)
+		r.True(res.Stopped, "provider %v", p)
 
 		// `res.Output` size is expected be smaller than expected due to `Stop` call.
 		outputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(hashLenBits))
