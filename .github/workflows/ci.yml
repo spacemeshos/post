@@ -1,10 +1,44 @@
 name: CI
 
-on: push
+env:
+  go-version: '1.15.13'
+
+on:
+  push:
+  pull_request:
 
 jobs:
-  build:
+
+  quicktests:
+    env:
+      execute: 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: checkout
+        if: env.execute == 'true'
+        uses: actions/checkout@v2
+      - name: set up go
+        if: env.execute == 'true'
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ env.go-version }}
+      - name: fmt, tidy, lint
+        if: env.execute == 'true'
+        run: |
+          make install
+          make test-tidy
+          make test-fmt
+          make lint
+      - name: Mark the job as succeeded
+        if: env.execute == 'false'
+        run: exit 0
+
+  unittests:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    needs:
+      - quicktests
     strategy:
       fail-fast: false
       matrix:
@@ -15,6 +49,6 @@ jobs:
       - name: set up go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.13.12'
-      - name: test gpu
-        run: go test ./gpu -v
+          go-version: ${{ env.go-version }}
+      - name: unit tests
+        run: make test-all

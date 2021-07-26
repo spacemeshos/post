@@ -1,5 +1,3 @@
 .idea
-
-post
-cmd/bench/bench
-
+libgpu-setup-*
+build
