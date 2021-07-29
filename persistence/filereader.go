@@ -21,7 +21,7 @@ var _ Reader = (*FileReader)(nil)
 func NewFileReader(name string, bitsPerLabel uint) (*FileReader, error) {
 	file, err := os.OpenFile(name, os.O_RDONLY, shared.OwnerReadWrite)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open file for labels reader: %v", err)
+		return nil, fmt.Errorf("failed to open file for labels reader: %w", err)
 	}
 	buf := bufio.NewReader(file)
 

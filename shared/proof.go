@@ -21,7 +21,7 @@ func (p *Proof) Encode() []byte {
 	b := make([]byte, size)
 
 	binary.LittleEndian.PutUint32(b, p.Nonce)
-	copy(b[4:], p.Indices[:])
+	copy(b[4:], p.Indices)
 
 	return b
 }
