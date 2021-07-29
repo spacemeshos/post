@@ -234,6 +234,8 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 	gsReader := shared.NewGranSpecificReader(reader, p.cfg.BitsPerLabel)
 
 	numWorkers := endNonce - startNonce + 1
+
+	var mu sync.RWMutex
 	var indices []byte
 
 	workersChans := make([]chan []byte, numWorkers)
@@ -271,8 +273,18 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 		i := i
 		go func() {
 			nonce := startNonce + i
-			indices, err = p.tryNonce(ctx, numLabels, challenge, nonce, workersChans[i], difficulty)
-			resultsChan <- nonceResult{nonce, indices, err}
+
+			tempIndices, tempErr := p.tryNonce(ctx, numLabels, challenge, nonce, workersChans[i], difficulty)
+
+			mu.Lock()
+			indices, err = tempIndices, tempErr
+			mu.Unlock()
+
+			mu.RLock()
+			result := nonceResult{nonce, indices, err}
+			mu.RUnlock()
+
+			resultsChan <- result
 		}()
 	}
 
