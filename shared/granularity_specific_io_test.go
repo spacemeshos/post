@@ -2,14 +2,13 @@ package shared_test
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/spacemeshos/post/shared"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
-var (
-	NewGranSpecificReader = shared.NewGranSpecificReader
-)
+var NewGranSpecificReader = shared.NewGranSpecificReader
 
 // change to simple array instead of file writing
 func TestGranSpecificReader_BitGranular(t *testing.T) {

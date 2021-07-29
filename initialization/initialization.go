@@ -4,16 +4,17 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/spacemeshos/post/config"
-	"github.com/spacemeshos/post/gpu"
-	"github.com/spacemeshos/post/oracle"
-	"github.com/spacemeshos/post/persistence"
-	"github.com/spacemeshos/post/shared"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/gpu"
+	"github.com/spacemeshos/post/oracle"
+	"github.com/spacemeshos/post/persistence"
+	"github.com/spacemeshos/post/shared"
 )
 
 type (

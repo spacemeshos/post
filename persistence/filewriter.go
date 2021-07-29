@@ -3,8 +3,9 @@ package persistence
 import (
 	"bufio"
 	"fmt"
-	"github.com/spacemeshos/post/shared"
 	"os"
+
+	"github.com/spacemeshos/post/shared"
 )
 
 type FileWriter struct {

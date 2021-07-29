@@ -4,17 +4,18 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"github.com/spacemeshos/post/config"
-	"github.com/spacemeshos/post/persistence"
-	"github.com/spacemeshos/post/shared"
-	smlog "github.com/spacemeshos/smutil/log"
-	"github.com/stretchr/testify/require"
 	"io"
 	"io/ioutil"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/persistence"
+	"github.com/spacemeshos/post/shared"
+	smlog "github.com/spacemeshos/smutil/log"
+	"github.com/stretchr/testify/require"
 )
 
 var (

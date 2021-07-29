@@ -3,6 +3,11 @@ package verifying
 import (
 	"flag"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"testing"
+
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/oracle"
@@ -10,10 +15,6 @@ import (
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
 	"github.com/stretchr/testify/require"
-	"io"
-	"io/ioutil"
-	"os"
-	"testing"
 )
 
 var (

@@ -5,16 +5,17 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"math"
+	"os"
+	"testing"
+
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/verifying"
 	smlog "github.com/spacemeshos/smutil/log"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
-	"math"
-	"os"
-	"testing"
 )
 
 var (
@@ -49,7 +50,7 @@ func TestMain(m *testing.M) {
 func TestProver_GenerateProof(t *testing.T) {
 	r := require.New(t)
 
-	for numUnits := uint(cfg.MinNumUnits); numUnits < 6; numUnits++ {
+	for numUnits := cfg.MinNumUnits; numUnits < 6; numUnits++ {
 		newOpts := opts
 		newOpts.NumUnits = numUnits
 

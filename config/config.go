@@ -2,9 +2,10 @@ package config
 
 import (
 	"fmt"
+	"path/filepath"
+
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/smutil"
-	"path/filepath"
 )
 
 const (
@@ -35,9 +36,7 @@ const (
 	MinNumFiles = 1
 )
 
-var (
-	DefaultDataDir = filepath.Join(smutil.GetUserHomeDirectory(), "post", DefaultDataDirName)
-)
+var DefaultDataDir = filepath.Join(smutil.GetUserHomeDirectory(), "post", DefaultDataDirName)
 
 type Config struct {
 	BitsPerLabel  uint

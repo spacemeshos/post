@@ -2,10 +2,11 @@ package persistence
 
 import (
 	"encoding/binary"
-	"github.com/stretchr/testify/require"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestGroup(t *testing.T) {

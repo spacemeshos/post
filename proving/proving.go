@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"sync"
+
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/oracle"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
-	"io"
 )
 
 const (
@@ -178,9 +180,9 @@ func (p *Prover) verifyMetadata(m *Metadata) error {
 }
 
 func (p *Prover) tryNonce(ctx context.Context, numLabels uint64, ch Challenge, nonce uint32, readerChan <-chan []byte, difficulty uint64) ([]byte, error) {
-	var bitsPerIndex = uint(shared.BinaryRepresentationMinBits(numLabels))
-	var buf = bytes.NewBuffer(make([]byte, shared.Size(bitsPerIndex, p.cfg.K2))[0:0])
-	var gsWriter = shared.NewGranSpecificWriter(buf, bitsPerIndex)
+	bitsPerIndex := uint(shared.BinaryRepresentationMinBits(numLabels))
+	buf := bytes.NewBuffer(make([]byte, shared.Size(bitsPerIndex, p.cfg.K2))[0:0])
+	gsWriter := shared.NewGranSpecificWriter(buf, bitsPerIndex)
 	var index uint64
 	var passed uint
 	for {
@@ -225,7 +227,7 @@ type nonceResult struct {
 }
 
 func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, endNonce uint32) (*nonceResult, error) {
-	var difficulty = shared.ProvingDifficulty(numLabels, uint64(p.cfg.K1))
+	difficulty := shared.ProvingDifficulty(numLabels, uint64(p.cfg.K1))
 
 	reader, err := persistence.NewLabelsReader(p.datadir, p.cfg.BitsPerLabel)
 	if err != nil {
