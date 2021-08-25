@@ -248,10 +248,12 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 	}
 	resultsChan := make(chan *nonceResult, numWorkers)
 	errChan := make(chan error, 1)
+
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	// Start IO worker.
 	// Feed all labels into each worker chan.
 	wg.Add(1)
