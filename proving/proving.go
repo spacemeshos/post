@@ -243,8 +243,7 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 	// workersComplete channel will be closed when worker stops listening for appropriate workersChan
 	workersComplete := make([]chan struct{}, numWorkers)
 	for i := range workersChans {
-		// by having a buffer of 1 all goroutines will be scheduled in a fair way
-		workersChans[i] = make(chan []byte, 1)
+		workersChans[i] = make(chan []byte, 1024)
 		workersComplete[i] = make(chan struct{})
 	}
 	resultsChan := make(chan *nonceResult, numWorkers)
@@ -261,7 +260,9 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 		for {
 			label, err := gsReader.ReadNext()
 			if err != nil {
-				errChan <- err
+				if !errors.Is(err, io.EOF) {
+					errChan <- err
+				}
 				for i := range workersChans {
 					close(workersChans[i])
 				}
@@ -307,14 +308,9 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 				return result, nil
 			}
 		case err := <-errChan:
-			if err != nil && !errors.Is(err, io.EOF) {
-				p.logger.Debug("proving: error: %v", err)
-				return nil, err
-			}
+			p.logger.Debug("proving: error: %v", err)
+			return nil, err
 		}
 	}
-	if result == nil {
-		panic("unexpected exit with nil result")
-	}
-	return nil, result.err
+	return nil, nil
 }
