@@ -243,7 +243,7 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 	// workersComplete channel will be closed when worker stops listening for appropriate workersChan
 	workersComplete := make([]chan struct{}, numWorkers)
 	for i := range workersChans {
-		workersChans[i] = make(chan []byte, 1024)
+		workersChans[i] = make(chan []byte, 1)
 		workersComplete[i] = make(chan struct{})
 	}
 	resultsChan := make(chan *nonceResult, numWorkers)
@@ -297,12 +297,10 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 		}()
 	}
 
-	// Drain the workers results chan.
-	var result *nonceResult
 	// return last observed error if all workers failed, otherwise return first found result
 	for i := uint32(0); i < numWorkers; i++ {
 		select {
-		case result = <-resultsChan:
+		case result := <-resultsChan:
 			if result.err != nil {
 				p.logger.Debug("proving: nonce %v failed: %v", result.nonce, result.err)
 			} else {
