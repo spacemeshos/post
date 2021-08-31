@@ -237,8 +237,6 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 	gsReader := shared.NewGranSpecificReader(reader, p.cfg.BitsPerLabel)
 
 	numWorkers := endNonce - startNonce + 1
-	var indices []byte
-
 	workersChans := make([]chan []byte, numWorkers)
 	// workersComplete channel will be closed when worker stops listening for appropriate workersChan
 	workersComplete := make([]chan struct{}, numWorkers)
@@ -290,7 +288,7 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 		wg.Add(1)
 		go func() {
 			nonce := startNonce + i
-			indices, err = p.tryNonce(ctx, numLabels, challenge, nonce, workersChans[i], difficulty)
+			indices, err := p.tryNonce(ctx, numLabels, challenge, nonce, workersChans[i], difficulty)
 			close(workersComplete[i])
 			resultsChan <- &nonceResult{nonce, indices, err}
 			wg.Done()
