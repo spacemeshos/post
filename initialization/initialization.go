@@ -361,11 +361,10 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 }
 
 func (init *Initializer) updateSessionNumLabelsWritten(numLabelsWritten uint64) {
-	init.mtx.RLock()
-
 	init.numLabelsWritten = numLabelsWritten
-	ch := init.numLabelsWrittenChan
 
+	init.mtx.RLock()
+	ch := init.numLabelsWrittenChan
 	init.mtx.RUnlock()
 
 	if ch != nil {

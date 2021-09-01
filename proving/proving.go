@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sync"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
@@ -237,9 +236,6 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 
 	numWorkers := endNonce - startNonce + 1
 
-	var mu sync.RWMutex
-	var indices []byte
-
 	workersChans := make([]chan []byte, numWorkers)
 	for i := range workersChans {
 		workersChans[i] = make(chan []byte, 1024)
@@ -276,15 +272,8 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 		go func() {
 			nonce := startNonce + i
 
-			tempIndices, tempErr := p.tryNonce(ctx, numLabels, challenge, nonce, workersChans[i], difficulty)
-
-			mu.Lock()
-			indices, err = tempIndices, tempErr
-			mu.Unlock()
-
-			mu.RLock()
+			indices, err := p.tryNonce(ctx, numLabels, challenge, nonce, workersChans[i], difficulty)
 			result := nonceResult{nonce, indices, err}
-			mu.RUnlock()
 
 			resultsChan <- result
 		}()
