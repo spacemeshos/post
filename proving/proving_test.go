@@ -67,7 +67,7 @@ func TestProver_GenerateProof(t *testing.T) {
 
 		binary.BigEndian.PutUint64(ch, uint64(numUnits))
 		proof, proofMetaData, err := p.GenerateProof(ch)
-		r.NoError(err, fmt.Sprintf("numUnits: %d", numUnits))
+		r.NoError(err, "numUnits: %d", numUnits)
 		r.NotNil(proof)
 		r.NotNil(proofMetaData)
 
@@ -84,7 +84,7 @@ func TestProver_GenerateProof(t *testing.T) {
 		r.Equal(shared.Size(indexBitSize, p.cfg.K2), uint(len(proof.Indices)))
 
 		if *debug {
-			fmt.Printf("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
+			t.Logf("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
 		}
 
 		err = verifying.Verify(proof, proofMetaData)

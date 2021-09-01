@@ -3,8 +3,10 @@ package proving
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
@@ -235,73 +237,78 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 	gsReader := shared.NewGranSpecificReader(reader, p.cfg.BitsPerLabel)
 
 	numWorkers := endNonce - startNonce + 1
-
 	workersChans := make([]chan []byte, numWorkers)
+	// workersComplete channel will be closed when worker stops listening for appropriate workersChan
+	workersComplete := make([]chan struct{}, numWorkers)
 	for i := range workersChans {
-		workersChans[i] = make(chan []byte, 1024)
+		workersChans[i] = make(chan []byte, 1)
+		workersComplete[i] = make(chan struct{})
 	}
-	resultsChan := make(chan nonceResult, numWorkers)
-	errChan := make(chan error, numWorkers)
+	resultsChan := make(chan *nonceResult, numWorkers)
+	errChan := make(chan error, 1)
+
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Start IO worker.
 	// Feed all labels into each worker chan.
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
 			label, err := gsReader.ReadNext()
 			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					errChan <- err
+				}
 				for i := range workersChans {
 					close(workersChans[i])
 				}
-
-				if err != io.EOF {
-					errChan <- err
-				}
-				break
+				return
 			}
 
 			for i := range workersChans {
-				workersChans[i] <- label
+				select {
+				case workersChans[i] <- label:
+				case <-workersComplete[i]:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}()
 
 	// Start a worker for each nonce.
-	ctx, cancel := context.WithCancel(context.Background())
+	// TODO(dshulyak) it would be more efficient to start a worker per CPU and distribute work among
+	// them but it is not trivial
 	for i := uint32(0); i < numWorkers; i++ {
 		i := i
+		wg.Add(1)
 		go func() {
 			nonce := startNonce + i
-
 			indices, err := p.tryNonce(ctx, numLabels, challenge, nonce, workersChans[i], difficulty)
-			result := nonceResult{nonce, indices, err}
-
-			resultsChan <- result
+			close(workersComplete[i])
+			resultsChan <- &nonceResult{nonce, indices, err}
+			wg.Done()
 		}()
 	}
 
-	// Drain the workers results chan.
-	var solutionNonceResult *nonceResult
+	// return last observed error if all workers failed, otherwise return first found result
 	for i := uint32(0); i < numWorkers; i++ {
-		res := <-resultsChan
-		if res.err != nil {
-			p.logger.Debug("proving: nonce %v failed: %v", res.nonce, res.err)
-		} else {
-			p.logger.Debug("proving: nonce %v succeeded", res.nonce)
-			cancel()
-
-			// There might be multiple successful nonces due to race condition with the cancellation,
-			// but this is not a problem. We'll use the last one to arrive.
-			solutionNonceResult = &res
+		select {
+		case result := <-resultsChan:
+			if result.err != nil {
+				p.logger.Debug("proving: nonce %v failed: %v", result.nonce, result.err)
+			} else {
+				p.logger.Debug("proving: nonce %v succeeded", result.nonce)
+				return result, nil
+			}
+		case err := <-errChan:
+			p.logger.Debug("proving: error: %v", err)
+			return nil, err
 		}
 	}
-
-	// Check for an error from the IO worker.
-	select {
-	case err := <-errChan:
-		p.logger.Debug("proving: error: %v", err)
-		return nil, err
-	default:
-	}
-
-	return solutionNonceResult, nil
+	return nil, nil
 }
