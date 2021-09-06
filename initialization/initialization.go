@@ -81,17 +81,24 @@ func NewInitializer(cfg Config, opts config.InitOpts, id []byte) (*Initializer, 
 // Initialize is the process in which the prover commits to store some data, by having its storage filled with
 // pseudo-random data with respect to a specific id. This data is the result of a computationally-expensive operation.
 func (init *Initializer) Initialize() error {
-	if init.isInitializing() {
+	init.mtx.Lock()
+
+	if init.initializing {
+		init.mtx.Unlock()
 		return ErrAlreadyInitializing
 	}
 
 	init.stopChan = make(chan struct{})
 	init.doneChan = make(chan struct{})
 
-	init.setInitializing(true)
+	init.initializing = true
+
+	init.mtx.Unlock()
 
 	defer func() {
-		init.setInitializing(false)
+		init.mtx.Lock()
+		init.initializing = false
+		init.mtx.Unlock()
 
 		close(init.doneChan)
 
@@ -137,13 +144,6 @@ func (init *Initializer) isInitializing() bool {
 	defer init.mtx.RUnlock()
 
 	return init.initializing
-}
-
-func (init *Initializer) setInitializing(value bool) {
-	init.mtx.Lock()
-	defer init.mtx.Unlock()
-
-	init.initializing = value
 }
 
 func (init *Initializer) Stop() error {
