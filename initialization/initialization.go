@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/spacemeshos/post/config"
@@ -177,7 +178,7 @@ func (init *Initializer) SessionNumLabelsWrittenChan() <-chan uint64 {
 }
 
 func (init *Initializer) SessionNumLabelsWritten() uint64 {
-	return init.numLabelsWritten
+	return atomic.LoadUint64(&init.numLabelsWritten)
 }
 
 func (init *Initializer) Reset() error {
@@ -361,7 +362,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 }
 
 func (init *Initializer) updateSessionNumLabelsWritten(numLabelsWritten uint64) {
-	init.numLabelsWritten = numLabelsWritten
+	atomic.StoreUint64(&init.numLabelsWritten, numLabelsWritten)
 
 	init.mtx.RLock()
 	ch := init.numLabelsWrittenChan
