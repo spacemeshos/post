@@ -15,7 +15,7 @@ type FileWriter struct {
 }
 
 func NewFileWriter(filename string, bitsPerLabel uint) (*FileWriter, error) {
-	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, shared.OwnerReadWrite)
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, shared.OwnerReadWrite)
 	if err != nil {
 		return nil, err
 	}
@@ -27,6 +27,7 @@ func NewFileWriter(filename string, bitsPerLabel uint) (*FileWriter, error) {
 }
 
 func (w *FileWriter) Write(b []byte) error {
+	w.file.Seek(0,os.SEEK_END)
 	_, err := w.buf.Write(b)
 	return err
 }
@@ -58,6 +59,8 @@ func (w *FileWriter) Truncate(numLabels uint64) error {
 	if err := w.file.Truncate(size); err != nil {
 		return fmt.Errorf("failed to truncate file: %v", err)
 	}
+	//w.file.Seek(0,os.SEEK_END)
+	w.file.Sync()
 
 	return nil
 }

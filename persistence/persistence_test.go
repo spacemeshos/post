@@ -36,6 +36,7 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 
 	reader, err := NewLabelsReader(datadir, labelSize)
 	req.NoError(err)
+	defer reader.Close()
 
 	readLabels := make([]Label, len(writtenLabels))
 	for i := range readLabels {
