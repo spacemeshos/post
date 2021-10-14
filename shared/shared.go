@@ -8,10 +8,10 @@ import (
 
 var (
 	// OwnerReadWriteExec is a standard owner read / write / exec file permission.
-	OwnerReadWriteExec = os.FileMode(0700)
+	OwnerReadWriteExec = os.FileMode(0o700)
 
 	// OwnerReadWrite is a standard owner read / write file permission.
-	OwnerReadWrite = os.FileMode(0600)
+	OwnerReadWrite = os.FileMode(0o600)
 )
 
 func DataSize(numLabels uint64, labelSize uint) uint64 {

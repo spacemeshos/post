@@ -3,11 +3,12 @@ package gpu
 import (
 	"flag"
 	"fmt"
-	"github.com/spacemeshos/post/shared"
-	"github.com/stretchr/testify/require"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/spacemeshos/post/shared"
+	"github.com/stretchr/testify/require"
 )
 
 var (

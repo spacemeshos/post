@@ -2,11 +2,12 @@ package persistence
 
 import (
 	"fmt"
-	"github.com/spacemeshos/post/shared"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/spacemeshos/post/shared"
 )
 
 type Reader interface {

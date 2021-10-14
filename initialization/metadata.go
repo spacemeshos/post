@@ -3,10 +3,11 @@ package initialization
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/spacemeshos/post/shared"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/spacemeshos/post/shared"
 )
 
 const metadataFileName = "postdata_metadata.json"

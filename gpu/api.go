@@ -2,9 +2,10 @@ package gpu
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/spacemeshos/post/config"
-	"time"
 )
 
 type ComputeProvider struct {

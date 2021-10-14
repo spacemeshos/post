@@ -4,16 +4,18 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/gpu"
 	"github.com/spacemeshos/post/oracle"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"sync"
-	"time"
 )
 
 type (
@@ -48,7 +50,7 @@ type Initializer struct {
 
 	diskState    *DiskState
 	initializing bool
-	mtx          sync.Mutex
+	mtx          sync.RWMutex
 
 	numLabelsWritten     uint64
 	numLabelsWrittenChan chan uint64
@@ -81,17 +83,24 @@ func NewInitializer(cfg Config, opts config.InitOpts, id []byte) (*Initializer, 
 // pseudo-random data with respect to a specific id. This data is the result of a computationally-expensive operation.
 func (init *Initializer) Initialize() error {
 	init.mtx.Lock()
+
 	if init.initializing {
 		init.mtx.Unlock()
 		return ErrAlreadyInitializing
 	}
+
 	init.stopChan = make(chan struct{})
 	init.doneChan = make(chan struct{})
+
 	init.initializing = true
+
 	init.mtx.Unlock()
 
 	defer func() {
+		init.mtx.Lock()
 		init.initializing = false
+		init.mtx.Unlock()
+
 		close(init.doneChan)
 
 		if init.numLabelsWrittenChan != nil {
@@ -131,8 +140,15 @@ func (init *Initializer) Initialize() error {
 	return nil
 }
 
+func (init *Initializer) isInitializing() bool {
+	init.mtx.RLock()
+	defer init.mtx.RUnlock()
+
+	return init.initializing
+}
+
 func (init *Initializer) Stop() error {
-	if !init.initializing {
+	if !init.isInitializing() {
 		return ErrNotInitializing
 	}
 
@@ -151,18 +167,22 @@ func (init *Initializer) Stop() error {
 }
 
 func (init *Initializer) SessionNumLabelsWrittenChan() <-chan uint64 {
+	init.mtx.Lock()
+	defer init.mtx.Unlock()
+
 	if init.numLabelsWrittenChan == nil {
 		init.numLabelsWrittenChan = make(chan uint64, 1024)
 	}
+
 	return init.numLabelsWrittenChan
 }
 
 func (init *Initializer) SessionNumLabelsWritten() uint64 {
-	return init.numLabelsWritten
+	return atomic.LoadUint64(&init.numLabelsWritten)
 }
 
 func (init *Initializer) Reset() error {
-	if init.initializing {
+	if init.isInitializing() {
 		return ErrCannotResetWhileInitializing
 	}
 
@@ -342,12 +362,15 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 }
 
 func (init *Initializer) updateSessionNumLabelsWritten(numLabelsWritten uint64) {
-	init.numLabelsWritten = numLabelsWritten
+	atomic.StoreUint64(&init.numLabelsWritten, numLabelsWritten)
 
-	if init.numLabelsWrittenChan != nil {
-		init.numLabelsWrittenChan <- numLabelsWritten
+	init.mtx.RLock()
+	ch := init.numLabelsWrittenChan
+	init.mtx.RUnlock()
+
+	if ch != nil {
+		ch <- numLabelsWritten
 	}
-
 }
 
 func (init *Initializer) verifyMetadata(m *Metadata) error {

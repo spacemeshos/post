@@ -4,10 +4,12 @@ package gpu
 // #include <stdlib.h>
 //
 import "C"
+
 import (
-	"github.com/spacemeshos/post/shared"
 	"sync"
 	"unsafe"
+
+	"github.com/spacemeshos/post/shared"
 )
 
 // mtx is a mutual exclusion lock for serializing calls to gpu-post lib.
@@ -97,7 +99,6 @@ func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPositi
 		cFree(unsafe.Pointer(cSalt))
 		cFree(unsafe.Pointer(cOut))
 		cFree(unsafe.Pointer(cD))
-
 	}()
 
 	retVal := C.scryptPositions(

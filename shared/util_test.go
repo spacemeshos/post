@@ -1,8 +1,9 @@
 package shared
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsPowerOfTwo(t *testing.T) {

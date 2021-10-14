@@ -59,7 +59,7 @@ func Group(readers []Reader) (*GroupReader, error) {
 func (g *GroupReader) Read(p []byte) (int, error) {
 	n, err := g.readers[g.activeReaderIndex].Read(p)
 	if err != nil {
-		if err == io.EOF && g.activeReaderIndex < len(g.readers)-1 {
+		if errors.Is(err, io.EOF) && g.activeReaderIndex < len(g.readers)-1 {
 			g.activeReaderIndex++
 			return g.Read(p)
 		}

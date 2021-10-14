@@ -50,7 +50,7 @@ func TestMain(m *testing.M) {
 func TestProver_GenerateProof(t *testing.T) {
 	r := require.New(t)
 
-	for numUnits := uint(cfg.MinNumUnits); numUnits < 6; numUnits++ {
+	for numUnits := cfg.MinNumUnits; numUnits < 6; numUnits++ {
 		newOpts := opts
 		newOpts.NumUnits = numUnits
 

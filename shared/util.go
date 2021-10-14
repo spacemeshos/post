@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"github.com/nullstyle/go-xdr/xdr3"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
+
+	"github.com/nullstyle/go-xdr/xdr3"
 )
 
 func GetProofsDir(datadir string) string {

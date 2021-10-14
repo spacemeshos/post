@@ -3,6 +3,7 @@ package verifying
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/oracle"
 	"github.com/spacemeshos/post/shared"
@@ -25,9 +26,9 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 		return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(m.ID))
 	}
 
-	var numLabels = uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
-	var bitsPerIndex = uint(shared.BinaryRepresentationMinBits(numLabels))
-	var expectedSize = shared.Size(bitsPerIndex, m.K2)
+	numLabels := uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
+	bitsPerIndex := uint(shared.BinaryRepresentationMinBits(numLabels))
+	expectedSize := shared.Size(bitsPerIndex, m.K2)
 	if expectedSize != uint(len(p.Indices)) {
 		return fmt.Errorf("invalid indices set size; expected %d, given: %d", expectedSize, len(p.Indices))
 	}

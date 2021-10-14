@@ -2,7 +2,7 @@ export CGO_ENABLED := 1
 include Makefile.Inc
 
 test test-all: get-gpu-setup
-	$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -v -timeout 0 -p 1 ./...
+	$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -v -timeout 0 -p 1 -race ./...
 .PHONY: test test-all
 
 compile-test: get-gpu-setup

@@ -1,8 +1,9 @@
 package shared
 
 import (
-	"github.com/spacemeshos/bitstream"
 	"io"
+
+	"github.com/spacemeshos/bitstream"
 )
 
 // GranSpecificReader provides a wrapper for io.Reader to allow granularity-specific

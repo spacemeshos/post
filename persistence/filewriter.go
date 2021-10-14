@@ -3,8 +3,9 @@ package persistence
 import (
 	"bufio"
 	"fmt"
-	"github.com/spacemeshos/post/shared"
 	"os"
+
+	"github.com/spacemeshos/post/shared"
 )
 
 type FileWriter struct {
@@ -33,7 +34,7 @@ func (w *FileWriter) Write(b []byte) error {
 
 func (w *FileWriter) Flush() error {
 	if err := w.buf.Flush(); err != nil {
-		return fmt.Errorf("failed to flush disk writer: %v", err)
+		return fmt.Errorf("failed to flush disk writer: %w", err)
 	}
 
 	return nil
@@ -56,7 +57,7 @@ func (w *FileWriter) Truncate(numLabels uint64) error {
 
 	size := int64(bitSize / 8)
 	if err := w.file.Truncate(size); err != nil {
-		return fmt.Errorf("failed to truncate file: %v", err)
+		return fmt.Errorf("failed to truncate file: %w", err)
 	}
 
 	return nil
