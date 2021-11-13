@@ -29,7 +29,7 @@ jobs:
           make install
           make test-tidy
           make test-fmt
-          make lint
+          # make lint
       - name: Mark the job as succeeded
         if: env.execute == 'false'
         run: exit 0
