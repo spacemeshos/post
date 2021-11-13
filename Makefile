@@ -20,6 +20,10 @@ install: get-gpu-setup
 	GO111MODULE=off go get golang.org/x/lint/golint
 .PHONY: install
 
+tidy:
+	go mod tidy
+.PHONY: tidy
+
 test-tidy:
 	# Working directory must be clean, or this test would be destructive
 	git diff --quiet || (echo "\033[0;31mWorking directory not clean!\033[0m" && git --no-pager diff && exit 1)
