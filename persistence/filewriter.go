@@ -59,7 +59,6 @@ func (w *FileWriter) Truncate(numLabels uint64) error {
 	if err := w.file.Truncate(size); err != nil {
 		return fmt.Errorf("failed to truncate file: %v", err)
 	}
-	//w.file.Seek(0,os.SEEK_END)
 	w.file.Sync()
 
 	return nil
