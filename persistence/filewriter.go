@@ -27,7 +27,7 @@ func NewFileWriter(filename string, bitsPerLabel uint) (*FileWriter, error) {
 }
 
 func (w *FileWriter) Write(b []byte) error {
-	w.file.Seek(0,os.SEEK_END)
+	w.file.Seek(0, os.SEEK_END)
 	_, err := w.buf.Write(b)
 	return err
 }
