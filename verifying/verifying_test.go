@@ -113,6 +113,7 @@ func TestLabelsCorrectness(t *testing.T) {
 
 		// Read.
 		reader, err := persistence.NewLabelsReader(datadir, uint(bitsPerLabel))
+		defer reader.Close()
 		gsReader := shared.NewGranSpecificReader(reader, uint(bitsPerLabel))
 		req.NoError(err)
 		var position uint64

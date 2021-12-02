@@ -408,7 +408,9 @@ func assertNumLabelsWrittenChan(init *Initializer, r *require.Assertions) chan s
 				fmt.Printf("num labels written: %v\n", p)
 			}
 		}
-		r.True(init.Completed())
+		c, err := init.Completed()
+		r.NoError(err)
+		r.True(c)
 		close(doneChan)
 	}()
 
@@ -420,6 +422,7 @@ func initData(datadir string, bitsPerLabel uint) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer reader.Close()
 
 	gsReader := shared.NewGranSpecificReader(reader, bitsPerLabel)
 	writer := bytes.NewBuffer(nil)

@@ -234,6 +234,7 @@ func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, en
 	if err != nil {
 		return nil, err
 	}
+	defer reader.Close()
 	gsReader := shared.NewGranSpecificReader(reader, p.cfg.BitsPerLabel)
 
 	numWorkers := endNonce - startNonce + 1

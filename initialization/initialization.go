@@ -248,6 +248,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 	if err != nil {
 		return err
 	}
+	defer writer.Close()
 
 	numLabelsWritten, err := writer.NumLabelsWritten()
 	if err != nil {
