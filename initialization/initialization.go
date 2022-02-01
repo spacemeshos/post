@@ -44,6 +44,10 @@ func CPUProviderID() int {
 }
 
 type Initializer struct {
+	// numLabelsWritten should be aligned by 8 bytes because it's accessed by atomics.
+	numLabelsWritten     uint64
+	numLabelsWrittenChan chan uint64
+
 	cfg  Config
 	opts InitOpts
 	id   []byte
@@ -51,9 +55,6 @@ type Initializer struct {
 	diskState    *DiskState
 	initializing bool
 	mtx          sync.RWMutex
-
-	numLabelsWritten     uint64
-	numLabelsWrittenChan chan uint64
 
 	stopChan chan struct{}
 	doneChan chan struct{}
