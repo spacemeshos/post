@@ -44,9 +44,12 @@ func CPUProviderID() int {
 }
 
 type Initializer struct {
+	// data per file
 	// numLabelsWritten should be aligned by 8 bytes because it's accessed by atomics.
 	numLabelsWritten     uint64
 	numLabelsWrittenChan chan uint64
+
+	processedFiles uint64
 
 	cfg  Config
 	opts InitOpts
@@ -126,19 +129,24 @@ func (init *Initializer) Initialize() error {
 		return err
 	}
 
-	numLabels := uint64(init.opts.NumUnits) * uint64(init.cfg.LabelsPerUnit)
-	fileNumLabels := numLabels / uint64(init.opts.NumFiles)
+	fileNumLabels := init.getFileNumLabels()
 
 	init.logger.Info("initialization: starting to write %v file(s); number of units: %v, number of labels per unit: %v, number of bits per label: %v, datadir: %v",
 		init.opts.NumFiles, init.opts.NumUnits, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel, init.opts.DataDir)
 
 	for i := 0; i < int(init.opts.NumFiles); i++ {
-		if err := init.initFile(uint(init.opts.ComputeProviderID), i, numLabels, fileNumLabels); err != nil {
+		if err := init.initFile(uint(init.opts.ComputeProviderID), i, fileNumLabels); err != nil {
 			return err
 		}
+		atomic.AddUint64(&init.processedFiles, 1)
 	}
 
 	return nil
+}
+
+func (init *Initializer) getFileNumLabels() uint64 {
+	numLabels := uint64(init.opts.NumUnits) * uint64(init.cfg.LabelsPerUnit)
+	return numLabels / uint64(init.opts.NumFiles)
 }
 
 func (init *Initializer) isInitializing() bool {
@@ -239,7 +247,7 @@ func (init *Initializer) VerifyStarted() error {
 	return nil
 }
 
-func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabels uint64, fileNumLabels uint64) error {
+func (init *Initializer) initFile(computeProviderID uint, fileIndex int, fileNumLabels uint64) error {
 	fileOffset := uint64(fileIndex) * fileNumLabels
 	fileTargetPosition := fileOffset + fileNumLabels
 	batchSize := uint64(config.DefaultComputeBatchSize)
