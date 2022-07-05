@@ -137,7 +137,7 @@ func (init *Initializer) Initialize() error {
 			return err
 		}
 	}
-
+	// sample pr for check CI
 	return nil
 }
 
