@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 )
 
+//go:generate scalegen -types Proof
+
 type Proof struct {
 	Nonce   uint32
 	Indices []byte
