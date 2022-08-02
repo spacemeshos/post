@@ -14,7 +14,7 @@ type GranSpecificReader struct {
 	ReadNextUintBE func() (uint64, error)
 }
 
-func NewGranSpecificReader(rd io.Reader, itemBitSize uint) *GranSpecificReader {
+func NewGranSpecificReader(rd io.Reader, itemBitSize uint64) *GranSpecificReader {
 	gsReader := new(GranSpecificReader)
 	if itemBitSize%8 == 0 {
 		// Byte-granular reader is using the underlying reader directly.

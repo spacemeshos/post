@@ -47,7 +47,7 @@ func BinaryRepresentationMinBits(val uint64) int {
 	return int(math.Log2(float64(val))) + 1
 }
 
-func Size(itemBitSize uint, numItems uint) uint {
+func Size(itemBitSize uint64, numItems uint64) uint64 {
 	bitSize := itemBitSize * numItems
 	return (bitSize + 7) / 8 // Integer ceil of (indicesBitSize / 8).
 }
