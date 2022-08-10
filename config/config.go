@@ -44,12 +44,12 @@ func init() {
 }
 
 type Config struct {
-	BitsPerLabel  uint
-	LabelsPerUnit uint
-	MinNumUnits   uint
-	MaxNumUnits   uint
-	K1            uint
-	K2            uint
+	MinNumUnits   uint32
+	MaxNumUnits   uint32
+	BitsPerLabel  uint8
+	LabelsPerUnit uint64
+	K1            uint32
+	K2            uint32
 }
 
 func DefaultConfig() Config {
@@ -65,8 +65,8 @@ func DefaultConfig() Config {
 
 type InitOpts struct {
 	DataDir           string
-	NumUnits          uint
-	NumFiles          uint
+	NumUnits          uint32
+	NumFiles          uint32
 	ComputeProviderID int
 	Throttle          bool
 }
@@ -102,7 +102,7 @@ func Validate(cfg Config, opts InitOpts) error {
 		return fmt.Errorf("invalid `opts.NumFiles`; expected: >= %d, given: %d", MinNumFiles, opts.NumFiles)
 	}
 
-	if cfg.BitsPerLabel > MaxBitsPerLabel {
+	if int(cfg.BitsPerLabel) > MaxBitsPerLabel {
 		return fmt.Errorf("invalid `cfg.BitsPerLabel`; expected: <= %d, given: %d", MaxBitsPerLabel, cfg.BitsPerLabel)
 	}
 
@@ -115,9 +115,9 @@ func Validate(cfg Config, opts InitOpts) error {
 			cfg.LabelsPerUnit, opts.NumUnits)
 	}
 
-	numLabels := cfg.LabelsPerUnit * opts.NumUnits
+	numLabels := cfg.LabelsPerUnit * uint64(opts.NumUnits)
 
-	if numLabels%opts.NumFiles != 0 {
+	if numLabels%uint64(opts.NumFiles) != 0 {
 		return fmt.Errorf("invalid `cfg.LabelsPerUnit` & `opts.NumUnits`; expected: `cfg.LabelsPerUnit` * `opts.NumUnits` to be evenly divisible by `opts.NumFiles` (%v), given: %d", opts.NumFiles, numLabels)
 	}
 

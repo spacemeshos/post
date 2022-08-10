@@ -52,7 +52,7 @@ func NewProver(cfg Config, datadir string, id []byte) (*Prover, error) {
 		cfg:       cfg,
 		datadir:   datadir,
 		id:        id,
-		diskState: initialization.NewDiskState(datadir, cfg.BitsPerLabel),
+		diskState: initialization.NewDiskState(datadir, uint(cfg.BitsPerLabel)),
 		logger:    shared.DisabledLogger{},
 	}, nil
 }
@@ -71,7 +71,7 @@ func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, err
 		return nil, nil, err
 	}
 
-	numLabels := uint64(m.NumUnits * p.cfg.LabelsPerUnit)
+	numLabels := uint64(m.NumUnits) * p.cfg.LabelsPerUnit
 
 	for i := 0; i < MaxNumIterations; i++ {
 		startNonce := uint32(i) * NumNoncesPerIteration
@@ -116,7 +116,7 @@ func (p *Prover) verifyGenerateProofAllowed(m *Metadata) error {
 		return err
 	}
 
-	if err := p.verifyInitCompleted(m.NumUnits); err != nil {
+	if err := p.verifyInitCompleted(uint(m.NumUnits)); err != nil {
 		return err
 	}
 
@@ -182,7 +182,7 @@ func (p *Prover) verifyMetadata(m *Metadata) error {
 
 func (p *Prover) tryNonce(ctx context.Context, numLabels uint64, ch Challenge, nonce uint32, readerChan <-chan []byte, difficulty uint64) ([]byte, error) {
 	bitsPerIndex := uint(shared.BinaryRepresentationMinBits(numLabels))
-	buf := bytes.NewBuffer(make([]byte, shared.Size(bitsPerIndex, p.cfg.K2))[0:0])
+	buf := bytes.NewBuffer(make([]byte, shared.Size(bitsPerIndex, uint(p.cfg.K2)))[0:0])
 	gsWriter := shared.NewGranSpecificWriter(buf, bitsPerIndex)
 	var index uint64
 	var passed uint
@@ -208,7 +208,7 @@ func (p *Prover) tryNonce(ctx context.Context, numLabels uint64, ch Challenge, n
 				}
 				passed++
 
-				if passed >= p.cfg.K2 {
+				if passed >= uint(p.cfg.K2) {
 					if err := gsWriter.Flush(); err != nil {
 						return nil, err
 					}
@@ -230,12 +230,12 @@ type nonceResult struct {
 func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, endNonce uint32) (*nonceResult, error) {
 	difficulty := shared.ProvingDifficulty(numLabels, uint64(p.cfg.K1))
 
-	reader, err := persistence.NewLabelsReader(p.datadir, p.cfg.BitsPerLabel)
+	reader, err := persistence.NewLabelsReader(p.datadir, uint(p.cfg.BitsPerLabel))
 	if err != nil {
 		return nil, err
 	}
 	defer reader.Close()
-	gsReader := shared.NewGranSpecificReader(reader, p.cfg.BitsPerLabel)
+	gsReader := shared.NewGranSpecificReader(reader, uint(p.cfg.BitsPerLabel))
 
 	numWorkers := endNonce - startNonce + 1
 	workersChans := make([]chan []byte, numWorkers)
