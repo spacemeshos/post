@@ -19,6 +19,10 @@ ifeq ($(GOOS),)
   GOOS := $(HOST_OS)
 endif
 
+ifeq ($(GOARCH),)
+  GOARCH := $(shell go env GOARCH)
+endif
+
 ifeq ($(GOOS),windows)
   platform := windows
   export PATH := $(PATH):$(PROJ_DIR)build
@@ -26,21 +30,28 @@ ifeq ($(GOOS),windows)
 else
   TEMP := /tmp
   ifeq ($(GOOS),darwin)
-    platform := macos
+    ifeq ($(GOARCH),arm64)
+    	platform := macos-m1
+    else
+    	platform := macos
+    endif
     CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,@loader_path
-  	ULIMIT := ulimit -n 9999;
+    ULIMIT := ulimit -n 9999;
   else
-    platform := linux
+    ifeq ($(GOARCH),arm64)
+    	platform := linux-arm64
+    else
+    	platform := linux
+    endif
     CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,$$ORIGIN
   endif
 endif
 
 $(info "OS: $(OS), HOST_OS: $(HOST_OS), GOOS: $(GOOS), GOARCH: $(GOARH), BIN_DIR: $(BIN_DIR), platform: $(platform)")
 
-GPU_SETUP_REV = 0.1.21
+GPU_SETUP_REV = 0.1.24
 GPU_SETUP_ZIP = libgpu-setup-$(platform)-$(GPU_SETUP_REV).zip
-GPU_SETUP_URL_ZIP = https://github.com/spacemeshos/gpu-post/releases/download/v$(GPU_SETUP_REV)/$(platform).zip
-#GPU_SETUP_URL_ZIP = https://github.com/spacemeshos/gpu-post/releases/download/v$(GPU_SETUP_REV)/$(GPU_SETUP_ZIP)
+GPU_SETUP_URL_ZIP = https://github.com/spacemeshos/gpu-post/releases/download/v$(GPU_SETUP_REV)/$(GPU_SETUP_ZIP)
 ifeq ($(platform), windows)
   GPU_SETUP_LIBS = gpu-setup.dll
 else
@@ -95,4 +106,3 @@ print-test-targets:
 	do echo $$i; \
 	done
 .PHONY: $(SUBDIRS_ALL) $(SUBDIRS_LVL2) $(SUBDIRS_ONLY) print-test-targets
-
