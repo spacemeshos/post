@@ -55,7 +55,7 @@ GPU_SETUP_URL_ZIP = https://github.com/spacemeshos/gpu-post/releases/download/v$
 ifeq ($(platform), windows)
   GPU_SETUP_LIBS = gpu-setup.dll
 else
-  ifeq ($(platform), macos)
+  ifeq ($(platform), $(filter $(platform), macos macos-m1))
     GPU_SETUP_LIBS = libgpu-setup.dylib libMoltenVK.dylib libvulkan.1.dylib MoltenVK_icd.json
   else
     GPU_SETUP_LIBS = libgpu-setup.so
