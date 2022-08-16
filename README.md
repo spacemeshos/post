@@ -1,4 +1,19 @@
-# post
-Spacemesh POST protocol implementation 
+# PoST
 
-todo: add instructions for building & running the tests from the command line here...
+Spacemesh Proof of Space-Time (PoST) protocol implementation
+
+## Installing dependencies for PoSP
+
+The Dependencies need to build the protocol can be installed using the following command:
+
+```bash
+make install
+```
+
+## Running tests
+
+To run the tests run the following command:
+
+```bash
+make test
+```

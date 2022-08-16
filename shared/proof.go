@@ -15,7 +15,6 @@ type Proof struct {
 // | nonce     | indices           |
 // | (4 bytes) | (remaining bytes) |
 // +-----------+-------------------+
-//
 func (p *Proof) Encode() []byte {
 	size := 4 + len(p.Indices)
 	b := make([]byte, size)

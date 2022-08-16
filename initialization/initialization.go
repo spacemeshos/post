@@ -376,7 +376,7 @@ func (init *Initializer) updateSessionNumLabelsWritten(numLabelsWritten uint64) 
 }
 
 func (init *Initializer) verifyMetadata(m *Metadata) error {
-	if bytes.Compare(init.id, m.ID) != 0 {
+	if !bytes.Equal(init.id, m.ID) {
 		return ConfigMismatchError{
 			Param:    "ID",
 			Expected: fmt.Sprintf("%x", init.id),

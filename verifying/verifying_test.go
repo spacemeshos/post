@@ -72,9 +72,9 @@ func TestVerify(t *testing.T) {
 // It is covers the following components: labels compute lib (package: oracle), labels writer (package: persistence),
 // labels reader (package: persistence), and the granularity-specific reader (package: shared).
 // it proceeds as follows:
-// 1. Compute labels, in batches, and write them into multiple files (prover).
-// 2. Read the sequence of labels from the files according to the specified label size (prover),
-//    and ensure that each one equals a single label compute (verifier).
+//  1. Compute labels, in batches, and write them into multiple files (prover).
+//  2. Read the sequence of labels from the files according to the specified label size (prover),
+//     and ensure that each one equals a single label compute (verifier).
 func TestLabelsCorrectness(t *testing.T) {
 	req := require.New(t)
 	if !*long {
