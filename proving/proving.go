@@ -150,7 +150,7 @@ func (p *Prover) loadMetadata() (*initialization.Metadata, error) {
 }
 
 func (p *Prover) verifyMetadata(m *Metadata) error {
-	if bytes.Compare(p.id, m.ID) != 0 {
+	if !bytes.Equal(p.id, m.ID) {
 		return ConfigMismatchError{
 			Param:    "ID",
 			Expected: fmt.Sprintf("%x", p.id),
