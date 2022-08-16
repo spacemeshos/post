@@ -4,11 +4,12 @@ env:
   go-version: '1.18.5'
 
 on:
-  push:
   pull_request:
+  push:
+    branches:
+      - develop
 
 jobs:
-
   quicktests:
     env:
       execute: 'true'
