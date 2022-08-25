@@ -18,7 +18,7 @@ jobs:
     steps:
       - name: checkout
         if: env.execute == 'true'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: set up go
         if: env.execute == 'true'
         uses: actions/setup-go@v2
@@ -46,7 +46,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: set up go
         uses: actions/setup-go@v2
         with:
