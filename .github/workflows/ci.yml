@@ -61,6 +61,7 @@ jobs:
 
   unittests:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     needs:
       - quicktests
       - lint
