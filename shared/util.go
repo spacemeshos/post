@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 
-	"github.com/nullstyle/go-xdr/xdr3"
+	xdr "github.com/nullstyle/go-xdr/xdr3"
 )
 
 func GetProofsDir(datadir string) string {
@@ -67,7 +66,7 @@ func PersistProof(datadir string, proof *Proof, proofMetadata *ProofMetadata) er
 		return fmt.Errorf("mkdir failure: %v", err)
 	}
 	filename := GetProofFilename(datadir, proofMetadata.Challenge)
-	err = ioutil.WriteFile(filename, w.Bytes(), OwnerReadWrite)
+	err = os.WriteFile(filename, w.Bytes(), OwnerReadWrite)
 	if err != nil {
 		return fmt.Errorf("write to disk failure: %v", err)
 	}
@@ -77,7 +76,7 @@ func PersistProof(datadir string, proof *Proof, proofMetadata *ProofMetadata) er
 
 func FetchProof(datadir string, challenge []byte) (*Proof, *ProofMetadata, error) {
 	filename := GetProofFilename(datadir, challenge)
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil, ErrProofNotExist

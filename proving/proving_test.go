@@ -5,16 +5,14 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"log"
 	"math"
-	"os"
 	"testing"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/verifying"
-	smlog "github.com/spacemeshos/smutil/log"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,48 +20,58 @@ var (
 	id = make([]byte, 32)
 	ch = make(Challenge, 32)
 
-	cfg  config.Config
-	opts config.InitOpts
-
-	log   = flag.Bool("log", false, "")
-	debug = flag.Bool("debug", false, "")
+	logFlag   = flag.Bool("log", false, "")
+	debugFlag = flag.Bool("debug", false, "")
 
 	NewInitializer = initialization.NewInitializer
 	CPUProviderID  = initialization.CPUProviderID
 )
 
-func TestMain(m *testing.M) {
-	cfg = config.DefaultConfig()
+func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
+	cfg := config.DefaultConfig()
 	cfg.LabelsPerUnit = 1 << 12
 
-	opts = config.DefaultInitOpts()
-	opts.DataDir, _ = ioutil.TempDir("", "post-test")
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
 	opts.ComputeProviderID = CPUProviderID()
 
-	res := m.Run()
-	os.Exit(res)
+	return cfg, opts
 }
 
-// TODO: tests should range through `cfg.BitsPerLabel` as well.
+type testLogger struct {
+	shared.Logger
+}
+
+func (l testLogger) Info(msg string, args ...interface{}) {
+	if *logFlag {
+		log.Printf("\tINFO\t"+msg, args...)
+	}
+}
+
+func (l testLogger) Debug(msg string, args ...interface{}) {
+	if *debugFlag {
+		log.Printf("\tDEBUG\t"+msg, args...)
+	}
+}
+
 func TestProver_GenerateProof(t *testing.T) {
+	// TODO(moshababo): tests should range through `cfg.BitsPerLabel` as well.
 	r := require.New(t)
 
+	cfg, opts := getTestConfig(t)
 	for numUnits := cfg.MinNumUnits; numUnits < 6; numUnits++ {
-		newOpts := opts
-		newOpts.NumUnits = numUnits
+		opts.NumUnits = numUnits
 
-		init, err := NewInitializer(cfg, newOpts, id)
+		init, err := NewInitializer(cfg, opts, id)
 		r.NoError(err)
 		err = init.Initialize()
 		r.NoError(err)
 
 		p, err := NewProver(cfg, opts.DataDir, id)
 		r.NoError(err)
-		if *log {
-			p.SetLogger(smlog.AppLog)
-		}
+		p.SetLogger(testLogger{})
 
 		binary.BigEndian.PutUint64(ch, uint64(numUnits))
 		proof, proofMetaData, err := p.GenerateProof(ch)
@@ -83,7 +91,7 @@ func TestProver_GenerateProof(t *testing.T) {
 		indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
 		r.Equal(shared.Size(indexBitSize, p.cfg.K2), uint(len(proof.Indices)))
 
-		if *debug {
+		if *debugFlag {
 			t.Logf("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
 		}
 
@@ -99,6 +107,7 @@ func TestProver_GenerateProof(t *testing.T) {
 func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 	r := require.New(t)
 
+	cfg, opts := getTestConfig(t)
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
 	err = init.Initialize()

@@ -1,8 +1,6 @@
 package persistence
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,7 +11,7 @@ func TestFileWriter_Width(t *testing.T) {
 
 	labelSize := uint(1)
 	index := 0
-	datadir, _ := ioutil.TempDir("", "post-test")
+	datadir := t.TempDir()
 
 	writer, err := NewLabelsWriter(datadir, index, labelSize)
 	req.NoError(err)
@@ -42,6 +40,4 @@ func TestFileWriter_Width(t *testing.T) {
 	width, err = writer.NumLabelsWritten()
 	req.NoError(err)
 	req.Equal(uint64(16), width)
-
-	_ = os.RemoveAll(datadir)
 }
