@@ -40,4 +40,7 @@ func TestFileWriter_Width(t *testing.T) {
 	width, err = writer.NumLabelsWritten()
 	req.NoError(err)
 	req.Equal(uint64(16), width)
+	info, err = writer.Close()
+	req.NoError(err)
+	req.Equal(int64(2), (*info).Size())
 }
