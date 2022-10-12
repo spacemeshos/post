@@ -189,7 +189,7 @@ func (p *Prover) tryNonce(ctx context.Context, numLabels uint64, ch Challenge, n
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("cancelled: tried: %v, passed: %v, needed: %v", index, passed, p.cfg.K2)
+			return nil, fmt.Errorf("canceled: tried: %v, passed: %v, needed: %v", index, passed, p.cfg.K2)
 		case label, more := <-readerChan:
 			if !more {
 				return nil, fmt.Errorf("exhausted all labels; tried: %v, passed: %v, needed: %v", index, passed, p.cfg.K2)

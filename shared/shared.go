@@ -52,7 +52,7 @@ func Size(itemBitSize uint, numItems uint) uint {
 	return (bitSize + 7) / 8 // Integer ceil of (indicesBitSize / 8).
 }
 
-// PutUintBE
+// PutUintBE encodes a uint64 into a big-endian byte slice.
 func PutUintBE(b []byte, v uint64) {
 	numBits := len(b) * 8
 
