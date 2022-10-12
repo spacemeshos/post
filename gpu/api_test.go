@@ -32,10 +32,13 @@ func TestScryptPositions(t *testing.T) {
 	var prevOutput []byte
 	for _, p := range providers {
 		providerId := uint(p.ID)
-		startPosition := uint64(1)
-		endPosition := uint64(1 << 8)
 		hashLenBits := uint32(4)
-		res, err := ScryptPositions(providerId, commitment, salt, startPosition, endPosition, hashLenBits)
+		res, err := ScryptPositions(providerId,
+			WithCommitment(commitment),
+			WithSalt(salt),
+			WithStartAndEndPosition(1, 1<<8),
+			WithBitsPerLabel(hashLenBits),
+		)
 		r.NoError(err)
 		r.NotNil(res)
 		r.NotNil(res.Output)
@@ -64,9 +67,12 @@ func TestScryptPositions_HashLenBits(t *testing.T) {
 		var prevOutput []byte
 		for _, p := range providers {
 			providerId := uint(p.ID)
-			startPosition := uint64(1)
-			endPosition := uint64(1 << 12)
-			res, err := ScryptPositions(providerId, commitment, salt, startPosition, endPosition, hashLenBits)
+			res, err := ScryptPositions(providerId,
+				WithCommitment(commitment),
+				WithSalt(salt),
+				WithStartAndEndPosition(1, 1<<12),
+				WithBitsPerLabel(hashLenBits),
+			)
 			r.NoError(err)
 			r.NotNil(res)
 			r.NotNil(res.Output)
@@ -88,7 +94,12 @@ func TestScryptPositions_InvalidProviderId(t *testing.T) {
 	req := require.New(t)
 
 	invalidProviderId := uint(1 << 10)
-	res, err := ScryptPositions(invalidProviderId, commitment, salt, 1, 1, 8)
+	res, err := ScryptPositions(invalidProviderId,
+		WithCommitment(commitment),
+		WithSalt(salt),
+		WithStartAndEndPosition(1, 1),
+		WithBitsPerLabel(8),
+	)
 	req.EqualError(err, "gpu-post error: invalid provider")
 	req.Nil(res)
 }
@@ -112,7 +123,12 @@ func TestStop(t *testing.T) {
 			startPosition := uint64(1)
 			endPosition := uint64(1 << 18)
 			hashLenBits := uint32(8)
-			res, err := ScryptPositions(providerId, commitment, salt, startPosition, endPosition, hashLenBits)
+			res, err := ScryptPositions(providerId,
+				WithCommitment(commitment),
+				WithSalt(salt),
+				WithStartAndEndPosition(startPosition, endPosition),
+				WithBitsPerLabel(hashLenBits),
+			)
 			r.NoError(err)
 			r.NotNil(res)
 			r.NotNil(res.Output)
@@ -139,7 +155,12 @@ func TestStop(t *testing.T) {
 		startPosition := uint64(1)
 		endPosition := uint64(1 << 17)
 		hashLenBits := uint32(8)
-		res, err := ScryptPositions(providerID, commitment, salt, startPosition, endPosition, hashLenBits)
+		res, err := ScryptPositions(providerID,
+			WithCommitment(commitment),
+			WithSalt(salt),
+			WithStartAndEndPosition(startPosition, endPosition),
+			WithBitsPerLabel(hashLenBits),
+		)
 		r.NoError(err)
 		r.NotNil(res)
 		r.NotNil(res.Output)
@@ -164,7 +185,12 @@ func TestStop_SameThread(t *testing.T) {
 		startPosition := uint64(1)
 		endPosition := uint64(1 << 18)
 		hashLenBits := uint32(8)
-		res, err := ScryptPositions(providerID, commitment, salt, startPosition, endPosition, hashLenBits)
+		res, err := ScryptPositions(providerID,
+			WithCommitment(commitment),
+			WithSalt(salt),
+			WithStartAndEndPosition(startPosition, endPosition),
+			WithBitsPerLabel(hashLenBits),
+		)
 		r.NoError(err)
 		r.NotNil(res)
 		r.NotNil(res.Output)
@@ -178,7 +204,12 @@ func TestStop_SameThread(t *testing.T) {
 		// Testing that a call to `ScryptPositions` after `Stop` is working properly.
 		startPosition = uint64(1)
 		endPosition = uint64(1 << 17)
-		res, err = ScryptPositions(providerID, commitment, salt, startPosition, endPosition, hashLenBits)
+		res, err = ScryptPositions(providerID,
+			WithCommitment(commitment),
+			WithSalt(salt),
+			WithStartAndEndPosition(startPosition, endPosition),
+			WithBitsPerLabel(hashLenBits),
+		)
 		r.NoError(err)
 		r.NotNil(res)
 		r.NotNil(res.Output)
@@ -196,10 +227,13 @@ func TestScryptPositions_PartialByte(t *testing.T) {
 	var prevOutput []byte
 	for _, p := range providers {
 		providerId := uint(p.ID)
-		startPosition := uint64(1)
-		endPosition := uint64(9)
 		hashLenBits := uint32(4)
-		res, err := ScryptPositions(providerId, commitment, salt, startPosition, endPosition, hashLenBits)
+		res, err := ScryptPositions(providerId,
+			WithCommitment(commitment),
+			WithSalt(salt),
+			WithStartAndEndPosition(1, 9),
+			WithBitsPerLabel(hashLenBits),
+		)
 		req.NoError(err)
 		req.NotNil(res)
 		req.NotNil(res.Output)

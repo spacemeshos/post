@@ -8,14 +8,17 @@ import (
 	"github.com/spacemeshos/post/shared"
 )
 
-type (
-	Challenge = shared.Challenge
-)
+type Challenge = shared.Challenge
 
 func WorkOracle(computeProviderId uint, id []byte, startPosition, endPosition uint64, bitsPerLabel uint32) ([]byte, error) {
 	salt := make([]byte, 32) // TODO(moshababo): apply salt
 
-	res, err := gpu.ScryptPositions(computeProviderId, id, salt, startPosition, endPosition, bitsPerLabel)
+	res, err := gpu.ScryptPositions(computeProviderId,
+		gpu.WithCommitment(id),
+		gpu.WithSalt(salt),
+		gpu.WithStartAndEndPosition(startPosition, endPosition),
+		gpu.WithBitsPerLabel(bitsPerLabel),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -31,16 +34,6 @@ func WorkOracleOne(id []byte, position uint64, bitsPerLabel uint32) []byte {
 	}
 
 	return output
-
-	/*
-		// A template for an alternative Go implementation:
-
-		input := make([]byte, len(id)+binary.Size(position))
-		copy(input, id)
-		binary.LittleEndian.PutUint64(input[len(id):], position)
-		output := scrypt(input)
-		return output[:labelSize/8] // Must also include the last (bitsPerLabel%8) bits as an additional byte.
-	*/
 }
 
 func FastOracle(ch Challenge, nonce uint32, label []byte) [32]byte {

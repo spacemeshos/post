@@ -42,16 +42,17 @@ func filterCPUProvider(providers []ComputeProvider) ComputeProvider {
 }
 
 func Benchmark(p ComputeProvider) (int, error) {
-	commitment := make([]byte, 32)
-	salt := make([]byte, 32)
-	hashLenBits := uint32(8)
-	startPosition := uint64(1)
 	endPosition := uint64(1 << 17)
 	if p.Model == "CPU" {
 		endPosition = uint64(1 << 14)
 	}
 
-	res, err := ScryptPositions(p.ID, commitment, salt, startPosition, endPosition, hashLenBits)
+	res, err := ScryptPositions(p.ID,
+		WithCommitment(make([]byte, 32)),
+		WithSalt(make([]byte, 32)),
+		WithStartAndEndPosition(1, endPosition),
+		WithBitsPerLabel(8),
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -66,18 +67,94 @@ type ScryptPositionsResult struct {
 	Stopped      bool
 }
 
-func ScryptPositions(providerId uint, commitment, salt []byte, startPosition, endPosition uint64, bitsPerLabel uint32) (*ScryptPositionsResult, error) {
-	if len(commitment) != 32 {
-		return nil, fmt.Errorf("invalid `commitment` length; expected: 32, given: %v", len(commitment))
-	}
+type scryptPositionOption struct {
+	commitment []byte
+	salt       []byte
 
-	if len(salt) != 32 {
-		return nil, fmt.Errorf("invalid `salt` length; expected: 32, given: %v", len(salt))
-	}
+	startPosition uint64
+	endPosition   uint64
 
-	if bitsPerLabel < config.MinBitsPerLabel || bitsPerLabel > config.MaxBitsPerLabel {
-		return nil, fmt.Errorf("invalid `bitsPerLabel`; expected: %d-%d, given: %v",
-			config.MinBitsPerLabel, config.MaxBitsPerLabel, bitsPerLabel)
+	bitsPerLabel uint32
+
+	computeLeafs bool
+	computePow   bool
+
+	n, r, p uint32
+}
+
+func (o *scryptPositionOption) optionBits() uint32 {
+	var bits uint32
+	if o.computeLeafs {
+		bits |= 1
+	}
+	if o.computePow {
+		bits |= 2
+	}
+	return bits
+}
+
+type scryptPositionOptionFunc func(*scryptPositionOption) error
+
+func WithCommitment(commitment []byte) scryptPositionOptionFunc {
+	return func(opts *scryptPositionOption) error {
+		if len(commitment) != 32 {
+			return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(commitment))
+		}
+
+		opts.commitment = commitment
+		return nil
+	}
+}
+
+func WithSalt(salt []byte) scryptPositionOptionFunc {
+	return func(opts *scryptPositionOption) error {
+		if len(salt) != 32 {
+			return fmt.Errorf("invalid `salt` length; expected: 32, given: %v", len(salt))
+		}
+
+		opts.salt = salt
+		return nil
+	}
+}
+
+func WithStartAndEndPosition(start, end uint64) scryptPositionOptionFunc {
+	return func(opts *scryptPositionOption) error {
+		opts.startPosition = start
+		opts.endPosition = end
+		return nil
+	}
+}
+
+func WithBitsPerLabel(bitsPerLabel uint32) scryptPositionOptionFunc {
+	return func(opts *scryptPositionOption) error {
+		if bitsPerLabel < config.MinBitsPerLabel || bitsPerLabel > config.MaxBitsPerLabel {
+			return fmt.Errorf("invalid `bitsPerLabel`; expected: %d-%d, given: %v", config.MinBitsPerLabel, config.MaxBitsPerLabel, bitsPerLabel)
+		}
+		opts.bitsPerLabel = bitsPerLabel
+		return nil
+	}
+}
+
+func WithComputeLeafs() scryptPositionOptionFunc {
+	return func(opts *scryptPositionOption) error {
+		opts.computeLeafs = true
+		return nil
+	}
+}
+
+func WithComputePow() scryptPositionOptionFunc {
+	return func(opts *scryptPositionOption) error {
+		opts.computePow = true
+		return nil
+	}
+}
+
+func ScryptPositions(providerId uint, opts ...scryptPositionOptionFunc) (*ScryptPositionsResult, error) {
+	options := &scryptPositionOption{}
+	for _, opt := range opts {
+		if err := opt(options); err != nil {
+			return nil, err
+		}
 	}
 
 	// Wait for the stop flag clearance for avoiding a race condition which can
@@ -95,10 +172,12 @@ func ScryptPositions(providerId uint, commitment, salt []byte, startPosition, en
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	const n, r, p = 512, 1, 1
-	const options = 1 // COMPUTE_LEAFS on, COMPUTE_POW off.
+	options.n = 512
+	options.r = 1
+	options.p = 1
+	options.computeLeafs = true
 
-	output, idxSolution, hashesPerSec, retVal := cScryptPositions(providerId, commitment, salt, startPosition, endPosition, bitsPerLabel, options, n, r, p)
+	output, idxSolution, hashesPerSec, retVal := cScryptPositions(providerId, options)
 
 	switch retVal {
 	case 1:
