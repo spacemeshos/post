@@ -17,8 +17,6 @@ import (
 )
 
 var (
-	id = make([]byte, 32)
-
 	logFlag   = flag.Bool("log", false, "")
 	debugFlag = flag.Bool("debug", false, "")
 )
@@ -56,6 +54,7 @@ func TestInitialize(t *testing.T) {
 	r := require.New(t)
 
 	cfg, opts := getTestConfig(t)
+	id := make([]byte, 32)
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
 	init.SetLogger(testLogger{})
@@ -74,6 +73,7 @@ func TestInitialize_Repeated(t *testing.T) {
 	r := require.New(t)
 
 	cfg, opts := getTestConfig(t)
+	id := make([]byte, 32)
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
 	init.SetLogger(testLogger{})
@@ -103,6 +103,7 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 
 	cfg, opts := getTestConfig(t)
 	opts.NumFiles = 1
+	id := make([]byte, 32)
 
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
@@ -136,6 +137,7 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	cfg, opts := getTestConfig(t)
 	opts.NumUnits++
 	opts.NumFiles = 1
+	id := make([]byte, 32)
 
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
@@ -169,6 +171,7 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	cfg, opts := getTestConfig(t)
 	opts.NumUnits++
 	opts.NumFiles = 2
+	id := make([]byte, 32)
 
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
@@ -208,6 +211,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	r := require.New(t)
 
 	cfg, opts := getTestConfig(t)
+	id := make([]byte, 32)
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
 	err = init.Initialize()
@@ -244,6 +248,7 @@ func TestNumLabelsWritten(t *testing.T) {
 	req := require.New(t)
 
 	cfg, opts := getTestConfig(t)
+	id := make([]byte, 32)
 	init, err := NewInitializer(cfg, opts, id)
 	req.NoError(err)
 
@@ -287,6 +292,7 @@ func TestValidateMetadata(t *testing.T) {
 	r := require.New(t)
 
 	cfg, opts := getTestConfig(t)
+	id := make([]byte, 32)
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
 
@@ -303,7 +309,6 @@ func TestValidateMetadata(t *testing.T) {
 
 	// Attempt to initialize with different `ID`.
 	newID := make([]byte, 32)
-	copy(newID, id)
 	newID[0] = newID[0] + 1
 	init, err = NewInitializer(cfg, opts, newID)
 	r.NoError(err)
@@ -352,6 +357,7 @@ func TestStop(t *testing.T) {
 
 	cfg, opts := getTestConfig(t)
 	opts.NumUnits = 10
+	id := make([]byte, 32)
 
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
