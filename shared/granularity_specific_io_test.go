@@ -10,8 +10,8 @@ import (
 
 var NewGranSpecificReader = shared.NewGranSpecificReader
 
-// change to simple array instead of file writing
 func TestGranSpecificReader_BitGranular(t *testing.T) {
+	// TODO(moshababo): change to simple array instead of file writing
 	req := require.New(t)
 
 	// Write one byte ([0b11111111])

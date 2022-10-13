@@ -11,10 +11,10 @@ type Proof struct {
 
 // Encode encodes Proof according to the following format:
 //
-// +-----------+-------------------+
-// | nonce     | indices           |
-// | (4 bytes) | (remaining bytes) |
-// +-----------+-------------------+
+//	+-----------+-------------------+
+//	| nonce     | indices           |
+//	| (4 bytes) | (remaining bytes) |
+//	+-----------+-------------------+
 func (p *Proof) Encode() []byte {
 	size := 4 + len(p.Indices)
 	b := make([]byte, size)

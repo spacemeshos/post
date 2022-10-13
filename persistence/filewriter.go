@@ -53,7 +53,7 @@ func (w *FileWriter) NumLabelsWritten() (uint64, error) {
 func (w *FileWriter) Truncate(numLabels uint64) error {
 	bitSize := numLabels * uint64(w.bitsPerLabel)
 	if bitSize%8 != 0 {
-		return fmt.Errorf("invalid `numLabels`; expected: evenly divisible by 8 (alone, or when multipled by `labelSize`), given: %d", numLabels)
+		return fmt.Errorf("invalid `numLabels`; expected: evenly divisible by 8 (alone, or when multiplied by `labelSize`), given: %d", numLabels)
 	}
 
 	size := int64(bitSize / 8)

@@ -292,6 +292,7 @@ func TestValidateMetadata(t *testing.T) {
 
 	m, err := init.loadMetadata()
 	r.Equal(ErrStateMetadataFileMissing, err)
+	r.Nil(m)
 
 	err = init.Initialize()
 	r.NoError(err)

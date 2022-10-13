@@ -17,7 +17,7 @@ endif
 
 install: get-gpu-setup
 	go mod download
-	GO111MODULE=off go get golang.org/x/lint/golint
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.50.0
 .PHONY: install
 
 tidy:
@@ -39,7 +39,17 @@ test-fmt:
 	git diff --exit-code || (git --no-pager diff && git checkout . && exit 1)
 .PHONY: test-fmt
 
-lint:
-	golint --set_exit_status ./...
+lint: get-gpu-setup
 	go vet ./...
+	./bin/golangci-lint run --config .golangci.yml
 .PHONY: lint
+
+# Auto-fixes golangci-lint issues where possible.
+lint-fix: get-gpu-setup
+	./bin/golangci-lint run --config .golangci.yml --fix
+.PHONY: lint-fix
+
+lint-github-action: get-gpu-setup
+	go vet ./...
+	./bin/golangci-lint run --config .golangci.yml --out-format=github-actions
+.PHONY: lint-github-action

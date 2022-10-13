@@ -64,7 +64,7 @@ func (s StopResult) String() string {
 	case StopResultErrorAlready:
 		return "already stopped"
 	case StopResultErrorCancelled:
-		return "cancelled"
+		return "canceled"
 	default:
 		panic("unreachable")
 	}
