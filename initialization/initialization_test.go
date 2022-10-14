@@ -3,11 +3,11 @@ package initialization
 import (
 	"bytes"
 	"io"
+	"log"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
@@ -397,7 +397,7 @@ func assertNumLabelsWrittenChan(init *Initializer, r *require.Assertions) chan s
 		for p := range init.SessionNumLabelsWrittenChan() {
 			r.True(p > prev)
 			prev = p
-			log.Info("num labels written: %v\n", p)
+			log.Printf("num labels written: %v\n", p)
 		}
 		c, err := init.Completed()
 		r.NoError(err)
