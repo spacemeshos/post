@@ -2,11 +2,8 @@ package initialization
 
 import (
 	"bytes"
-	"flag"
-	"fmt"
 	"io"
-	"io/ioutil"
-	"os"
+	"log"
 	"sync"
 	"testing"
 	"time"
@@ -14,41 +11,40 @@ import (
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
-	smlog "github.com/spacemeshos/smutil/log"
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	id   = make([]byte, 32)
-	cfg  config.Config
-	opts config.InitOpts
-
-	log   = flag.Bool("log", false, "")
-	debug = flag.Bool("debug", false, "")
-)
-
-func TestMain(m *testing.M) {
-	cfg = config.DefaultConfig()
+func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
+	cfg := config.DefaultConfig()
 	cfg.LabelsPerUnit = 1 << 12
 
-	opts = config.DefaultInitOpts()
-	opts.DataDir, _ = ioutil.TempDir("", "post-test")
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
 	opts.ComputeProviderID = CPUProviderID()
 
-	res := m.Run()
-	os.Exit(res)
+	return cfg, opts
 }
+
+type testLogger struct {
+	shared.Logger
+
+	t *testing.T
+}
+
+func (l testLogger) Info(msg string, args ...interface{})  { l.t.Logf("\tINFO\t"+msg, args...) }
+func (l testLogger) Debug(msg string, args ...interface{}) { l.t.Logf("\tDEBUG\t"+msg, args...) }
 
 func TestInitialize(t *testing.T) {
 	r := require.New(t)
+	log := testLogger{t: t}
 
+	cfg, opts := getTestConfig(t)
+	id := make([]byte, 32)
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
-	if *log {
-		init.SetLogger(smlog.AppLog)
-	}
+	init.SetLogger(log)
 
 	doneChan := assertNumLabelsWrittenChan(init, r)
 	err = init.Initialize()
@@ -62,12 +58,13 @@ func TestInitialize(t *testing.T) {
 
 func TestInitialize_Repeated(t *testing.T) {
 	r := require.New(t)
+	log := testLogger{t: t}
 
+	cfg, opts := getTestConfig(t)
+	id := make([]byte, 32)
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
-	if *log {
-		init.SetLogger(smlog.AppLog)
-	}
+	init.SetLogger(log)
 
 	doneChan := assertNumLabelsWrittenChan(init, r)
 	err = init.Initialize()
@@ -77,9 +74,7 @@ func TestInitialize_Repeated(t *testing.T) {
 	// Initialize again using the same config & opts.
 	init, err = NewInitializer(cfg, opts, id)
 	r.NoError(err)
-	if *log {
-		init.SetLogger(smlog.AppLog)
-	}
+	init.SetLogger(log)
 
 	doneChan = assertNumLabelsWrittenChan(init, r)
 	err = init.Initialize()
@@ -93,15 +88,15 @@ func TestInitialize_Repeated(t *testing.T) {
 
 func TestInitialize_NumUnits_Increase(t *testing.T) {
 	r := require.New(t)
+	log := testLogger{t: t}
 
-	newOpts := opts
-	newOpts.NumFiles = 1
+	cfg, opts := getTestConfig(t)
+	opts.NumFiles = 1
+	id := make([]byte, 32)
 
-	init, err := NewInitializer(cfg, newOpts, id)
+	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
-	if *log {
-		init.SetLogger(smlog.AppLog)
-	}
+	init.SetLogger(log)
 
 	doneChan := assertNumLabelsWrittenChan(init, r)
 	err = init.Initialize()
@@ -109,13 +104,11 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	<-doneChan
 
 	// Increase `opts.NumUnits`.
-	newOpts.NumUnits++
+	opts.NumUnits++
 
-	init, err = NewInitializer(cfg, newOpts, id)
+	init, err = NewInitializer(cfg, opts, id)
 	r.NoError(err)
-	if *log {
-		init.SetLogger(smlog.AppLog)
-	}
+	init.SetLogger(log)
 
 	doneChan = assertNumLabelsWrittenChan(init, r)
 	err = init.Initialize()
@@ -129,16 +122,16 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 
 func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	r := require.New(t)
+	log := testLogger{t: t}
 
-	newOpts := opts
-	newOpts.NumUnits++
-	newOpts.NumFiles = 1
+	cfg, opts := getTestConfig(t)
+	opts.NumUnits++
+	opts.NumFiles = 1
+	id := make([]byte, 32)
 
-	init, err := NewInitializer(cfg, newOpts, id)
+	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
-	if *log {
-		init.SetLogger(smlog.AppLog)
-	}
+	init.SetLogger(log)
 
 	doneChan := assertNumLabelsWrittenChan(init, r)
 	err = init.Initialize()
@@ -146,13 +139,11 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	<-doneChan
 
 	// Decrease `opts.NumUnits`.
-	newOpts.NumUnits--
+	opts.NumUnits--
 
-	init, err = NewInitializer(cfg, newOpts, id)
+	init, err = NewInitializer(cfg, opts, id)
 	r.NoError(err)
-	if *log {
-		init.SetLogger(smlog.AppLog)
-	}
+	init.SetLogger(log)
 
 	doneChan = assertNumLabelsWrittenChan(init, r)
 	err = init.Initialize()
@@ -166,26 +157,26 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 
 func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	r := require.New(t)
+	log := testLogger{t: t}
 
-	newOpts := opts
-	newOpts.NumUnits++
-	newOpts.NumFiles = 2
+	cfg, opts := getTestConfig(t)
+	opts.NumUnits++
+	opts.NumFiles = 2
+	id := make([]byte, 32)
 
-	init, err := NewInitializer(cfg, newOpts, id)
+	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
-	if *log {
-		init.SetLogger(smlog.AppLog)
-	}
+	init.SetLogger(log)
 
 	doneChan := assertNumLabelsWrittenChan(init, r)
 	err = init.Initialize()
 	r.NoError(err)
 	<-doneChan
 
-	prevNumUnits := newOpts.NumUnits
+	prevNumUnits := opts.NumUnits
 
 	// Increase `opts.NumUnits` while `opts.NumFiles` > 1.
-	newOpts.NumUnits = prevNumUnits + 1
+	opts.NumUnits = prevNumUnits + 1
 	init, err = NewInitializer(cfg, opts, id)
 	r.NoError(err)
 	err = init.Initialize()
@@ -194,7 +185,7 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	r.Equal("NumUnits", errConfigMismatch.Param)
 
 	// Decrease `opts.NumUnits` while `opts.NumFiles` > 1.
-	newOpts.NumUnits = prevNumUnits - 1
+	opts.NumUnits = prevNumUnits - 1
 	init, err = NewInitializer(cfg, opts, id)
 	r.NoError(err)
 	err = init.Initialize()
@@ -210,6 +201,8 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 func TestInitialize_MultipleFiles(t *testing.T) {
 	r := require.New(t)
 
+	cfg, opts := getTestConfig(t)
+	id := make([]byte, 32)
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
 	err = init.Initialize()
@@ -245,6 +238,8 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 func TestNumLabelsWritten(t *testing.T) {
 	req := require.New(t)
 
+	cfg, opts := getTestConfig(t)
+	id := make([]byte, 32)
 	init, err := NewInitializer(cfg, opts, id)
 	req.NoError(err)
 
@@ -287,6 +282,8 @@ func TestNumLabelsWritten(t *testing.T) {
 func TestValidateMetadata(t *testing.T) {
 	r := require.New(t)
 
+	cfg, opts := getTestConfig(t)
+	id := make([]byte, 32)
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
 
@@ -303,7 +300,6 @@ func TestValidateMetadata(t *testing.T) {
 
 	// Attempt to initialize with different `ID`.
 	newID := make([]byte, 32)
-	copy(newID, id)
 	newID[0] = newID[0] + 1
 	init, err = NewInitializer(cfg, opts, newID)
 	r.NoError(err)
@@ -349,15 +345,15 @@ func TestValidateMetadata(t *testing.T) {
 
 func TestStop(t *testing.T) {
 	r := require.New(t)
+	log := testLogger{t: t}
 
-	newOpts := opts
-	newOpts.NumUnits = 10
+	cfg, opts := getTestConfig(t)
+	opts.NumUnits = 10
+	id := make([]byte, 32)
 
-	init, err := NewInitializer(cfg, newOpts, id)
+	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
-	if *log {
-		init.SetLogger(smlog.AppLog)
-	}
+	init.SetLogger(log)
 
 	// Start initialization and stop it after a short while.
 	var wg sync.WaitGroup
@@ -373,10 +369,7 @@ func TestStop(t *testing.T) {
 		for p := range init.SessionNumLabelsWrittenChan() {
 			r.True(p > prev)
 			prev = p
-
-			if *debug {
-				fmt.Printf("num labels written: %v\n", p)
-			}
+			log.Info("num labels written: %v\n", p)
 		}
 		r.True(init.Started())
 		r.False(init.Completed())
@@ -404,10 +397,7 @@ func assertNumLabelsWrittenChan(init *Initializer, r *require.Assertions) chan s
 		for p := range init.SessionNumLabelsWrittenChan() {
 			r.True(p > prev)
 			prev = p
-
-			if *debug {
-				fmt.Printf("num labels written: %v\n", p)
-			}
+			log.Printf("num labels written: %v\n", p)
 		}
 		c, err := init.Completed()
 		r.NoError(err)

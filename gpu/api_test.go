@@ -96,7 +96,7 @@ func TestScryptPositions_InvalidProviderId(t *testing.T) {
 
 	invalidProviderId := uint(1 << 10)
 	res, err := ScryptPositions(invalidProviderId, id, salt, 1, 1, 8)
-	req.EqualError(err, fmt.Sprintf("gpu-post error: invalid provider"))
+	req.EqualError(err, "gpu-post error: invalid provider")
 	req.Nil(res)
 }
 

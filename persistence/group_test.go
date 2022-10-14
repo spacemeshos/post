@@ -163,7 +163,6 @@ func NewLabelFromUint64(i uint64, labelSize uint) []byte {
 
 type sliceWriter struct {
 	slice    *[][]byte
-	position uint64
 	itemSize uint
 }
 

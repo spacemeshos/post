@@ -3,7 +3,6 @@ package initialization
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -32,7 +31,7 @@ func SaveMetadata(dir string, v *Metadata) error {
 		return fmt.Errorf("serialization failure: %v", err)
 	}
 
-	err = ioutil.WriteFile(filepath.Join(dir, metadataFileName), data, shared.OwnerReadWrite)
+	err = os.WriteFile(filepath.Join(dir, metadataFileName), data, shared.OwnerReadWrite)
 	if err != nil {
 		return fmt.Errorf("write to disk failure: %v", err)
 	}
@@ -42,7 +41,7 @@ func SaveMetadata(dir string, v *Metadata) error {
 
 func LoadMetadata(dir string) (*Metadata, error) {
 	filename := filepath.Join(dir, metadataFileName)
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, ErrStateMetadataFileMissing

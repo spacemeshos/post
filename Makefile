@@ -1,9 +1,9 @@
 export CGO_ENABLED := 1
 include Makefile.Inc
 
-test test-all: get-gpu-setup
-	$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -v -timeout 0 -p 1 -race ./...
-.PHONY: test test-all
+test: get-gpu-setup
+	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" gotestsum -- -timeout 5m -p 1 -race ./...
+.PHONY: test
 
 compile-test: get-gpu-setup
 	CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -v -c -o $(BIN_DIR)test$(EXE) ./...
@@ -18,6 +18,8 @@ endif
 install: get-gpu-setup
 	go mod download
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.50.0
+	go install gotest.tools/gotestsum@v1.8.2
+	go install honnef.co/go/tools/cmd/staticcheck@latest
 .PHONY: install
 
 tidy:
@@ -39,6 +41,10 @@ test-fmt:
 	git diff --exit-code || (git --no-pager diff && git checkout . && exit 1)
 .PHONY: test-fmt
 
+clear-test-cache:
+	go clean -testcache
+.PHONY: clear-test-cache
+
 lint: get-gpu-setup
 	go vet ./...
 	./bin/golangci-lint run --config .golangci.yml
@@ -53,3 +59,11 @@ lint-github-action: get-gpu-setup
 	go vet ./...
 	./bin/golangci-lint run --config .golangci.yml --out-format=github-actions
 .PHONY: lint-github-action
+
+cover: get-gpu-setup
+	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -coverprofile=cover.out -timeout 0 -p 1 $(UNIT_TESTS)
+.PHONY: cover
+
+staticcheck: get-gpu-setup
+	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" staticcheck ./...
+.PHONY: staticcheck

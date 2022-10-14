@@ -2,7 +2,6 @@ package persistence
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -32,7 +31,7 @@ func NewLabelsReader(datadir string, bitsPerLabel uint) (Reader, error) {
 }
 
 func GetReaders(datadir string, bitsPerLabel uint) ([]Reader, error) {
-	files, err := ioutil.ReadDir(datadir)
+	files, err := os.ReadDir(datadir)
 	if err != nil {
 		return nil, fmt.Errorf("initialization directory not found: %v", err)
 	}
@@ -43,8 +42,12 @@ func GetReaders(datadir string, bitsPerLabel uint) ([]Reader, error) {
 	// Filter.
 	var initFiles []os.FileInfo
 	for _, file := range files {
-		if shared.IsInitFile(file) {
-			initFiles = append(initFiles, file)
+		info, err := file.Info()
+		if err != nil {
+			continue
+		}
+		if shared.IsInitFile(info) {
+			initFiles = append(initFiles, info)
 		}
 	}
 

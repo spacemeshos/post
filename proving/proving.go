@@ -128,7 +128,7 @@ func (p *Prover) verifyInitCompleted(numUnits uint) error {
 	if err != nil {
 		return err
 	}
-	if ok == false {
+	if !ok {
 		return shared.ErrInitNotCompleted
 	}
 

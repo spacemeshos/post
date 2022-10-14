@@ -3,18 +3,13 @@ package proving
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"flag"
-	"fmt"
-	"io/ioutil"
 	"math"
-	"os"
 	"testing"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/verifying"
-	smlog "github.com/spacemeshos/smutil/log"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,48 +17,49 @@ var (
 	id = make([]byte, 32)
 	ch = make(Challenge, 32)
 
-	cfg  config.Config
-	opts config.InitOpts
-
-	log   = flag.Bool("log", false, "")
-	debug = flag.Bool("debug", false, "")
-
 	NewInitializer = initialization.NewInitializer
 	CPUProviderID  = initialization.CPUProviderID
 )
 
-func TestMain(m *testing.M) {
-	cfg = config.DefaultConfig()
+func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
+	cfg := config.DefaultConfig()
 	cfg.LabelsPerUnit = 1 << 12
 
-	opts = config.DefaultInitOpts()
-	opts.DataDir, _ = ioutil.TempDir("", "post-test")
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
 	opts.ComputeProviderID = CPUProviderID()
 
-	res := m.Run()
-	os.Exit(res)
+	return cfg, opts
 }
 
-// TODO: tests should range through `cfg.BitsPerLabel` as well.
+type testLogger struct {
+	shared.Logger
+
+	t *testing.T
+}
+
+func (l testLogger) Info(msg string, args ...interface{})  { l.t.Logf("\tINFO\t"+msg, args...) }
+func (l testLogger) Debug(msg string, args ...interface{}) { l.t.Logf("\tDEBUG\t"+msg, args...) }
+
 func TestProver_GenerateProof(t *testing.T) {
+	// TODO(moshababo): tests should range through `cfg.BitsPerLabel` as well.
 	r := require.New(t)
+	log := testLogger{t: t}
 
+	cfg, opts := getTestConfig(t)
 	for numUnits := cfg.MinNumUnits; numUnits < 6; numUnits++ {
-		newOpts := opts
-		newOpts.NumUnits = numUnits
+		opts.NumUnits = numUnits
 
-		init, err := NewInitializer(cfg, newOpts, id)
+		init, err := NewInitializer(cfg, opts, id)
 		r.NoError(err)
 		err = init.Initialize()
 		r.NoError(err)
 
 		p, err := NewProver(cfg, opts.DataDir, id)
 		r.NoError(err)
-		if *log {
-			p.SetLogger(smlog.AppLog)
-		}
+		p.SetLogger(log)
 
 		binary.BigEndian.PutUint64(ch, uint64(numUnits))
 		proof, proofMetaData, err := p.GenerateProof(ch)
@@ -83,9 +79,7 @@ func TestProver_GenerateProof(t *testing.T) {
 		indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
 		r.Equal(shared.Size(indexBitSize, p.cfg.K2), uint(len(proof.Indices)))
 
-		if *debug {
-			t.Logf("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
-		}
+		log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
 
 		err = verifying.Verify(proof, proofMetaData)
 		r.NoError(err)
@@ -99,6 +93,7 @@ func TestProver_GenerateProof(t *testing.T) {
 func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 	r := require.New(t)
 
+	cfg, opts := getTestConfig(t)
 	init, err := NewInitializer(cfg, opts, id)
 	r.NoError(err)
 	err = init.Initialize()
@@ -152,12 +147,11 @@ func TestCalcProvingDifficulty(t *testing.T) {
 	NumLabels := uint64(4294967296)
 	K1 := uint64(2000000)
 
-	fmt.Printf("NumLabels: %v\n", NumLabels)
-	fmt.Printf("K1: %v\n", K1)
-	fmt.Println()
+	t.Logf("NumLabels: %v\n", NumLabels)
+	t.Logf("K1: %v\n", K1)
 
 	maxTarget := uint64(math.MaxUint64)
-	fmt.Printf("max target: %d\n", maxTarget)
+	t.Logf("\nmax target: %d\n", maxTarget)
 
 	if ok := shared.Uint64MulOverflow(NumLabels, K1); ok {
 		panic("NumLabels*K1 overflow")
@@ -166,33 +160,32 @@ func TestCalcProvingDifficulty(t *testing.T) {
 	x := maxTarget / NumLabels
 	y := maxTarget % NumLabels
 	difficulty := x*K1 + (y*K1)/NumLabels
-	fmt.Printf("difficulty: %v\n", difficulty)
+	t.Logf("difficulty: %v\n", difficulty)
 
-	fmt.Println()
-	fmt.Printf("calculating various values...\n")
+	t.Log("\ncalculating various values...\n")
 	for i := 129540; i < 129545; i++ { // value 129544 pass
 		// Generate a preimage.
 		var b [4]byte
 		binary.BigEndian.PutUint32(b[:], uint32(i))
-		fmt.Printf("%v: preimage: 0x%x\n", i, b)
+		t.Logf("%v: preimage: 0x%x\n", i, b)
 
 		// Derive the hash output.
 		hash := sha256.Sum256(b[:])
-		fmt.Printf("%v: hash: Ox%x\n", i, hash)
+		t.Logf("%v: hash: Ox%x\n", i, hash)
 
 		// Convert the hash output leading 64 bits to an integer
 		// so that it could be used to perform math comparisons.
 		hashNum := binary.BigEndian.Uint64(hash[:])
-		fmt.Printf("%v: hashNum: %v\n", i, hashNum)
+		t.Logf("%v: hashNum: %v\n", i, hashNum)
 
 		// Test the difficulty requirement.
 		if hashNum > difficulty {
-			fmt.Printf("%v: Not passed. hashNum > difficulty\n", i)
+			t.Logf("%v: Not passed. hashNum > difficulty\n", i)
 		} else {
-			fmt.Printf("%v: Great success! hashNum <= difficulty\n", i)
+			t.Logf("%v: Great success! hashNum <= difficulty\n", i)
 			break
 		}
 
-		fmt.Println()
+		t.Log("\n")
 	}
 }

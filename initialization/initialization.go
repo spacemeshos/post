@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -191,13 +190,17 @@ func (init *Initializer) Reset() error {
 		return err
 	}
 
-	files, err := ioutil.ReadDir(init.opts.DataDir)
+	files, err := os.ReadDir(init.opts.DataDir)
 	if err != nil {
 		return err
 	}
 
 	for _, file := range files {
-		if shared.IsInitFile(file) || file.Name() == metadataFileName {
+		info, err := file.Info()
+		if err != nil {
+			continue
+		}
+		if shared.IsInitFile(info) || file.Name() == metadataFileName {
 			path := filepath.Join(init.opts.DataDir, file.Name())
 			if err := os.Remove(path); err != nil {
 				return fmt.Errorf("failed to delete file (%v): %v", path, err)
@@ -232,7 +235,7 @@ func (init *Initializer) VerifyStarted() error {
 	if err != nil {
 		return err
 	}
-	if ok == false {
+	if !ok {
 		return shared.ErrInitNotStarted
 	}
 

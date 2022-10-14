@@ -2,3 +2,5 @@
 libgpu-setup-*
 build
 bin
+
+*.out

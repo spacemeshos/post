@@ -4,8 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/spacemeshos/post/config"
@@ -21,9 +19,6 @@ var (
 	id = make([]byte, 32)
 	ch = make(proving.Challenge, 32)
 
-	cfg  config.Config
-	opts config.InitOpts
-
 	debug = flag.Bool("debug", false, "")
 	long  = flag.Bool("long", false, "")
 
@@ -32,23 +27,23 @@ var (
 	CPUProviderID  = initialization.CPUProviderID
 )
 
-func TestMain(m *testing.M) {
-	cfg = config.DefaultConfig()
+func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
+	cfg := config.DefaultConfig()
 	cfg.LabelsPerUnit = 1 << 12
 
-	opts = config.DefaultInitOpts()
-	opts.DataDir, _ = ioutil.TempDir("", "post-test")
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
 	opts.ComputeProviderID = CPUProviderID()
 
-	res := m.Run()
-	os.Exit(res)
+	return cfg, opts
 }
 
 func TestVerify(t *testing.T) {
 	req := require.New(t)
 
+	cfg, opts := getTestConfig(t)
 	init, err := NewInitializer(cfg, opts, id)
 	req.NoError(err)
 	err = init.Initialize()
@@ -85,7 +80,7 @@ func TestLabelsCorrectness(t *testing.T) {
 	numFileBatches := 2
 	batchSize := 256
 	id := make([]byte, 32)
-	datadir, _ := ioutil.TempDir("", "post-test")
+	datadir := t.TempDir()
 
 	for bitsPerLabel := uint32(config.MinBitsPerLabel); bitsPerLabel <= config.MaxBitsPerLabel; bitsPerLabel++ {
 		if *debug {
@@ -132,8 +127,5 @@ func TestLabelsCorrectness(t *testing.T) {
 
 			position++
 		}
-
-		// Cleanup.
-		_ = os.RemoveAll(datadir)
 	}
 }

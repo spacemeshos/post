@@ -1,12 +1,11 @@
 package persistence
 
 import (
-	"io/ioutil"
 	"os"
 )
 
 func NumBytesWritten(dir string, predicate func(os.FileInfo) bool) (uint64, error) {
-	allFiles, err := ioutil.ReadDir(dir)
+	allFiles, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return 0, nil
@@ -16,8 +15,13 @@ func NumBytesWritten(dir string, predicate func(os.FileInfo) bool) (uint64, erro
 
 	includedFiles := make([]os.FileInfo, 0)
 	for _, file := range allFiles {
-		if predicate(file) {
-			includedFiles = append(includedFiles, file)
+		info, err := file.Info()
+		if err != nil {
+			continue
+		}
+
+		if predicate(info) {
+			includedFiles = append(includedFiles, info)
 		}
 	}
 

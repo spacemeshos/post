@@ -2,8 +2,6 @@ package persistence
 
 import (
 	"io"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,7 +16,7 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 
 	labelGroups := genLabelGroups(labelSize)
 	writtenLabels := make([]Label, 0)
-	datadir, _ := ioutil.TempDir("", "post-test")
+	datadir := t.TempDir()
 
 	for i, labelGroup := range labelGroups {
 		writer, err := NewLabelsWriter(datadir, i, labelSize)
@@ -53,8 +51,6 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 	req.Equal(p, make([]byte, labelSize/8)) // empty.
 
 	req.EqualValues(writtenLabels, readLabels)
-
-	_ = os.RemoveAll(datadir)
 }
 
 func genLabelGroups(labelSize uint) [][]Label {
