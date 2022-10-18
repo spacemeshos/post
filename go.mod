@@ -6,7 +6,7 @@ require (
 	github.com/nullstyle/go-xdr v0.0.0-20180726165426-f4c839f75077
 	github.com/pkg/errors v0.9.1
 	github.com/spacemeshos/bitstream v0.0.0-20220825090124-a402b591ff20
-	github.com/spacemeshos/go-scale v0.0.0-20220915084948-ecda42870b1b
+	github.com/spacemeshos/go-scale v0.0.0-20221018103010-514dd8c38257
 	github.com/stretchr/testify v1.8.0
 )
 
