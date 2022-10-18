@@ -150,7 +150,12 @@ func WithComputePow() scryptPositionOptionFunc {
 }
 
 func ScryptPositions(providerId uint, opts ...scryptPositionOptionFunc) (*ScryptPositionsResult, error) {
-	options := &scryptPositionOption{}
+	options := &scryptPositionOption{
+		n:            512,
+		r:            1,
+		p:            1,
+		computeLeafs: true,
+	}
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
 			return nil, err
@@ -171,11 +176,6 @@ func ScryptPositions(providerId uint, opts ...scryptPositionOptionFunc) (*Scrypt
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-
-	options.n = 512
-	options.r = 1
-	options.p = 1
-	options.computeLeafs = true
 
 	output, idxSolution, hashesPerSec, retVal := cScryptPositions(providerId, options)
 
