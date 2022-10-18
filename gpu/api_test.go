@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spacemeshos/post/shared"
 	"github.com/stretchr/testify/require"
+
+	"github.com/spacemeshos/post/shared"
 )
 
 var (

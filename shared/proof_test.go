@@ -1,9 +1,9 @@
 package shared
 
 import (
-	"github.com/spacemeshos/go-scale/tester"
 	"testing"
 
+	"github.com/spacemeshos/go-scale/tester"
 	"github.com/stretchr/testify/require"
 )
 

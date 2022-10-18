@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
-	"github.com/stretchr/testify/require"
 )
 
 func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {

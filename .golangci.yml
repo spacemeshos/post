@@ -153,12 +153,12 @@ linters-settings:
     range-loops: true # Report preallocation suggestions on range loops, true by default
     for-loops: false # Report preallocation suggestions on for loops, false by default
   goimports:
-    local-prefixes: github.com/spacemeshos/go-spacemesh
+    local-prefixes: github.com/spacemeshos/post
   gci:
     sections:
       - standard
       - default
-      - prefix(github.com/spacemeshos/go-spacemesh)
+      - prefix(github.com/spacemeshos/post)
   godot:
     # comments to be checked: `declarations`, `toplevel`, or `all`
     scope: declarations
