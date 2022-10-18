@@ -18,6 +18,7 @@ endif
 install: get-gpu-setup
 	go mod download
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.50.0
+	go install github.com/spacemeshos/go-scale/scalegen
 	go install gotest.tools/gotestsum@v1.8.2
 	go install honnef.co/go/tools/cmd/staticcheck@latest
 .PHONY: install
@@ -67,3 +68,7 @@ cover: get-gpu-setup
 staticcheck: get-gpu-setup
 	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" staticcheck ./...
 .PHONY: staticcheck
+
+generate: get-gpu-setup
+	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go generate ./...
+.PHONY: generate
