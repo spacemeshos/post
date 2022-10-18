@@ -14,10 +14,10 @@ const metadataFileName = "postdata_metadata.json"
 // metadata is the data associated with the PoST init procedure, persisted in the datadir next to the init files.
 type Metadata struct {
 	ID            []byte
-	BitsPerLabel  uint
-	LabelsPerUnit uint
-	NumUnits      uint
-	NumFiles      uint
+	BitsPerLabel  uint8
+	LabelsPerUnit uint64
+	NumUnits      uint32
+	NumFiles      uint32
 }
 
 func SaveMetadata(dir string, v *Metadata) error {

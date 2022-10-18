@@ -209,14 +209,14 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	err = init.Initialize()
 	r.NoError(err)
 
-	oneFileData, err := initData(opts.DataDir, cfg.BitsPerLabel)
+	oneFileData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
 	r.NoError(err)
 
 	// Cleanup.
 	err = init.Reset()
 	r.NoError(err)
 
-	for numFiles := uint(2); numFiles <= 16; numFiles <<= 1 {
+	for numFiles := uint32(2); numFiles <= 16; numFiles <<= 1 {
 		opts := opts
 		opts.NumFiles = numFiles
 
@@ -225,7 +225,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 		err = init.Initialize()
 		r.NoError(err)
 
-		multipleFilesData, err := initData(opts.DataDir, cfg.BitsPerLabel)
+		multipleFilesData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
 		r.NoError(err)
 
 		r.Equal(multipleFilesData, oneFileData)
@@ -254,26 +254,26 @@ func TestNumLabelsWritten(t *testing.T) {
 	req.NoError(err)
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	req.NoError(err)
-	req.Equal(uint64(opts.NumUnits*cfg.LabelsPerUnit), numLabelsWritten)
+	req.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
 
 	// Initialize repeated.
 	err = init.Initialize()
 	req.NoError(err)
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	req.NoError(err)
-	req.Equal(uint64(opts.NumUnits*cfg.LabelsPerUnit), numLabelsWritten)
+	req.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
 
 	// Initialize repeated, using a new instance.
 	init, err = NewInitializer(cfg, opts, id)
 	req.NoError(err)
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	req.NoError(err)
-	req.Equal(uint64(opts.NumUnits*cfg.LabelsPerUnit), numLabelsWritten)
+	req.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
 	err = init.Initialize()
 	req.NoError(err)
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	req.NoError(err)
-	req.Equal(uint64(opts.NumUnits*cfg.LabelsPerUnit), numLabelsWritten)
+	req.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
 
 	// Cleanup.
 	err = init.Reset()

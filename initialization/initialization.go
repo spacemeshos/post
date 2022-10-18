@@ -74,7 +74,7 @@ func NewInitializer(cfg Config, opts config.InitOpts, id []byte) (*Initializer, 
 		cfg:       cfg,
 		opts:      opts,
 		id:        id,
-		diskState: NewDiskState(opts.DataDir, cfg.BitsPerLabel),
+		diskState: NewDiskState(opts.DataDir, uint(cfg.BitsPerLabel)),
 		logger:    shared.DisabledLogger{},
 	}, nil
 }
@@ -248,7 +248,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 	batchSize := uint64(config.DefaultComputeBatchSize)
 
 	// Initialize the labels file writer.
-	writer, err := persistence.NewLabelsWriter(init.opts.DataDir, fileIndex, init.cfg.BitsPerLabel)
+	writer, err := persistence.NewLabelsWriter(init.opts.DataDir, fileIndex, uint(init.cfg.BitsPerLabel))
 	if err != nil {
 		return err
 	}
