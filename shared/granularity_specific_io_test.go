@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/spacemeshos/post/shared"
 	"github.com/stretchr/testify/require"
+
+	"github.com/spacemeshos/post/shared"
 )
 
 var NewGranSpecificReader = shared.NewGranSpecificReader

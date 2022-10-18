@@ -3,6 +3,7 @@ package shared
 import (
 	"testing"
 
+	"github.com/spacemeshos/go-scale/tester"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,4 +26,12 @@ func makeNonEmptyBytes(size int) []byte {
 		b[0] = byte(i) // // Assign some arbitrary value.
 	}
 	return b
+}
+
+func FuzzProofConsistency(f *testing.F) {
+	tester.FuzzConsistency[Proof](f)
+}
+
+func FuzzMerkleProofSafety(f *testing.F) {
+	tester.FuzzSafety[Proof](f)
 }
