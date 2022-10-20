@@ -70,7 +70,7 @@ func WithBitsPerLabel(bitsPerLabel uint32) workOracleOptionFunc {
 	}
 }
 
-// TODO(mafa): use this to verify incoming nonce
+// TODO(mafa): use this to verify incoming nonce.
 func WorkOracle(opts ...workOracleOptionFunc) ([]byte, error) {
 	options := &workOracleOption{
 		computeProviderID: uint(gpu.CPUProviderID()),

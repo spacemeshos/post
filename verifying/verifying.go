@@ -54,6 +54,9 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 			oracle.WithPosition(index),
 			oracle.WithBitsPerLabel(uint32(m.BitsPerLabel)),
 		)
+		if err != nil {
+			return err
+		}
 		hash := FastOracle(m.Challenge, p.Nonce, label)
 		hashNum := UInt64LE(hash[:])
 		if hashNum > difficulty {
