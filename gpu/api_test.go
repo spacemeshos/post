@@ -31,9 +31,9 @@ func TestScryptPositions(t *testing.T) {
 	providers := Providers()
 	var prevOutput []byte
 	for _, p := range providers {
-		providerId := uint(p.ID)
 		hashLenBits := uint32(4)
-		res, err := ScryptPositions(providerId,
+		res, err := ScryptPositions(
+			WithComputeProviderID(p.ID),
 			WithCommitment(commitment),
 			WithSalt(salt),
 			WithStartAndEndPosition(1, 1<<8),
@@ -66,8 +66,8 @@ func TestScryptPositions_HashLenBits(t *testing.T) {
 	for hashLenBits := uint32(1); hashLenBits <= 256; hashLenBits++ {
 		var prevOutput []byte
 		for _, p := range providers {
-			providerId := uint(p.ID)
-			res, err := ScryptPositions(providerId,
+			res, err := ScryptPositions(
+				WithComputeProviderID(p.ID),
 				WithCommitment(commitment),
 				WithSalt(salt),
 				WithStartAndEndPosition(1, 1<<12),
@@ -94,7 +94,8 @@ func TestScryptPositions_InvalidProviderId(t *testing.T) {
 	req := require.New(t)
 
 	invalidProviderId := uint(1 << 10)
-	res, err := ScryptPositions(invalidProviderId,
+	res, err := ScryptPositions(
+		WithComputeProviderID(invalidProviderId),
 		WithCommitment(commitment),
 		WithSalt(salt),
 		WithStartAndEndPosition(1, 1),
@@ -123,7 +124,8 @@ func TestStop(t *testing.T) {
 			startPosition := uint64(1)
 			endPosition := uint64(1 << 18)
 			hashLenBits := uint32(8)
-			res, err := ScryptPositions(providerId,
+			res, err := ScryptPositions(
+				WithComputeProviderID(providerId),
 				WithCommitment(commitment),
 				WithSalt(salt),
 				WithStartAndEndPosition(startPosition, endPosition),
@@ -151,11 +153,11 @@ func TestStop(t *testing.T) {
 		}
 
 		// Testing that a call to `ScryptPositions` after `Stop` is working properly.
-		providerID := uint(p.ID)
 		startPosition := uint64(1)
 		endPosition := uint64(1 << 17)
 		hashLenBits := uint32(8)
-		res, err := ScryptPositions(providerID,
+		res, err := ScryptPositions(
+			WithComputeProviderID(p.ID),
 			WithCommitment(commitment),
 			WithSalt(salt),
 			WithStartAndEndPosition(startPosition, endPosition),
@@ -181,11 +183,11 @@ func TestStop_SameThread(t *testing.T) {
 			res := cStop(10000)
 			r.Equal(StopResultOk, res)
 		}()
-		providerID := uint(p.ID)
 		startPosition := uint64(1)
 		endPosition := uint64(1 << 18)
 		hashLenBits := uint32(8)
-		res, err := ScryptPositions(providerID,
+		res, err := ScryptPositions(
+			WithComputeProviderID(p.ID),
 			WithCommitment(commitment),
 			WithSalt(salt),
 			WithStartAndEndPosition(startPosition, endPosition),
@@ -204,7 +206,8 @@ func TestStop_SameThread(t *testing.T) {
 		// Testing that a call to `ScryptPositions` after `Stop` is working properly.
 		startPosition = uint64(1)
 		endPosition = uint64(1 << 17)
-		res, err = ScryptPositions(providerID,
+		res, err = ScryptPositions(
+			WithComputeProviderID(p.ID),
 			WithCommitment(commitment),
 			WithSalt(salt),
 			WithStartAndEndPosition(startPosition, endPosition),
@@ -226,9 +229,9 @@ func TestScryptPositions_PartialByte(t *testing.T) {
 	providers := Providers()
 	var prevOutput []byte
 	for _, p := range providers {
-		providerId := uint(p.ID)
 		hashLenBits := uint32(4)
-		res, err := ScryptPositions(providerId,
+		res, err := ScryptPositions(
+			WithComputeProviderID(p.ID),
 			WithCommitment(commitment),
 			WithSalt(salt),
 			WithStartAndEndPosition(1, 9),

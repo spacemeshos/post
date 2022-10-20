@@ -47,7 +47,8 @@ func Benchmark(p ComputeProvider) (int, error) {
 		endPosition = uint64(1 << 14)
 	}
 
-	res, err := ScryptPositions(p.ID,
+	res, err := ScryptPositions(
+		WithComputeProviderID(p.ID),
 		WithCommitment(make([]byte, 32)),
 		WithSalt(make([]byte, 32)),
 		WithStartAndEndPosition(1, endPosition),
@@ -68,6 +69,8 @@ type ScryptPositionsResult struct {
 }
 
 type scryptPositionOption struct {
+	computeProviderID uint
+
 	commitment []byte
 	salt       []byte
 
@@ -95,10 +98,17 @@ func (o *scryptPositionOption) optionBits() uint32 {
 
 type scryptPositionOptionFunc func(*scryptPositionOption) error
 
+func WithComputeProviderID(id uint) scryptPositionOptionFunc {
+	return func(opts *scryptPositionOption) error {
+		opts.computeProviderID = id
+		return nil
+	}
+}
+
 func WithCommitment(commitment []byte) scryptPositionOptionFunc {
 	return func(opts *scryptPositionOption) error {
 		if len(commitment) != 32 {
-			return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(commitment))
+			return fmt.Errorf("invalid `commitment` length; expected: 32, given: %v", len(commitment))
 		}
 
 		opts.commitment = commitment
@@ -149,7 +159,7 @@ func WithComputePow() scryptPositionOptionFunc {
 	}
 }
 
-func ScryptPositions(providerId uint, opts ...scryptPositionOptionFunc) (*ScryptPositionsResult, error) {
+func ScryptPositions(opts ...scryptPositionOptionFunc) (*ScryptPositionsResult, error) {
 	options := &scryptPositionOption{
 		n:            512,
 		r:            1,
@@ -177,7 +187,7 @@ func ScryptPositions(providerId uint, opts ...scryptPositionOptionFunc) (*Scrypt
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	output, idxSolution, hashesPerSec, retVal := cScryptPositions(providerId, options)
+	output, idxSolution, hashesPerSec, retVal := cScryptPositions(options)
 
 	switch retVal {
 	case 1:

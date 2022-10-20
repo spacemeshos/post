@@ -14,9 +14,9 @@ type (
 )
 
 var (
-	WorkOracleOne = oracle.WorkOracleOne
-	FastOracle    = oracle.FastOracle
-	UInt64LE      = shared.UInt64LE
+	WorkOracle = oracle.WorkOracle
+	FastOracle = oracle.FastOracle
+	UInt64LE   = shared.UInt64LE
 )
 
 // Verify ensures the validity of a proof in respect to its metadata.
@@ -48,7 +48,12 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 		}
 		indicesSet[index] = true
 
-		label := WorkOracleOne(m.Commitment, index, uint32(m.BitsPerLabel))
+		// TODO(mafa): verification of nonce happens here
+		label, err := WorkOracle(
+			oracle.WithCommitment(m.Commitment),
+			oracle.WithPosition(index),
+			oracle.WithBitsPerLabel(uint32(m.BitsPerLabel)),
+		)
 		hash := FastOracle(m.Challenge, p.Nonce, label)
 		hashNum := UInt64LE(hash[:])
 		if hashNum > difficulty {

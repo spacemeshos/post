@@ -308,7 +308,12 @@ func (init *Initializer) initFile(ctx context.Context, computeProviderID uint, f
 			// Calculate labels of the batch position range.
 			startPosition := fileOffset + currentPosition
 			endPosition := startPosition + uint64(batchSize) - 1
-			output, err := oracle.WorkOracle(computeProviderID, init.commitment, startPosition, endPosition, uint32(init.cfg.BitsPerLabel))
+			output, err := oracle.WorkOracle(
+				oracle.WithComputeProviderID(computeProviderID),
+				oracle.WithCommment(init.commitment),
+				oracle.WithStartAndEndPosition(startPosition, endPosition),
+				oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
+			)
 			if err != nil {
 				return err
 			}

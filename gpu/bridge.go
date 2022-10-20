@@ -65,12 +65,12 @@ func (s StopResult) String() string {
 	}
 }
 
-func cScryptPositions(providerId uint, options *scryptPositionOption) ([]byte, uint64, int, int) {
+func cScryptPositions(options *scryptPositionOption) ([]byte, uint64, int, int) {
 	mtx.Lock()
 	defer mtx.Unlock()
 
 	outputSize := shared.DataSize(uint64(options.endPosition-options.startPosition+1), uint(options.bitsPerLabel))
-	cProviderId := C.uint(providerId)
+	cProviderId := C.uint(options.computeProviderID)
 
 	cCommitment := C.CBytes(options.commitment)
 	defer C.free(cCommitment)
