@@ -16,10 +16,10 @@ github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINE
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/rogpeppe/go-internal v1.9.0 h1:73kH8U+JUqXU8lRuOHeVHaa/SZPifC7BkcraZVejAe8=
-github.com/spacemeshos/bitstream v0.0.0-20220825090124-a402b591ff20 h1:TaTJaskjlQ9dYtM3NZ3Yu/G2Bc88xzN0E0s2PIGbvBA=
-github.com/spacemeshos/bitstream v0.0.0-20220825090124-a402b591ff20/go.mod h1:k4jwfnHLdSt9YYsbonu0DdGZEZEvgzm12Zfm+UJARG8=
-github.com/spacemeshos/go-scale v0.0.0-20221018103010-514dd8c38257 h1:nkMI71/EaSXfMGk75hC1tOQlVmIUZLQ36egkpKEEX74=
-github.com/spacemeshos/go-scale v0.0.0-20221018103010-514dd8c38257/go.mod h1:82OPgK0o+s6IzdienL6n0TURSQvHPThZ+h+CeDoawbc=
+github.com/spacemeshos/bitstream v0.0.0-20221019141347-c47ad6b731c3 h1:EoA3KIhpZbDQqrSQ8XzfTPYA8M9DEL2KTU5vH9bbE4Y=
+github.com/spacemeshos/bitstream v0.0.0-20221019141347-c47ad6b731c3/go.mod h1:dvKyLbKVem81ZhQiCJXoNKNnRdPuOozjSBhqavbVuWQ=
+github.com/spacemeshos/go-scale v1.0.0 h1:xwOtuDi7wFt9wLTwN5iihHvCratKjpzuLQT+2Tvo3xk=
+github.com/spacemeshos/go-scale v1.0.0/go.mod h1:82OPgK0o+s6IzdienL6n0TURSQvHPThZ+h+CeDoawbc=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
