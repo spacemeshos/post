@@ -307,7 +307,7 @@ func TestValidateMetadata(t *testing.T) {
 	err = init.Initialize()
 	errConfigMismatch, ok := err.(ConfigMismatchError)
 	r.True(ok)
-	r.Equal("ID", errConfigMismatch.Param)
+	r.Equal("Commitment", errConfigMismatch.Param)
 
 	// Attempt to initialize with different `cfg.BitsPerLabel`.
 	newCfg := cfg
