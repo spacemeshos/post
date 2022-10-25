@@ -1,7 +1,6 @@
 package verifying
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"testing"
@@ -19,9 +18,6 @@ import (
 var (
 	id = make([]byte, 32)
 	ch = make(proving.Challenge, 32)
-
-	debug = flag.Bool("debug", false, "")
-	long  = flag.Bool("long", false, "")
 
 	NewInitializer = initialization.NewInitializer
 	NewProver      = proving.NewProver
@@ -73,7 +69,7 @@ func TestVerify(t *testing.T) {
 //     and ensure that each one equals a single label compute (verifier).
 func TestLabelsCorrectness(t *testing.T) {
 	req := require.New(t)
-	if !*long {
+	if testing.Short() {
 		t.Skip("long test")
 	}
 
@@ -84,9 +80,7 @@ func TestLabelsCorrectness(t *testing.T) {
 	datadir := t.TempDir()
 
 	for bitsPerLabel := uint32(config.MinBitsPerLabel); bitsPerLabel <= config.MaxBitsPerLabel; bitsPerLabel++ {
-		if *debug {
-			fmt.Printf("bitsPerLabel: %v\n", bitsPerLabel)
-		}
+		t.Logf("bitsPerLabel: %v\n", bitsPerLabel)
 
 		// Write.
 		for i := 0; i < numFiles; i++ {
