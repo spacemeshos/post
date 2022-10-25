@@ -88,10 +88,10 @@ type scryptPositionOption struct {
 func (o *scryptPositionOption) optionBits() uint32 {
 	var bits uint32
 	if o.computeLeafs {
-		bits |= 1
+		bits |= (1 << 0)
 	}
 	if o.computePow {
-		bits |= 2
+		bits |= (1 << 1)
 	}
 	return bits
 }
