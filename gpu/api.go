@@ -1,10 +1,9 @@
 package gpu
 
 import (
+	"errors"
 	"fmt"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/spacemeshos/post/config"
 )
