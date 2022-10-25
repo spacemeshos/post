@@ -310,7 +310,7 @@ func (init *Initializer) initFile(ctx context.Context, computeProviderID uint, f
 			endPosition := startPosition + uint64(batchSize) - 1
 			output, err := oracle.WorkOracle(
 				oracle.WithComputeProviderID(computeProviderID),
-				oracle.WithCommment(init.commitment),
+				oracle.WithCommitment(init.commitment),
 				oracle.WithStartAndEndPosition(startPosition, endPosition),
 				oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
 			)

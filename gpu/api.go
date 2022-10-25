@@ -145,16 +145,20 @@ func WithBitsPerLabel(bitsPerLabel uint32) scryptPositionOptionFunc {
 	}
 }
 
-func WithComputeLeafs() scryptPositionOptionFunc {
+// WithComputeLeafs instructs scrypt to compute leafs or not.
+// By default computing leafs is enabled.
+func WithComputeLeafs(enabled bool) scryptPositionOptionFunc {
 	return func(opts *scryptPositionOption) error {
-		opts.computeLeafs = true
+		opts.computeLeafs = enabled
 		return nil
 	}
 }
 
-func WithComputePow() scryptPositionOptionFunc {
+// WithComputePow instructs scrypt to compute a proof of work or not.
+// By default computing proof of work is disabled.
+func WithComputePow(enabled bool) scryptPositionOptionFunc {
 	return func(opts *scryptPositionOption) error {
-		opts.computePow = true
+		opts.computePow = enabled
 		return nil
 	}
 }
