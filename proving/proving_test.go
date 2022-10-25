@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	id = make([]byte, 32)
-	ch = make(Challenge, 32)
+	commitment = make([]byte, 32)
+	ch         = make(Challenge, 32)
 
 	NewInitializer = initialization.NewInitializer
 	CPUProviderID  = initialization.CPUProviderID
@@ -53,12 +53,12 @@ func TestProver_GenerateProof(t *testing.T) {
 	for numUnits := cfg.MinNumUnits; numUnits < 6; numUnits++ {
 		opts.NumUnits = numUnits
 
-		init, err := NewInitializer(cfg, opts, id)
+		init, err := NewInitializer(cfg, opts, commitment)
 		r.NoError(err)
 		err = init.Initialize()
 		r.NoError(err)
 
-		p, err := NewProver(cfg, opts.DataDir, id)
+		p, err := NewProver(cfg, opts.DataDir, commitment)
 		r.NoError(err)
 		p.SetLogger(log)
 
@@ -68,7 +68,7 @@ func TestProver_GenerateProof(t *testing.T) {
 		r.NotNil(proof)
 		r.NotNil(proofMetaData)
 
-		r.Equal(id, proofMetaData.ID)
+		r.Equal(commitment, proofMetaData.Commitment)
 		r.Equal(ch, proofMetaData.Challenge)
 		r.Equal(cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
 		r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
@@ -95,27 +95,27 @@ func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 	r := require.New(t)
 
 	cfg, opts := getTestConfig(t)
-	init, err := NewInitializer(cfg, opts, id)
+	init, err := NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 	err = init.Initialize()
 	r.NoError(err)
 
 	// Attempt to generate proof with different `ID`.
-	newID := make([]byte, 32)
-	copy(newID, id)
-	newID[0] = newID[0] + 1
-	p, err := NewProver(cfg, opts.DataDir, newID)
+	newCommitment := make([]byte, 32)
+	copy(newCommitment, commitment)
+	newCommitment[0] = newCommitment[0] + 1
+	p, err := NewProver(cfg, opts.DataDir, newCommitment)
 	r.NoError(err)
 	_, _, err = p.GenerateProof(ch)
 	r.Error(err)
 	errConfigMismatch, ok := err.(initialization.ConfigMismatchError)
 	r.True(ok)
-	r.Equal("ID", errConfigMismatch.Param)
+	r.Equal("Commitment", errConfigMismatch.Param)
 
 	// Attempt to generate proof with different `BitsPerLabel`.
 	newCfg := cfg
 	newCfg.BitsPerLabel++
-	p, err = NewProver(newCfg, opts.DataDir, id)
+	p, err = NewProver(newCfg, opts.DataDir, commitment)
 	r.NoError(err)
 	_, _, err = p.GenerateProof(ch)
 	r.Error(err)
@@ -126,7 +126,7 @@ func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 	// Attempt to generate proof with different `LabelsPerUnint`.
 	newCfg = cfg
 	newCfg.LabelsPerUnit++
-	p, err = NewProver(newCfg, opts.DataDir, id)
+	p, err = NewProver(newCfg, opts.DataDir, commitment)
 	r.NoError(err)
 	_, _, err = p.GenerateProof(ch)
 	r.Error(err)

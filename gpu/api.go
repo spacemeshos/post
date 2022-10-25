@@ -1,10 +1,9 @@
 package gpu
 
 import (
+	"errors"
 	"fmt"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/spacemeshos/post/config"
 )
@@ -67,9 +66,9 @@ type ScryptPositionsResult struct {
 	Stopped      bool
 }
 
-func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, bitsPerLabel uint32) (*ScryptPositionsResult, error) {
-	if len(id) != 32 {
-		return nil, fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(id))
+func ScryptPositions(providerId uint, commitment, salt []byte, startPosition, endPosition uint64, bitsPerLabel uint32) (*ScryptPositionsResult, error) {
+	if len(commitment) != 32 {
+		return nil, fmt.Errorf("invalid `commitment` length; expected: 32, given: %v", len(commitment))
 	}
 
 	if len(salt) != 32 {
@@ -99,7 +98,7 @@ func ScryptPositions(providerId uint, id, salt []byte, startPosition, endPositio
 	const n, r, p = 512, 1, 1
 	const options = 1 // COMPUTE_LEAFS on, COMPUTE_POW off.
 
-	output, idxSolution, hashesPerSec, retVal := cScryptPositions(providerId, id, salt, startPosition, endPosition, bitsPerLabel, options, n, r, p)
+	output, idxSolution, hashesPerSec, retVal := cScryptPositions(providerId, commitment, salt, startPosition, endPosition, bitsPerLabel, options, n, r, p)
 
 	switch retVal {
 	case 1:

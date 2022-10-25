@@ -33,7 +33,7 @@ func NewLabelsReader(datadir string, bitsPerLabel uint) (Reader, error) {
 func GetReaders(datadir string, bitsPerLabel uint) ([]Reader, error) {
 	files, err := os.ReadDir(datadir)
 	if err != nil {
-		return nil, fmt.Errorf("initialization directory not found: %v", err)
+		return nil, fmt.Errorf("initialization directory not found: %w", err)
 	}
 	if len(files) == 0 {
 		return nil, fmt.Errorf("initialization directory (%v) is empty", datadir)

@@ -38,22 +38,22 @@ var (
 )
 
 type Prover struct {
-	cfg     Config
-	datadir string
-	id      []byte
+	cfg        Config
+	datadir    string
+	commitment []byte
 
 	diskState *DiskState
 
 	logger Logger
 }
 
-func NewProver(cfg Config, datadir string, id []byte) (*Prover, error) {
+func NewProver(cfg Config, datadir string, commitment []byte) (*Prover, error) {
 	return &Prover{
-		cfg:       cfg,
-		datadir:   datadir,
-		id:        id,
-		diskState: initialization.NewDiskState(datadir, uint(cfg.BitsPerLabel)),
-		logger:    shared.DisabledLogger{},
+		cfg:        cfg,
+		datadir:    datadir,
+		commitment: commitment,
+		diskState:  initialization.NewDiskState(datadir, uint(cfg.BitsPerLabel)),
+		logger:     shared.DisabledLogger{},
 	}, nil
 }
 
@@ -92,7 +92,7 @@ func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, err
 				Indices: solutionNonceResult.indices,
 			}
 			proofMetadata := &ProofMetadata{
-				ID:            p.id,
+				Commitment:    p.commitment,
 				Challenge:     challenge,
 				BitsPerLabel:  p.cfg.BitsPerLabel,
 				LabelsPerUnit: p.cfg.LabelsPerUnit,
@@ -150,11 +150,11 @@ func (p *Prover) loadMetadata() (*initialization.Metadata, error) {
 }
 
 func (p *Prover) verifyMetadata(m *Metadata) error {
-	if !bytes.Equal(p.id, m.ID) {
+	if !bytes.Equal(p.commitment, m.Commitment) {
 		return ConfigMismatchError{
-			Param:    "ID",
-			Expected: fmt.Sprintf("%x", p.id),
-			Found:    fmt.Sprintf("%x", m.ID),
+			Param:    "Commitment",
+			Expected: fmt.Sprintf("%x", p.commitment),
+			Found:    fmt.Sprintf("%x", m.Commitment),
 			DataDir:  p.datadir,
 		}
 	}
@@ -189,7 +189,7 @@ func (p *Prover) tryNonce(ctx context.Context, numLabels uint64, ch Challenge, n
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("canceled: tried: %v, passed: %v, needed: %v", index, passed, p.cfg.K2)
+			return nil, fmt.Errorf("%w: tried: %v, passed: %v, needed: %v", ctx.Err(), index, passed, p.cfg.K2)
 		case label, more := <-readerChan:
 			if !more {
 				return nil, fmt.Errorf("exhausted all labels; tried: %v, passed: %v, needed: %v", index, passed, p.cfg.K2)
