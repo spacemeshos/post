@@ -97,8 +97,7 @@ func TestLabelsCorrectness(t *testing.T) {
 					oracle.WithBitsPerLabel(bitsPerLabel),
 				)
 				req.NoError(err)
-				err = writer.Write(labels)
-				req.NoError(err)
+				req.NoError(writer.Write(labels))
 			}
 			_, err = writer.Close()
 			req.NoError(err)
