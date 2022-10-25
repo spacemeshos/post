@@ -83,6 +83,7 @@ type scryptPositionOption struct {
 	computePow   bool
 
 	n, r, p uint32
+	d       []byte
 }
 
 func (o *scryptPositionOption) optionBits() uint32 {
@@ -155,10 +156,17 @@ func WithComputeLeafs(enabled bool) scryptPositionOptionFunc {
 }
 
 // WithComputePow instructs scrypt to compute a proof of work or not.
+// If difficulty is nil, no PoW will be computed. Otherwise it specifies the difficulty
+// of the PoW to be computed (higher values are more difficult).
 // By default computing proof of work is disabled.
-func WithComputePow(enabled bool) scryptPositionOptionFunc {
+func WithComputePow(difficulty []byte) scryptPositionOptionFunc {
 	return func(opts *scryptPositionOption) error {
-		opts.computePow = enabled
+		if len(difficulty) != 32 {
+			return fmt.Errorf("invalid `difficulty` length; expected: 32, given: %v", len(difficulty))
+		}
+
+		opts.computePow = true
+		opts.d = difficulty
 		return nil
 	}
 }
@@ -169,6 +177,7 @@ func ScryptPositions(opts ...scryptPositionOptionFunc) (*ScryptPositionsResult, 
 		r:            1,
 		p:            1,
 		computeLeafs: true,
+		d:            make([]byte, 32),
 	}
 	for _, opt := range opts {
 		if err := opt(options); err != nil {

@@ -92,7 +92,7 @@ func cScryptPositions(options *scryptPositionOption) ([]byte, uint64, int, int) 
 	cR := C.uint(options.r)
 	cP := C.uint(options.p)
 
-	cD := (C.calloc(32, 1))
+	cD := C.CBytes(options.d)
 	defer C.free(cD)
 
 	var cIdxSolution C.uint64_t

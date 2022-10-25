@@ -48,7 +48,6 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 		}
 		indicesSet[index] = true
 
-		// TODO(mafa): verification of nonce happens here
 		label, err := WorkOracle(
 			oracle.WithCommitment(m.Commitment),
 			oracle.WithPosition(index),
