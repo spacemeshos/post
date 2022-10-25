@@ -22,8 +22,8 @@ var (
 // Verify ensures the validity of a proof in respect to its metadata.
 // It returns nil if the proof is valid or an error describing the failure, otherwise.
 func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
-	if len(m.ID) != 32 {
-		return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(m.ID))
+	if len(m.Commitment) != 32 {
+		return fmt.Errorf("invalid `commitment` length; expected: 32, given: %v", len(m.Commitment))
 	}
 
 	numLabels := uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
@@ -48,7 +48,7 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 		}
 		indicesSet[index] = true
 
-		label := WorkOracleOne(m.ID, index, uint32(m.BitsPerLabel))
+		label := WorkOracleOne(m.Commitment, index, uint32(m.BitsPerLabel))
 		hash := FastOracle(m.Challenge, p.Nonce, label)
 		hashNum := UInt64LE(hash[:])
 		if hashNum > difficulty {

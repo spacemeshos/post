@@ -47,9 +47,9 @@ type Initializer struct {
 	numLabelsWritten     uint64
 	numLabelsWrittenChan chan uint64
 
-	cfg  Config
-	opts InitOpts
-	id   []byte
+	cfg        Config
+	opts       InitOpts
+	commitment []byte
 
 	diskState    *DiskState
 	initializing bool
@@ -61,9 +61,9 @@ type Initializer struct {
 	logger Logger
 }
 
-func NewInitializer(cfg Config, opts config.InitOpts, id []byte) (*Initializer, error) {
-	if len(id) != 32 {
-		return nil, fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(id))
+func NewInitializer(cfg Config, opts config.InitOpts, commitment []byte) (*Initializer, error) {
+	if len(commitment) != 32 {
+		return nil, fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(commitment))
 	}
 
 	if err := config.Validate(cfg, opts); err != nil {
@@ -71,11 +71,11 @@ func NewInitializer(cfg Config, opts config.InitOpts, id []byte) (*Initializer, 
 	}
 
 	return &Initializer{
-		cfg:       cfg,
-		opts:      opts,
-		id:        id,
-		diskState: NewDiskState(opts.DataDir, uint(cfg.BitsPerLabel)),
-		logger:    shared.DisabledLogger{},
+		cfg:        cfg,
+		opts:       opts,
+		commitment: commitment,
+		diskState:  NewDiskState(opts.DataDir, uint(cfg.BitsPerLabel)),
+		logger:     shared.DisabledLogger{},
 	}, nil
 }
 
@@ -203,7 +203,7 @@ func (init *Initializer) Reset() error {
 		if shared.IsInitFile(info) || file.Name() == metadataFileName {
 			path := filepath.Join(init.opts.DataDir, file.Name())
 			if err := os.Remove(path); err != nil {
-				return fmt.Errorf("failed to delete file (%v): %v", path, err)
+				return fmt.Errorf("failed to delete file (%v): %w", path, err)
 			}
 		}
 	}
@@ -316,7 +316,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 			// Calculate labels of the batch position range.
 			startPosition := fileOffset + currentPosition
 			endPosition := startPosition + uint64(batchSize) - 1
-			output, err := oracle.WorkOracle(computeProviderID, init.id, startPosition, endPosition, uint32(init.cfg.BitsPerLabel))
+			output, err := oracle.WorkOracle(computeProviderID, init.commitment, startPosition, endPosition, uint32(init.cfg.BitsPerLabel))
 			if err != nil {
 				computeErr <- err
 				return
@@ -379,11 +379,11 @@ func (init *Initializer) updateSessionNumLabelsWritten(numLabelsWritten uint64) 
 }
 
 func (init *Initializer) verifyMetadata(m *Metadata) error {
-	if !bytes.Equal(init.id, m.ID) {
+	if !bytes.Equal(init.commitment, m.Commitment) {
 		return ConfigMismatchError{
-			Param:    "ID",
-			Expected: fmt.Sprintf("%x", init.id),
-			Found:    fmt.Sprintf("%x", m.ID),
+			Param:    "Commitment",
+			Expected: fmt.Sprintf("%x", init.commitment),
+			Found:    fmt.Sprintf("%x", m.Commitment),
 			DataDir:  init.opts.DataDir,
 		}
 	}
@@ -430,7 +430,7 @@ func (init *Initializer) verifyMetadata(m *Metadata) error {
 
 func (init *Initializer) saveMetadata() error {
 	v := Metadata{
-		ID:            init.id,
+		Commitment:    init.commitment,
 		BitsPerLabel:  init.cfg.BitsPerLabel,
 		LabelsPerUnit: init.cfg.LabelsPerUnit,
 		NumUnits:      init.opts.NumUnits,
