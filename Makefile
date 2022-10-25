@@ -2,7 +2,7 @@ export CGO_ENABLED := 1
 include Makefile.Inc
 
 test: get-gpu-setup
-	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" gotestsum -- -timeout 5m -p 1 -race ./...
+	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" gotestsum -- -timeout 5m -p 1 -race -short ./...
 .PHONY: test
 
 compile-test: get-gpu-setup
@@ -62,7 +62,7 @@ lint-github-action: get-gpu-setup
 .PHONY: lint-github-action
 
 cover: get-gpu-setup
-	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -coverprofile=cover.out -timeout 0 -p 1 $(UNIT_TESTS)
+	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -coverprofile=cover.out -timeout 0 -p 1 ./...
 .PHONY: cover
 
 staticcheck: get-gpu-setup

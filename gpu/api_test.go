@@ -1,7 +1,6 @@
 package gpu
 
 import (
-	"flag"
 	"fmt"
 	"sync"
 	"testing"
@@ -15,9 +14,6 @@ import (
 var (
 	commitment = make([]byte, 32)
 	salt       = make([]byte, 32)
-
-	debug = flag.Bool("debug", false, "")
-	long  = flag.Bool("long", false, "")
 )
 
 func TestCPUProviderExists(t *testing.T) {
@@ -45,9 +41,7 @@ func TestScryptPositions(t *testing.T) {
 		r.NotNil(res.Output)
 		r.False(res.Stopped)
 
-		if *debug {
-			fmt.Printf("provider: %+v, res: %+v\n", p, res)
-		}
+		t.Logf("provider: %+v, res: %+v\n", p, res)
 
 		// Assert that output content is equal between different providers.
 		if prevOutput == nil {
@@ -61,7 +55,7 @@ func TestScryptPositions(t *testing.T) {
 // TestScryptPositions_HashLenBits tests output correctness for the entire value range of HashLenBits for a specific batch size.
 func TestScryptPositions_HashLenBits(t *testing.T) {
 	r := require.New(t)
-	if !*long {
+	if testing.Short() {
 		t.Skip("long test")
 	}
 
@@ -78,9 +72,7 @@ func TestScryptPositions_HashLenBits(t *testing.T) {
 			r.NotNil(res.Output)
 			r.False(res.Stopped)
 
-			if *debug {
-				fmt.Printf("provider: %+v, len: %v, hs: %v\n", p, hashLenBits, res.HashesPerSec)
-			}
+			t.Logf("provider: %+v, len: %v, hs: %v\n", p, hashLenBits, res.HashesPerSec)
 
 			// Assert that output content is equal between different providers.
 			if prevOutput == nil {
