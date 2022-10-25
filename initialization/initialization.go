@@ -91,22 +91,18 @@ func (init *Initializer) Initialize() error {
 
 	init.stopChan = make(chan struct{})
 	init.doneChan = make(chan struct{})
+	init.numLabelsWrittenChan = make(chan uint64)
 
 	init.initializing = true
-
 	init.mtx.Unlock()
 
 	defer func() {
 		init.mtx.Lock()
 		init.initializing = false
-		init.mtx.Unlock()
 
 		close(init.doneChan)
-
-		if init.numLabelsWrittenChan != nil {
-			close(init.numLabelsWrittenChan)
-			init.numLabelsWrittenChan = nil
-		}
+		close(init.numLabelsWrittenChan)
+		init.mtx.Unlock()
 	}()
 
 	if numLabelsWritten, err := init.diskState.NumLabelsWritten(); err != nil {
@@ -143,7 +139,6 @@ func (init *Initializer) Initialize() error {
 func (init *Initializer) isInitializing() bool {
 	init.mtx.RLock()
 	defer init.mtx.RUnlock()
-
 	return init.initializing
 }
 
@@ -167,13 +162,8 @@ func (init *Initializer) Stop() error {
 }
 
 func (init *Initializer) SessionNumLabelsWrittenChan() <-chan uint64 {
-	init.mtx.Lock()
-	defer init.mtx.Unlock()
-
-	if init.numLabelsWrittenChan == nil {
-		init.numLabelsWrittenChan = make(chan uint64, 1024)
-	}
-
+	init.mtx.RLock()
+	defer init.mtx.RUnlock()
 	return init.numLabelsWrittenChan
 }
 
@@ -286,14 +276,13 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 	ioError := make(chan error, 1)
 
 	var wg sync.WaitGroup
-	wg.Add(2)
 
 	// Start compute worker.
+	wg.Add(1)
 	go func() {
-		defer func() {
-			close(outputChan)
-			wg.Done()
-		}()
+		defer wg.Done()
+		defer close(outputChan)
+
 		for currentPosition < fileNumLabels {
 			select {
 			case <-init.stopChan:
@@ -329,6 +318,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 	}()
 
 	// Start IO worker.
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for {
@@ -362,19 +352,17 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 	}
 
 	init.logger.Info("initialization: file #%v completed; number of labels written: %v", fileIndex, numLabelsWritten)
-
 	return nil
 }
 
 func (init *Initializer) updateSessionNumLabelsWritten(numLabelsWritten uint64) {
 	atomic.StoreUint64(&init.numLabelsWritten, numLabelsWritten)
 
-	init.mtx.RLock()
-	ch := init.numLabelsWrittenChan
-	init.mtx.RUnlock()
-
-	if ch != nil {
-		ch <- numLabelsWritten
+	select {
+	case init.numLabelsWrittenChan <- numLabelsWritten:
+	default:
+		// if no one listens for the update, we just drop it
+		// otherwise Initializer would eventually stop working until someone reads from the channel
 	}
 }
 

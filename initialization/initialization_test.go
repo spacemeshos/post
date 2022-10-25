@@ -42,8 +42,8 @@ func TestInitialize(t *testing.T) {
 	log := testLogger{t: t}
 
 	cfg, opts := getTestConfig(t)
-	id := make([]byte, 32)
-	init, err := NewInitializer(cfg, opts, id)
+	commitment := make([]byte, 32)
+	init, err := NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 	init.SetLogger(log)
 
@@ -62,8 +62,8 @@ func TestInitialize_Repeated(t *testing.T) {
 	log := testLogger{t: t}
 
 	cfg, opts := getTestConfig(t)
-	id := make([]byte, 32)
-	init, err := NewInitializer(cfg, opts, id)
+	commitment := make([]byte, 32)
+	init, err := NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 	init.SetLogger(log)
 
@@ -73,7 +73,7 @@ func TestInitialize_Repeated(t *testing.T) {
 	<-doneChan
 
 	// Initialize again using the same config & opts.
-	init, err = NewInitializer(cfg, opts, id)
+	init, err = NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 	init.SetLogger(log)
 
@@ -93,9 +93,9 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 
 	cfg, opts := getTestConfig(t)
 	opts.NumFiles = 1
-	id := make([]byte, 32)
+	commitment := make([]byte, 32)
 
-	init, err := NewInitializer(cfg, opts, id)
+	init, err := NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 	init.SetLogger(log)
 
@@ -107,7 +107,7 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	// Increase `opts.NumUnits`.
 	opts.NumUnits++
 
-	init, err = NewInitializer(cfg, opts, id)
+	init, err = NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 	init.SetLogger(log)
 
@@ -128,9 +128,9 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	cfg, opts := getTestConfig(t)
 	opts.NumUnits++
 	opts.NumFiles = 1
-	id := make([]byte, 32)
+	commitment := make([]byte, 32)
 
-	init, err := NewInitializer(cfg, opts, id)
+	init, err := NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 	init.SetLogger(log)
 
@@ -142,7 +142,7 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	// Decrease `opts.NumUnits`.
 	opts.NumUnits--
 
-	init, err = NewInitializer(cfg, opts, id)
+	init, err = NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 	init.SetLogger(log)
 
@@ -163,9 +163,9 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	cfg, opts := getTestConfig(t)
 	opts.NumUnits++
 	opts.NumFiles = 2
-	id := make([]byte, 32)
+	commitment := make([]byte, 32)
 
-	init, err := NewInitializer(cfg, opts, id)
+	init, err := NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 	init.SetLogger(log)
 
@@ -178,7 +178,7 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 
 	// Increase `opts.NumUnits` while `opts.NumFiles` > 1.
 	opts.NumUnits = prevNumUnits + 1
-	init, err = NewInitializer(cfg, opts, id)
+	init, err = NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 	err = init.Initialize()
 	cfgMissErr := &shared.ConfigMismatchError{}
@@ -187,7 +187,7 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 
 	// Decrease `opts.NumUnits` while `opts.NumFiles` > 1.
 	opts.NumUnits = prevNumUnits - 1
-	init, err = NewInitializer(cfg, opts, id)
+	init, err = NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 	err = init.Initialize()
 	r.ErrorAs(err, cfgMissErr)
@@ -202,8 +202,8 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	r := require.New(t)
 
 	cfg, opts := getTestConfig(t)
-	id := make([]byte, 32)
-	init, err := NewInitializer(cfg, opts, id)
+	commitment := make([]byte, 32)
+	init, err := NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 	err = init.Initialize()
 	r.NoError(err)
@@ -219,7 +219,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 		opts := opts
 		opts.NumFiles = numFiles
 
-		init, err := NewInitializer(cfg, opts, id)
+		init, err := NewInitializer(cfg, opts, commitment)
 		r.NoError(err)
 		err = init.Initialize()
 		r.NoError(err)
@@ -239,8 +239,8 @@ func TestNumLabelsWritten(t *testing.T) {
 	req := require.New(t)
 
 	cfg, opts := getTestConfig(t)
-	id := make([]byte, 32)
-	init, err := NewInitializer(cfg, opts, id)
+	commitment := make([]byte, 32)
+	init, err := NewInitializer(cfg, opts, commitment)
 	req.NoError(err)
 
 	// Check initial state.
@@ -263,7 +263,7 @@ func TestNumLabelsWritten(t *testing.T) {
 	req.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
 
 	// Initialize repeated, using a new instance.
-	init, err = NewInitializer(cfg, opts, id)
+	init, err = NewInitializer(cfg, opts, commitment)
 	req.NoError(err)
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	req.NoError(err)
@@ -283,8 +283,8 @@ func TestValidateMetadata(t *testing.T) {
 	r := require.New(t)
 
 	cfg, opts := getTestConfig(t)
-	id := make([]byte, 32)
-	init, err := NewInitializer(cfg, opts, id)
+	commitment := make([]byte, 32)
+	init, err := NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 
 	m, err := init.loadMetadata()
@@ -299,9 +299,9 @@ func TestValidateMetadata(t *testing.T) {
 	r.NoError(err)
 
 	// Attempt to initialize with different `Commitment`.
-	newID := make([]byte, 32)
-	newID[0] = newID[0] + 1
-	init, err = NewInitializer(cfg, opts, newID)
+	newCommitment := make([]byte, 32)
+	newCommitment[0] = newCommitment[0] + 1
+	init, err = NewInitializer(cfg, opts, newCommitment)
 	r.NoError(err)
 	err = init.Initialize()
 	errConfigMismatch, ok := err.(ConfigMismatchError)
@@ -311,7 +311,7 @@ func TestValidateMetadata(t *testing.T) {
 	// Attempt to initialize with different `cfg.BitsPerLabel`.
 	newCfg := cfg
 	newCfg.BitsPerLabel = cfg.BitsPerLabel + 1
-	init, err = NewInitializer(newCfg, opts, id)
+	init, err = NewInitializer(newCfg, opts, commitment)
 	r.NoError(err)
 	err = init.Initialize()
 	errConfigMismatch, ok = err.(ConfigMismatchError)
@@ -321,7 +321,7 @@ func TestValidateMetadata(t *testing.T) {
 	// Attempt to initialize with different `opts.NumFiles`.
 	newOpts := opts
 	newOpts.NumFiles = 4
-	init, err = NewInitializer(cfg, newOpts, id)
+	init, err = NewInitializer(cfg, newOpts, commitment)
 	r.NoError(err)
 	err = init.Initialize()
 	errConfigMismatch, ok = err.(ConfigMismatchError)
@@ -331,7 +331,7 @@ func TestValidateMetadata(t *testing.T) {
 	// Attempt to initialize with different `opts.NumUnits` while `opts.NumFiles` > 1.
 	newOpts = opts
 	newOpts.NumUnits++
-	init, err = NewInitializer(cfg, newOpts, id)
+	init, err = NewInitializer(cfg, newOpts, commitment)
 	r.NoError(err)
 	err = init.Initialize()
 	errConfigMismatch, ok = err.(ConfigMismatchError)
@@ -349,9 +349,9 @@ func TestStop(t *testing.T) {
 
 	cfg, opts := getTestConfig(t)
 	opts.NumUnits = 10
-	id := make([]byte, 32)
+	commitment := make([]byte, 32)
 
-	init, err := NewInitializer(cfg, opts, id)
+	init, err := NewInitializer(cfg, opts, commitment)
 	r.NoError(err)
 	init.SetLogger(log)
 

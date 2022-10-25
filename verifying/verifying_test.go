@@ -76,7 +76,7 @@ func TestLabelsCorrectness(t *testing.T) {
 	numFiles := 2
 	numFileBatches := 2
 	batchSize := 256
-	id := make([]byte, 32)
+	commitment := make([]byte, 32)
 	datadir := t.TempDir()
 
 	for bitsPerLabel := uint32(config.MinBitsPerLabel); bitsPerLabel <= config.MaxBitsPerLabel; bitsPerLabel++ {
@@ -91,7 +91,7 @@ func TestLabelsCorrectness(t *testing.T) {
 				startPosition := uint64(numBatch * batchSize)
 				endPosition := startPosition + uint64(batchSize) - 1
 
-				labels, err := oracle.WorkOracle(uint(CPUProviderID()), id, startPosition, endPosition, bitsPerLabel)
+				labels, err := oracle.WorkOracle(uint(CPUProviderID()), commitment, startPosition, endPosition, bitsPerLabel)
 				req.NoError(err)
 				err = writer.Write(labels)
 				req.NoError(err)
@@ -117,7 +117,7 @@ func TestLabelsCorrectness(t *testing.T) {
 			}
 
 			// Verify correctness.
-			labelCompute := oracle.WorkOracleOne(id, position, bitsPerLabel)
+			labelCompute := oracle.WorkOracleOne(commitment, position, bitsPerLabel)
 			req.Equal(labelCompute, label, fmt.Sprintf("position: %v, bitsPerLabel: %v", position, bitsPerLabel))
 
 			position++
