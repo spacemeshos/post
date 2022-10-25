@@ -299,7 +299,7 @@ func TestValidateMetadata(t *testing.T) {
 	err = init.verifyMetadata(m)
 	r.NoError(err)
 
-	// Attempt to initialize with different `ID`.
+	// Attempt to initialize with different `Commitment`.
 	newID := make([]byte, 32)
 	newID[0] = newID[0] + 1
 	init, err = NewInitializer(cfg, opts, newID)

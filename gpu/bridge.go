@@ -70,14 +70,14 @@ func (s StopResult) String() string {
 	}
 }
 
-func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPosition uint64, labelSize uint32, options uint32, n, r, p uint32) ([]byte, uint64, int, int) {
+func cScryptPositions(providerId uint, commitment, salt []byte, startPosition, endPosition uint64, labelSize uint32, options uint32, n, r, p uint32) ([]byte, uint64, int, int) {
 	mtx.Lock()
 	defer mtx.Unlock()
 
 	outputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(labelSize))
 
 	cProviderId := C.uint(providerId)
-	cId := (*C.uchar)(GoBytes(id).CBytesClone().data)
+	cCommitment := (*C.uchar)(GoBytes(commitment).CBytesClone().data)
 	cStartPosition := C.uint64_t(startPosition)
 	cEndPosition := C.uint64_t(endPosition)
 	cHashLenBits := C.uint32_t(labelSize)
@@ -95,7 +95,7 @@ func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPositi
 	var cHashesPerSec C.uint64_t
 
 	defer func() {
-		cFree(unsafe.Pointer(cId))
+		cFree(unsafe.Pointer(cCommitment))
 		cFree(unsafe.Pointer(cSalt))
 		cFree(unsafe.Pointer(cOut))
 		cFree(unsafe.Pointer(cD))
@@ -103,7 +103,7 @@ func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPositi
 
 	retVal := C.scryptPositions(
 		cProviderId,
-		cId,
+		cCommitment,
 		cStartPosition,
 		cEndPosition,
 		cHashLenBits,
