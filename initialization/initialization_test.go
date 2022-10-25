@@ -181,18 +181,17 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	init, err = NewInitializer(cfg, opts, id)
 	r.NoError(err)
 	err = init.Initialize()
-	errConfigMismatch, ok := err.(ConfigMismatchError)
-	r.True(ok)
-	r.Equal("NumUnits", errConfigMismatch.Param)
+	cfgMissErr := &shared.ConfigMismatchError{}
+	r.ErrorAs(err, cfgMissErr)
+	r.Equal("NumUnits", cfgMissErr.Param)
 
 	// Decrease `opts.NumUnits` while `opts.NumFiles` > 1.
 	opts.NumUnits = prevNumUnits - 1
 	init, err = NewInitializer(cfg, opts, id)
 	r.NoError(err)
 	err = init.Initialize()
-	errConfigMismatch, ok = err.(ConfigMismatchError)
-	r.True(ok)
-	r.Equal("NumUnits", errConfigMismatch.Param)
+	r.ErrorAs(err, cfgMissErr)
+	r.Equal("NumUnits", cfgMissErr.Param)
 
 	// Cleanup.
 	err = init.Reset()
