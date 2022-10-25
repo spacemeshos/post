@@ -7,7 +7,6 @@ import "C"
 
 import (
 	"sync"
-	"unsafe"
 
 	"github.com/spacemeshos/post/shared"
 )
@@ -15,11 +14,6 @@ import (
 // mtx is a mutual exclusion lock for serializing calls to gpu-post lib.
 // If not applied, concurrent calls are expected to cause a crash.
 var mtx sync.Mutex
-
-type (
-	cChar  = C.char
-	cUchar = C.uchar
-)
 
 const (
 	ComputeAPIClassUnspecified = ComputeAPIClass((C.ComputeApiClass)(C.COMPUTE_API_CLASS_UNSPECIFIED))
@@ -77,43 +71,47 @@ func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPositi
 	outputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(labelSize))
 
 	cProviderId := C.uint(providerId)
-	cId := (*C.uchar)(GoBytes(id).CBytesClone().data)
+
+	cId := C.CBytes(id)
+	defer C.free(cId)
+
 	cStartPosition := C.uint64_t(startPosition)
 	cEndPosition := C.uint64_t(endPosition)
 	cHashLenBits := C.uint32_t(labelSize)
-	cSalt := (*C.uchar)(GoBytes(salt).CBytesClone().data)
+
+	cSalt := C.CBytes(salt)
+	defer C.free(cSalt)
+
 	cOptions := C.uint(options)
 	cOutputSize := C.size_t(outputSize)
-	cOut := (*C.uchar)(C.calloc(cOutputSize, 1))
+
+	cOut := (C.calloc(cOutputSize, 1))
+	defer C.free(cOut)
+
 	cN := C.uint(n)
 	cR := C.uint(r)
 	cP := C.uint(p)
-	cD := (*C.uchar)(C.calloc(32, 1))
+
+	cD := (C.calloc(32, 1))
+	defer C.free(cD)
 
 	var cIdxSolution C.uint64_t
 	var cHashesComputed C.uint64_t
 	var cHashesPerSec C.uint64_t
 
-	defer func() {
-		cFree(unsafe.Pointer(cId))
-		cFree(unsafe.Pointer(cSalt))
-		cFree(unsafe.Pointer(cOut))
-		cFree(unsafe.Pointer(cD))
-	}()
-
 	retVal := C.scryptPositions(
 		cProviderId,
-		cId,
+		(*C.uchar)(cId),
 		cStartPosition,
 		cEndPosition,
 		cHashLenBits,
-		cSalt,
+		(*C.uchar)(cSalt),
 		cOptions,
-		cOut,
+		(*C.uchar)(cOut),
 		cN,
 		cR,
 		cP,
-		cD,
+		(*C.uchar)(cD),
 		&cIdxSolution,
 		&cHashesComputed,
 		&cHashesPerSec,
@@ -121,7 +119,7 @@ func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPositi
 
 	// Output size could be smaller than anticipated if `C.stop` was called while `C.scryptPositions` was blocking.
 	outputSize = shared.DataSize(uint64(cHashesComputed), uint(labelSize))
-	output := cBytesCloneToGoBytes(cOut, int(outputSize))
+	output := C.GoBytes(cOut, C.int(outputSize))
 
 	return output, uint64(cIdxSolution), int(cHashesPerSec), int(retVal)
 }
@@ -138,7 +136,7 @@ func cGetProviders() []ComputeProvider {
 
 	for i := 0; i < int(numProviders); i++ {
 		providers[i].ID = uint(cProviders[i].id)
-		providers[i].Model = cStringArrayToGoString(cProviders[i].model)
+		providers[i].Model = C.GoString(&cProviders[i].model[0])
 		providers[i].ComputeAPI = ComputeAPIClass(cProviders[i].compute_api)
 	}
 
@@ -152,8 +150,4 @@ func cStopCleared() bool {
 func cStop(msTimeout uint) StopResult {
 	cMsTimeout := C.uint(msTimeout)
 	return StopResult(C.stop(cMsTimeout))
-}
-
-func cFree(p unsafe.Pointer) {
-	C.free(p)
 }
