@@ -16,11 +16,6 @@ import (
 // If not applied, concurrent calls are expected to cause a crash.
 var mtx sync.Mutex
 
-type (
-	cChar  = C.char
-	cUchar = C.uchar
-)
-
 const (
 	ComputeAPIClassUnspecified = ComputeAPIClass((C.ComputeApiClass)(C.COMPUTE_API_CLASS_UNSPECIFIED))
 	ComputeAPIClassCPU         = ComputeAPIClass((C.ComputeApiClass)(C.COMPUTE_API_CLASS_CPU))
@@ -95,10 +90,10 @@ func cScryptPositions(providerId uint, id, salt []byte, startPosition, endPositi
 	var cHashesPerSec C.uint64_t
 
 	defer func() {
-		cFree(unsafe.Pointer(cId))
-		cFree(unsafe.Pointer(cSalt))
-		cFree(unsafe.Pointer(cOut))
-		cFree(unsafe.Pointer(cD))
+		C.free(unsafe.Pointer(cId))
+		C.free(unsafe.Pointer(cSalt))
+		C.free(unsafe.Pointer(cOut))
+		C.free(unsafe.Pointer(cD))
 	}()
 
 	retVal := C.scryptPositions(
@@ -152,8 +147,4 @@ func cStopCleared() bool {
 func cStop(msTimeout uint) StopResult {
 	cMsTimeout := C.uint(msTimeout)
 	return StopResult(C.stop(cMsTimeout))
-}
-
-func cFree(p unsafe.Pointer) {
-	C.free(p)
 }

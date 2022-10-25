@@ -5,7 +5,7 @@ import (
 	"unsafe"
 )
 
-func cBytesCloneToGoBytes(data *cUchar, len int) []byte {
+func cBytesCloneToGoBytes(data *C.uchar, len int) []byte {
 	cBytes := CBytes{
 		data: unsafe.Pointer(data),
 		len:  len,
@@ -44,30 +44,7 @@ func (s CBytes) GoBytesClone() []byte {
 	return C.GoBytes(s.data, C.int(s.len))
 }
 
-// GoBytesAlias create a new []byte slice backed by a C array, without copying the original data.
-// Go garbage collector will not interact with this data, and if it is freed via
-// the C allocator, the behavior of any Go code using the slice is non-deterministic.
-func (s CBytes) GoBytesAlias() []byte {
-	// Arbitrary large-enough size for
-	// the array type to hold any len.
-	const size = 1 << 30
-
-	p := s.data
-	len := s.len
-
-	if p == nil || len == 0 {
-		return []byte(nil)
-	}
-
-	return (*[size]byte)(p)[:len:len]
-}
-
-// Free deallocate the C array via the C allocator.
-func (s CBytes) Free() {
-	cFree(s.data)
-}
-
-func cStringArrayToGoString(src [256]cChar) string {
+func cStringArrayToGoString(src [256]C.char) string {
 	var dst []byte
 	for i := 0; i < 256; i++ {
 		if src[i] == 0 {
