@@ -47,7 +47,7 @@ func CPUProviderID() int {
 
 type Initializer struct {
 	// numLabelsWritten should be aligned by 8 bytes because it's accessed by atomics.
-	numLabelsWritten     uint64
+	numLabelsWritten     atomic.Int64
 	numLabelsWrittenChan chan uint64
 
 	cfg        Config
@@ -171,7 +171,7 @@ func (init *Initializer) SessionNumLabelsWrittenChan() <-chan uint64 {
 }
 
 func (init *Initializer) SessionNumLabelsWritten() uint64 {
-	return atomic.LoadUint64(&init.numLabelsWritten)
+	return uint64(init.numLabelsWritten.Load())
 }
 
 func (init *Initializer) Reset() error {
@@ -346,7 +346,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 }
 
 func (init *Initializer) updateSessionNumLabelsWritten(numLabelsWritten uint64) {
-	atomic.StoreUint64(&init.numLabelsWritten, numLabelsWritten)
+	init.numLabelsWritten.Add(int64(numLabelsWritten))
 
 	select {
 	case init.numLabelsWrittenChan <- numLabelsWritten:
