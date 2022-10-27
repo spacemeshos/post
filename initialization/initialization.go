@@ -2,6 +2,7 @@ package initialization
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -9,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/gpu"
@@ -98,11 +101,11 @@ func (init *Initializer) Initialize() error {
 
 	defer func() {
 		init.mtx.Lock()
+		defer init.mtx.Unlock()
 		init.initializing = false
 
 		close(init.doneChan)
 		close(init.numLabelsWrittenChan)
-		init.mtx.Unlock()
 	}()
 
 	if numLabelsWritten, err := init.diskState.NumLabelsWritten(); err != nil {
@@ -272,25 +275,18 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 
 	currentPosition := numLabelsWritten
 	outputChan := make(chan []byte, 1024)
-	computeErr := make(chan error, 1)
-	ioError := make(chan error, 1)
 
-	var wg sync.WaitGroup
+	errGroup, ctx := errgroup.WithContext(context.Background())
 
 	// Start compute worker.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	errGroup.Go(func() error {
 		defer close(outputChan)
 
 		for currentPosition < fileNumLabels {
 			select {
 			case <-init.stopChan:
 				init.logger.Info("initialization: stopped")
-				computeErr <- ErrStopped
-				return
-			case <-ioError:
-				return
+				return ErrStopped
 			default:
 			}
 
@@ -307,43 +303,37 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 			endPosition := startPosition + uint64(batchSize) - 1
 			output, err := oracle.WorkOracle(computeProviderID, init.commitment, startPosition, endPosition, uint32(init.cfg.BitsPerLabel))
 			if err != nil {
-				computeErr <- err
-				return
+				return err
 			}
 			outputChan <- output
 			currentPosition += uint64(batchSize)
 
 			init.updateSessionNumLabelsWritten(fileOffset + currentPosition)
 		}
-	}()
+		return nil
+	})
 
 	// Start IO worker.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	errGroup.Go(func() error {
 		for {
-			batch, more := <-outputChan
-			if !more {
-				_ = writer.Flush()
-				return
-			}
+			select {
+			case <-ctx.Done():
+				return writer.Flush()
+			case batch, ok := <-outputChan:
+				if !ok {
+					return writer.Flush()
+				}
 
-			// Write labels batch to disk.
-			if err := writer.Write(batch); err != nil {
-				ioError <- err
-				return
+				// Write labels batch to disk.
+				if err := writer.Write(batch); err != nil {
+					return err
+				}
 			}
 		}
-	}()
+	})
 
-	wg.Wait()
-
-	select {
-	case err := <-computeErr:
+	if err := errGroup.Wait(); err != nil {
 		return err
-	case err := <-ioError:
-		return err
-	default:
 	}
 
 	numLabelsWritten, err = writer.NumLabelsWritten()
