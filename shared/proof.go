@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 )
 
-//go:generate scalegen -types Proof
+//go:generate scalegen -types Proof,ProofMetadata
 
 type Proof struct {
 	Nonce   uint32
