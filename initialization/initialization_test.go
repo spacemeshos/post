@@ -3,6 +3,7 @@ package initialization
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -392,6 +393,32 @@ func Test_SessionNumLabelsWrittenChan_Racefree(t *testing.T) {
 	init.SetLogger(log)
 
 	eg, _ := errgroup.WithContext(context.Background())
+
+	// call SessionNumLabelsWrittenChan() during initialization
+	eg.Go(func() error {
+		ch := make([]<-chan uint64, 0, 10)
+
+		for i := 0; i < 10; i++ {
+			time.Sleep(600 * time.Millisecond)
+			ch = append(ch, init.SessionNumLabelsWrittenChan())
+		}
+
+		if ch[0] != nil {
+			return errors.New("channel should be nil")
+		}
+
+		for _, c := range ch[1:] {
+			<-c
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		time.Sleep(1 * time.Second)
+		return init.Initialize()
+	})
+	r.NoError(eg.Wait())
+
+	// call SessionNumLabelsWrittenChan() after initialization
 	eg.Go(func() error {
 		ch := make([]<-chan uint64, 0, 10)
 
@@ -400,23 +427,14 @@ func Test_SessionNumLabelsWrittenChan_Racefree(t *testing.T) {
 		}
 
 		for _, c := range ch {
-			<-c
-		}
-		return nil
-	})
-	eg.Go(func() error {
-		for i := 0; i < 10; i++ {
-			if err := init.Initialize(); err != nil {
-				return err
+			select {
+			case <-c:
+			default:
+				return errors.New("channel should be closed")
 			}
 		}
 		return nil
 	})
-	r.NoError(eg.Wait())
-
-	// Continue the initialization to completion.
-	eg.Go(assertNumLabelsWrittenChan(init, t))
-	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
 
 	// Cleanup.

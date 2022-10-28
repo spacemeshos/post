@@ -46,7 +46,6 @@ func CPUProviderID() int {
 }
 
 type Initializer struct {
-	// numLabelsWritten should be aligned by 8 bytes because it's accessed by atomics.
 	numLabelsWritten     atomic.Int64
 	numLabelsWrittenChan chan uint64
 
