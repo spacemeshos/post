@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/spacemeshos/bitstream v0.0.0-20221019141347-c47ad6b731c3
-	github.com/spacemeshos/go-scale v1.0.0
+	github.com/spacemeshos/go-scale v1.1.0
 	github.com/stretchr/testify v1.8.1
 	golang.org/x/sync v0.1.0
 )
