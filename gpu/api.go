@@ -42,7 +42,7 @@ func filterCPUProvider(providers []ComputeProvider) ComputeProvider {
 }
 
 func Benchmark(p ComputeProvider) (int, error) {
-	id := make([]byte, 32)
+	commitment := make([]byte, 32)
 	salt := make([]byte, 32)
 	hashLenBits := uint32(8)
 	startPosition := uint64(1)
@@ -51,7 +51,7 @@ func Benchmark(p ComputeProvider) (int, error) {
 		endPosition = uint64(1 << 14)
 	}
 
-	res, err := ScryptPositions(p.ID, id, salt, startPosition, endPosition, hashLenBits)
+	res, err := ScryptPositions(p.ID, commitment, salt, startPosition, endPosition, hashLenBits)
 	if err != nil {
 		return 0, err
 	}
