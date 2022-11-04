@@ -51,7 +51,7 @@ ifneq ($(VERBOSE),)
   $(info "OS: $(OS), HOST_OS: $(HOST_OS), GOOS: $(GOOS), GOARCH: $(GOARH), BIN_DIR: $(BIN_DIR), platform: $(platform)")
 endif
 
-GPU_SETUP_REV = 0.1.26-rc1
+GPU_SETUP_REV = 0.1.26
 GPU_SETUP_ZIP = libgpu-setup-$(platform)-$(GPU_SETUP_REV).zip
 GPU_SETUP_URL_ZIP = https://github.com/spacemeshos/gpu-post/releases/download/v$(GPU_SETUP_REV)/$(GPU_SETUP_ZIP)
 ifeq ($(platform), windows)
