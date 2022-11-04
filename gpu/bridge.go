@@ -1,8 +1,9 @@
 package gpu
 
-// #include "./api.h"
-// #include <stdlib.h>
+// #cgo LDFLAGS: -lgpu-setup
 //
+// #include "../build/api.h"
+// #include <stdlib.h>
 import "C"
 
 import (

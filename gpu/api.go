@@ -102,7 +102,7 @@ func ScryptPositions(providerId uint, commitment, salt []byte, startPosition, en
 
 	switch retVal {
 	case 1:
-		panic("pow solution found") // TODO: handle
+		return &ScryptPositionsResult{output, idxSolution, hashesPerSec, false}, nil
 	case 0:
 		return &ScryptPositionsResult{output, idxSolution, hashesPerSec, false}, nil
 	case -1:
