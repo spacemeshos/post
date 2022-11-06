@@ -345,7 +345,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 }
 
 func (init *Initializer) updateSessionNumLabelsWritten(numLabelsWritten uint64) {
-	init.numLabelsWritten.Add(int64(numLabelsWritten))
+	init.numLabelsWritten.Store(int64(numLabelsWritten))
 
 	select {
 	case init.numLabelsWrittenChan <- numLabelsWritten:
