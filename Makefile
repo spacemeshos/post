@@ -1,4 +1,5 @@
 export CGO_ENABLED := 1
+export CGO_CFLAGS := "-I$(BIN_DIR)"
 include Makefile.Inc
 
 test: get-gpu-setup

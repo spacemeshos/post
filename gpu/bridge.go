@@ -2,7 +2,7 @@ package gpu
 
 // #cgo LDFLAGS: -lgpu-setup
 //
-// #include "../build/api.h"
+// #include <api.h>
 // #include <stdlib.h>
 import "C"
 
