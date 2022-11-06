@@ -2,6 +2,7 @@ PROJ_DIR := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 BIN_DIR ?= $(PROJ_DIR)build/
 
 export CGO_LDFLAGS := -L$(BIN_DIR)
+export CPATH := $(PROJ_DIR)build/
 export GOOS
 export GOARCH
 export GOARM
@@ -48,7 +49,7 @@ else
 endif
 
 ifneq ($(VERBOSE),)
-  $(info "OS: $(OS), HOST_OS: $(HOST_OS), GOOS: $(GOOS), GOARCH: $(GOARH), BIN_DIR: $(BIN_DIR), platform: $(platform)")
+  $(info "OS: $(OS), HOST_OS: $(HOST_OS), GOOS: $(GOOS), GOARCH: $(GOARCH), BIN_DIR: $(BIN_DIR), platform: $(platform)")
 endif
 
 GPU_SETUP_REV = 0.1.26
