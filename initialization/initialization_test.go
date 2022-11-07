@@ -50,8 +50,8 @@ func TestInitialize(t *testing.T) {
 	init.SetLogger(log)
 
 	var eg errgroup.Group
-	eg.Go(init.Initialize)
 	eg.Go(assertNumLabelsWrittenChan(init, t))
+	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
 
 	// Cleanup.
@@ -69,8 +69,8 @@ func TestInitialize_Repeated(t *testing.T) {
 	init.SetLogger(log)
 
 	var eg errgroup.Group
-	eg.Go(init.Initialize)
 	eg.Go(assertNumLabelsWrittenChan(init, t))
+	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
 
 	// Initialize again using the same config & opts.
@@ -78,8 +78,8 @@ func TestInitialize_Repeated(t *testing.T) {
 	r.NoError(err)
 	init.SetLogger(log)
 
-	eg.Go(init.Initialize)
 	eg.Go(assertNumLabelsWrittenChan(init, t))
+	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
 
 	// Cleanup.
@@ -99,8 +99,8 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	init.SetLogger(log)
 
 	var eg errgroup.Group
-	eg.Go(init.Initialize)
 	eg.Go(assertNumLabelsWrittenChan(init, t))
+	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
 
 	// Increase `opts.NumUnits`.
@@ -110,8 +110,8 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	r.NoError(err)
 	init.SetLogger(log)
 
-	eg.Go(init.Initialize)
 	eg.Go(assertNumLabelsWrittenChan(init, t))
+	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
 
 	// Cleanup.
@@ -132,8 +132,8 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	init.SetLogger(log)
 
 	var eg errgroup.Group
-	eg.Go(init.Initialize)
 	eg.Go(assertNumLabelsWrittenChan(init, t))
+	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
 
 	// Decrease `opts.NumUnits`.
@@ -143,8 +143,8 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	r.NoError(err)
 	init.SetLogger(log)
 
-	eg.Go(init.Initialize)
 	eg.Go(assertNumLabelsWrittenChan(init, t))
+	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
 
 	// Cleanup.
@@ -165,8 +165,8 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	init.SetLogger(log)
 
 	var eg errgroup.Group
-	eg.Go(init.Initialize)
 	eg.Go(assertNumLabelsWrittenChan(init, t))
+	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
 
 	prevNumUnits := opts.NumUnits
@@ -372,8 +372,8 @@ func TestStop(t *testing.T) {
 	r.NoError(eg.Wait())
 
 	// Continue the initialization to completion.
-	eg.Go(init.Initialize)
 	eg.Go(assertNumLabelsWrittenChan(init, t))
+	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
 
 	// Cleanup.
