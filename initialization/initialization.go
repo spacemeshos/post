@@ -163,12 +163,6 @@ func (init *Initializer) Stop() error {
 	return nil
 }
 
-func (init *Initializer) SessionNumLabelsWrittenChan() <-chan uint64 {
-	init.mtx.RLock()
-	defer init.mtx.RUnlock()
-	return init.numLabelsWrittenChan
-}
-
 func (init *Initializer) SessionNumLabelsWritten() uint64 {
 	return init.numLabelsWritten.Load()
 }
