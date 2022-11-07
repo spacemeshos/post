@@ -46,8 +46,7 @@ func CPUProviderID() int {
 }
 
 type Initializer struct {
-	numLabelsWritten     atomic.Uint64
-	numLabelsWrittenChan chan uint64
+	numLabelsWritten atomic.Uint64
 
 	cfg        Config
 	opts       InitOpts
@@ -93,7 +92,6 @@ func (init *Initializer) Initialize() error {
 
 	init.stopChan = make(chan struct{})
 	init.doneChan = make(chan struct{})
-	init.numLabelsWrittenChan = make(chan uint64)
 
 	init.initializing = true
 	init.mtx.Unlock()
@@ -104,7 +102,6 @@ func (init *Initializer) Initialize() error {
 		init.initializing = false
 
 		close(init.doneChan)
-		close(init.numLabelsWrittenChan)
 	}()
 
 	if numLabelsWritten, err := init.diskState.NumLabelsWritten(); err != nil {
@@ -248,7 +245,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 	if numLabelsWritten > 0 {
 		if numLabelsWritten == fileNumLabels {
 			init.logger.Info("initialization: file #%v already initialized; number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileOffset)
-			init.updateSessionNumLabelsWritten(fileTargetPosition)
+			init.numLabelsWritten.Store(fileTargetPosition)
 			return nil
 		}
 
@@ -257,7 +254,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 			if err := writer.Truncate(fileNumLabels); err != nil {
 				return err
 			}
-			init.updateSessionNumLabelsWritten(fileTargetPosition)
+			init.numLabelsWritten.Store(fileTargetPosition)
 			return nil
 		}
 
@@ -301,7 +298,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 			outputChan <- output
 			currentPosition += uint64(batchSize)
 
-			init.updateSessionNumLabelsWritten(fileOffset + currentPosition)
+			init.numLabelsWritten.Store(fileOffset + currentPosition)
 		}
 		return nil
 	})
@@ -336,17 +333,6 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 
 	init.logger.Info("initialization: file #%v completed; number of labels written: %v", fileIndex, numLabelsWritten)
 	return nil
-}
-
-func (init *Initializer) updateSessionNumLabelsWritten(numLabelsWritten uint64) {
-	init.numLabelsWritten.Store(numLabelsWritten)
-
-	select {
-	case init.numLabelsWrittenChan <- numLabelsWritten:
-	default:
-		// if no one listens for the update, we just drop it
-		// otherwise Initializer would eventually stop working until someone reads from the channel
-	}
 }
 
 func (init *Initializer) verifyMetadata(m *Metadata) error {
