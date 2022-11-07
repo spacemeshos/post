@@ -445,10 +445,14 @@ func assertNumLabelsWrittenChan(init *Initializer, t *testing.T) func() error {
 	return func() error {
 		// hack to avoid receiving a nil channel from SessionNumLabelsWrittenChan()
 		// TODO (mafa): for a proper fix see https://github.com/spacemeshos/post/issues/78
-		time.Sleep(10 * time.Millisecond)
+		var labelsChan <-chan uint64
+		assert.Eventually(t, func() bool {
+			labelsChan = init.SessionNumLabelsWrittenChan()
+			return labelsChan != nil
+		}, time.Second, time.Millisecond)
 
 		var prev uint64
-		for p := range init.SessionNumLabelsWrittenChan() {
+		for p := range labelsChan {
 			assert.Less(t, prev, p)
 			prev = p
 			t.Logf("num labels written: %v\n", p)
