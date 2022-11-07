@@ -49,7 +49,7 @@ func TestInitialize(t *testing.T) {
 	r.NoError(err)
 	init.SetLogger(log)
 
-	eg, _ := errgroup.WithContext(context.Background())
+	var eg errgroup.Group
 	eg.Go(assertNumLabelsWrittenChan(init, t))
 	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
@@ -68,7 +68,7 @@ func TestInitialize_Repeated(t *testing.T) {
 	r.NoError(err)
 	init.SetLogger(log)
 
-	eg, _ := errgroup.WithContext(context.Background())
+	var eg errgroup.Group
 	eg.Go(assertNumLabelsWrittenChan(init, t))
 	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
@@ -98,7 +98,7 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	r.NoError(err)
 	init.SetLogger(log)
 
-	eg, _ := errgroup.WithContext(context.Background())
+	var eg errgroup.Group
 	eg.Go(assertNumLabelsWrittenChan(init, t))
 	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
@@ -131,7 +131,7 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	r.NoError(err)
 	init.SetLogger(log)
 
-	eg, _ := errgroup.WithContext(context.Background())
+	var eg errgroup.Group
 	eg.Go(assertNumLabelsWrittenChan(init, t))
 	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
@@ -164,7 +164,7 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	r.NoError(err)
 	init.SetLogger(log)
 
-	eg, _ := errgroup.WithContext(context.Background())
+	var eg errgroup.Group
 	eg.Go(assertNumLabelsWrittenChan(init, t))
 	r.NoError(init.Initialize())
 	r.NoError(eg.Wait())
@@ -443,8 +443,16 @@ func Test_SessionNumLabelsWrittenChan_Racefree(t *testing.T) {
 
 func assertNumLabelsWrittenChan(init *Initializer, t *testing.T) func() error {
 	return func() error {
+		// hack to avoid receiving a nil channel from SessionNumLabelsWrittenChan()
+		// TODO (mafa): for a proper fix see https://github.com/spacemeshos/post/issues/78
+		var labelsChan <-chan uint64
+		assert.Eventually(t, func() bool {
+			labelsChan = init.SessionNumLabelsWrittenChan()
+			return labelsChan != nil
+		}, time.Second, time.Millisecond)
+
 		var prev uint64
-		for p := range init.SessionNumLabelsWrittenChan() {
+		for p := range labelsChan {
 			assert.Less(t, prev, p)
 			prev = p
 			t.Logf("num labels written: %v\n", p)

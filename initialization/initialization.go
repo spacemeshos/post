@@ -46,7 +46,7 @@ func CPUProviderID() int {
 }
 
 type Initializer struct {
-	numLabelsWritten     atomic.Int64
+	numLabelsWritten     atomic.Uint64
 	numLabelsWrittenChan chan uint64
 
 	cfg        Config
@@ -170,7 +170,7 @@ func (init *Initializer) SessionNumLabelsWrittenChan() <-chan uint64 {
 }
 
 func (init *Initializer) SessionNumLabelsWritten() uint64 {
-	return uint64(init.numLabelsWritten.Load())
+	return init.numLabelsWritten.Load()
 }
 
 func (init *Initializer) Reset() error {
@@ -345,7 +345,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 }
 
 func (init *Initializer) updateSessionNumLabelsWritten(numLabelsWritten uint64) {
-	init.numLabelsWritten.Add(int64(numLabelsWritten))
+	init.numLabelsWritten.Store(numLabelsWritten)
 
 	select {
 	case init.numLabelsWrittenChan <- numLabelsWritten:
