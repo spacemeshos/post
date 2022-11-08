@@ -231,7 +231,6 @@ func (init *Initializer) SessionNumLabelsWritten() uint64 {
 }
 
 func (init *Initializer) Reset() error {
-
 	switch init.Status() {
 	case StatusInitializing:
 		return ErrCannotResetWhileInitializing
