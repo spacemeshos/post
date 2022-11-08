@@ -451,20 +451,9 @@ func TestStop(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(func() error {
-			timer := time.NewTicker(50 * time.Millisecond)
-			defer timer.Stop()
-
-			for {
-				select {
-				case <-ctx.Done():
-					return nil
-				case <-timer.C:
-					if init.SessionNumLabelsWritten() > 0 {
-						cancel()
-						return nil
-					}
-				}
-			}
+			r.Eventually(func() bool { return init.SessionNumLabelsWritten() > 0 }, 5*time.Second, 50*time.Millisecond)
+			cancel()
+			return nil
 		})
 		r.ErrorIs(init.Initialize(ctx), context.Canceled)
 		eg.Wait()
@@ -502,7 +491,7 @@ func assertNumLabelsWritten(ctx context.Context, t *testing.T, init *Initializer
 			case <-timer.C:
 				num := init.SessionNumLabelsWritten()
 				t.Logf("num labels written: %v\n", num)
-				assert.LessOrEqual(t, prev, num)
+				assert.GreaterOrEqual(t, num, prev)
 				prev = num
 			}
 		}

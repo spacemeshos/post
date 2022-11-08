@@ -17,9 +17,6 @@ import (
 )
 
 var (
-	commitment = make([]byte, 32)
-	ch         = make(Challenge, 32)
-
 	NewInitializer = initialization.NewInitializer
 	CPUProviderID  = initialization.CPUProviderID
 )
@@ -51,9 +48,18 @@ func TestProver_GenerateProof(t *testing.T) {
 	r := require.New(t)
 	log := testLogger{t: t}
 
-	cfg, opts := getTestConfig(t)
-	for numUnits := cfg.MinNumUnits; numUnits < 6; numUnits++ {
+	for numUnits := uint32(config.DefaultMinNumUnits); numUnits < 6; numUnits++ {
 		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
+			t.Parallel()
+
+			commitment := make([]byte, 32)
+			ch := make(Challenge, 32)
+			cfg := config.DefaultConfig()
+			cfg.LabelsPerUnit = 1 << 12
+
+			opts := config.DefaultInitOpts()
+			opts.NumFiles = 2
+			opts.ComputeProviderID = CPUProviderID()
 			opts.NumUnits = numUnits
 			opts.DataDir = t.TempDir()
 
@@ -61,7 +67,7 @@ func TestProver_GenerateProof(t *testing.T) {
 				initialization.WithCommitment(commitment),
 				initialization.WithConfig(cfg),
 				initialization.WithInitOpts(opts),
-				initialization.WithLogger(testLogger{t: t}),
+				initialization.WithLogger(log),
 			)
 			r.NoError(err)
 			r.NoError(init.Initialize(context.Background()))
@@ -70,9 +76,9 @@ func TestProver_GenerateProof(t *testing.T) {
 			r.NoError(err)
 			p.SetLogger(log)
 
-			binary.BigEndian.PutUint64(ch, uint64(numUnits))
+			binary.BigEndian.PutUint64(ch, uint64(opts.NumUnits))
 			proof, proofMetaData, err := p.GenerateProof(ch)
-			r.NoError(err, "numUnits: %d", numUnits)
+			r.NoError(err, "numUnits: %d", opts.NumUnits)
 			r.NotNil(proof)
 			r.NotNil(proofMetaData)
 
@@ -80,7 +86,7 @@ func TestProver_GenerateProof(t *testing.T) {
 			r.Equal(ch, proofMetaData.Challenge)
 			r.Equal(cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
 			r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
-			r.Equal(numUnits, proofMetaData.NumUnits)
+			r.Equal(opts.NumUnits, proofMetaData.NumUnits)
 			r.Equal(cfg.K1, proofMetaData.K1)
 			r.Equal(cfg.K2, proofMetaData.K2)
 
@@ -98,6 +104,8 @@ func TestProver_GenerateProof(t *testing.T) {
 func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 	r := require.New(t)
 
+	commitment := make([]byte, 32)
+	ch := make(Challenge, 32)
 	cfg, opts := getTestConfig(t)
 	init, err := NewInitializer(
 		initialization.WithCommitment(commitment),

@@ -68,10 +68,7 @@ func (opts *initializeOption) verify() error {
 		return errors.New("no init options provided")
 	}
 
-	if err := config.Validate(*opts.cfg, *opts.initOpts); err != nil {
-		return err
-	}
-	return nil
+	return config.Validate(*opts.cfg, *opts.initOpts)
 }
 
 type initializeOptionFunc func(*initializeOption) error
