@@ -433,7 +433,7 @@ func TestStop(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = 10
-	opts.NumFiles = 2
+	opts.NumFiles = 5
 	opts.ComputeProviderID = CPUProviderID()
 
 	init, err := NewInitializer(
@@ -444,18 +444,28 @@ func TestStop(t *testing.T) {
 	)
 	r.NoError(err)
 
-	// Start initialization and stop it after a short while.
+	// Start initialization and stop it after it has written some labels
 	{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		var eg errgroup.Group
 		eg.Go(func() error {
-			time.Sleep(2 * time.Second)
-			cancel()
-			return nil
+			timer := time.NewTimer(50 * time.Millisecond)
+			defer timer.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return nil
+				case <-timer.C:
+					if init.SessionNumLabelsWritten() > 0 {
+						cancel()
+						return nil
+					}
+				}
+			}
 		})
-		eg.Go(assertNumLabelsWritten(ctx, t, init))
 		r.ErrorIs(init.Initialize(ctx), context.Canceled)
 		eg.Wait()
 
