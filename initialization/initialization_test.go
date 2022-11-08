@@ -451,7 +451,7 @@ func TestStop(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(func() error {
-			timer := time.NewTimer(50 * time.Millisecond)
+			timer := time.NewTicker(50 * time.Millisecond)
 			defer timer.Stop()
 
 			for {
