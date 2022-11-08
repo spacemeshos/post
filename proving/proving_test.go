@@ -1,8 +1,10 @@
 package proving
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"testing"
 
@@ -51,43 +53,45 @@ func TestProver_GenerateProof(t *testing.T) {
 
 	cfg, opts := getTestConfig(t)
 	for numUnits := cfg.MinNumUnits; numUnits < 6; numUnits++ {
-		opts.NumUnits = numUnits
+		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
+			opts.NumUnits = numUnits
+			opts.DataDir = t.TempDir()
 
-		init, err := NewInitializer(cfg, opts, commitment)
-		r.NoError(err)
-		err = init.Initialize()
-		r.NoError(err)
+			init, err := NewInitializer(
+				initialization.WithCommitment(commitment),
+				initialization.WithConfig(cfg),
+				initialization.WithInitOpts(opts),
+				initialization.WithLogger(testLogger{t: t}),
+			)
+			r.NoError(err)
+			r.NoError(init.Initialize(context.Background()))
 
-		p, err := NewProver(cfg, opts.DataDir, commitment)
-		r.NoError(err)
-		p.SetLogger(log)
+			p, err := NewProver(cfg, opts.DataDir, commitment)
+			r.NoError(err)
+			p.SetLogger(log)
 
-		binary.BigEndian.PutUint64(ch, uint64(numUnits))
-		proof, proofMetaData, err := p.GenerateProof(ch)
-		r.NoError(err, "numUnits: %d", numUnits)
-		r.NotNil(proof)
-		r.NotNil(proofMetaData)
+			binary.BigEndian.PutUint64(ch, uint64(numUnits))
+			proof, proofMetaData, err := p.GenerateProof(ch)
+			r.NoError(err, "numUnits: %d", numUnits)
+			r.NotNil(proof)
+			r.NotNil(proofMetaData)
 
-		r.Equal(commitment, proofMetaData.Commitment)
-		r.Equal(ch, proofMetaData.Challenge)
-		r.Equal(cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
-		r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
-		r.Equal(numUnits, proofMetaData.NumUnits)
-		r.Equal(cfg.K1, proofMetaData.K1)
-		r.Equal(cfg.K2, proofMetaData.K2)
+			r.Equal(commitment, proofMetaData.Commitment)
+			r.Equal(ch, proofMetaData.Challenge)
+			r.Equal(cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
+			r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
+			r.Equal(numUnits, proofMetaData.NumUnits)
+			r.Equal(cfg.K1, proofMetaData.K1)
+			r.Equal(cfg.K2, proofMetaData.K2)
 
-		numLabels := cfg.LabelsPerUnit * uint64(numUnits)
-		indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
-		r.Equal(shared.Size(indexBitSize, uint(p.cfg.K2)), uint(len(proof.Indices)))
+			numLabels := cfg.LabelsPerUnit * uint64(numUnits)
+			indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
+			r.Equal(shared.Size(indexBitSize, uint(p.cfg.K2)), uint(len(proof.Indices)))
 
-		log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
+			log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
 
-		err = verifying.Verify(proof, proofMetaData)
-		r.NoError(err)
-
-		// Cleanup.
-		err = init.Reset()
-		r.NoError(err)
+			r.NoError(verifying.Verify(proof, proofMetaData))
+		})
 	}
 }
 
@@ -95,10 +99,14 @@ func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 	r := require.New(t)
 
 	cfg, opts := getTestConfig(t)
-	init, err := NewInitializer(cfg, opts, commitment)
+	init, err := NewInitializer(
+		initialization.WithCommitment(commitment),
+		initialization.WithConfig(cfg),
+		initialization.WithInitOpts(opts),
+		initialization.WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
-	err = init.Initialize()
-	r.NoError(err)
+	r.NoError(init.Initialize(context.Background()))
 
 	// Attempt to generate proof with different `ID`.
 	newCommitment := make([]byte, 32)
@@ -133,10 +141,6 @@ func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 	errConfigMismatch, ok = err.(initialization.ConfigMismatchError)
 	r.True(ok)
 	r.Equal("LabelsPerUnit", errConfigMismatch.Param)
-
-	// Cleanup.
-	err = init.Reset()
-	r.NoError(err)
 }
 
 func TestCalcProvingDifficulty(t *testing.T) {

@@ -1,6 +1,7 @@
 package verifying
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"testing"
@@ -16,8 +17,8 @@ import (
 )
 
 var (
-	id = make([]byte, 32)
-	ch = make(proving.Challenge, 32)
+	commitment = make([]byte, 32)
+	ch         = make(proving.Challenge, 32)
 
 	NewInitializer = initialization.NewInitializer
 	NewProver      = proving.NewProver
@@ -41,22 +42,20 @@ func TestVerify(t *testing.T) {
 	req := require.New(t)
 
 	cfg, opts := getTestConfig(t)
-	init, err := NewInitializer(cfg, opts, id)
+	init, err := NewInitializer(
+		initialization.WithCommitment(commitment),
+		initialization.WithConfig(cfg),
+		initialization.WithInitOpts(opts),
+	)
 	req.NoError(err)
-	err = init.Initialize()
-	req.NoError(err)
+	req.NoError(init.Initialize(context.Background()))
 
-	p, err := NewProver(cfg, opts.DataDir, id)
+	p, err := NewProver(cfg, opts.DataDir, commitment)
 	req.NoError(err)
 	proof, proofMetadata, err := p.GenerateProof(ch)
 	req.NoError(err)
 
-	err = Verify(proof, proofMetadata)
-	req.NoError(err)
-
-	// Cleanup.
-	err = init.Reset()
-	req.NoError(err)
+	req.NoError(Verify(proof, proofMetadata))
 }
 
 // TestLabelsCorrectness tests, for variation of label sizes, the correctness of

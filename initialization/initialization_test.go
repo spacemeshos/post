@@ -3,6 +3,7 @@ package initialization
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -16,7 +17,7 @@ import (
 	"github.com/spacemeshos/post/shared"
 )
 
-func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
+func getTestOptions(t *testing.T) []initializeOptionFunc {
 	cfg := config.DefaultConfig()
 	cfg.LabelsPerUnit = 1 << 12
 
@@ -26,7 +27,12 @@ func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
 	opts.NumFiles = 2
 	opts.ComputeProviderID = CPUProviderID()
 
-	return cfg, opts
+	return []initializeOptionFunc{
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	}
 }
 
 type testLogger struct {
@@ -40,13 +46,8 @@ func (l testLogger) Debug(msg string, args ...interface{}) { l.t.Logf("\tDEBUG\t
 
 func TestInitialize(t *testing.T) {
 	r := require.New(t)
-	log := testLogger{t: t}
-
-	cfg, opts := getTestConfig(t)
-	commitment := make([]byte, 32)
-	init, err := NewInitializer(cfg, opts, commitment)
+	init, err := NewInitializer(getTestOptions(t)...)
 	r.NoError(err)
-	init.SetLogger(log)
 
 	{
 		ctx, cancel := context.WithCancel(context.Background())
@@ -54,24 +55,17 @@ func TestInitialize(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
-		r.NoError(init.Initialize())
+		r.NoError(init.Initialize(ctx))
 		cancel()
 		eg.Wait()
 	}
-
-	// Cleanup.
-	r.NoError(init.Reset())
 }
 
 func TestInitialize_Repeated(t *testing.T) {
 	r := require.New(t)
-	log := testLogger{t: t}
-
-	cfg, opts := getTestConfig(t)
-	commitment := make([]byte, 32)
-	init, err := NewInitializer(cfg, opts, commitment)
+	opts := getTestOptions(t)
+	init, err := NewInitializer(opts...)
 	r.NoError(err)
-	init.SetLogger(log)
 
 	{
 		ctx, cancel := context.WithCancel(context.Background())
@@ -79,15 +73,14 @@ func TestInitialize_Repeated(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
-		r.NoError(init.Initialize())
+		r.NoError(init.Initialize(ctx))
 		cancel()
 		eg.Wait()
 	}
 
 	// Initialize again using the same config & opts.
-	init, err = NewInitializer(cfg, opts, commitment)
+	init, err = NewInitializer(opts...)
 	r.NoError(err)
-	init.SetLogger(log)
 
 	{
 		ctx, cancel := context.WithCancel(context.Background())
@@ -95,26 +88,31 @@ func TestInitialize_Repeated(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
-		r.NoError(init.Initialize())
+		r.NoError(init.Initialize(ctx))
 		cancel()
 		eg.Wait()
 	}
-
-	// Cleanup.
-	r.NoError(init.Reset())
 }
 
 func TestInitialize_NumUnits_Increase(t *testing.T) {
 	r := require.New(t)
-	log := testLogger{t: t}
 
-	cfg, opts := getTestConfig(t)
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 1
-	commitment := make([]byte, 32)
+	opts.ComputeProviderID = CPUProviderID()
 
-	init, err := NewInitializer(cfg, opts, commitment)
+	init, err := NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
-	init.SetLogger(log)
 
 	{
 		ctx, cancel := context.WithCancel(context.Background())
@@ -122,17 +120,20 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
-		r.NoError(init.Initialize())
+		r.NoError(init.Initialize(ctx))
 		cancel()
 		eg.Wait()
 	}
 
 	// Increase `opts.NumUnits`.
 	opts.NumUnits++
-
-	init, err = NewInitializer(cfg, opts, commitment)
+	init, err = NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
-	init.SetLogger(log)
 
 	{
 		ctx, cancel := context.WithCancel(context.Background())
@@ -140,27 +141,31 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
-		r.NoError(init.Initialize())
+		r.NoError(init.Initialize(ctx))
 		cancel()
 		eg.Wait()
 	}
-
-	// Cleanup.
-	r.NoError(init.Reset())
 }
 
 func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	r := require.New(t)
-	log := testLogger{t: t}
 
-	cfg, opts := getTestConfig(t)
-	opts.NumUnits++
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits + 1
 	opts.NumFiles = 1
-	commitment := make([]byte, 32)
+	opts.ComputeProviderID = CPUProviderID()
 
-	init, err := NewInitializer(cfg, opts, commitment)
+	init, err := NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
-	init.SetLogger(log)
 
 	{
 		ctx, cancel := context.WithCancel(context.Background())
@@ -168,45 +173,51 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
-		r.NoError(init.Initialize())
+		r.NoError(init.Initialize(ctx))
 		cancel()
 		eg.Wait()
 	}
 
 	// Decrease `opts.NumUnits`.
 	opts.NumUnits--
-
-	init, err = NewInitializer(cfg, opts, commitment)
+	init, err = NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
-	init.SetLogger(log)
-
 	{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		var eg errgroup.Group
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
-		r.NoError(init.Initialize())
+		r.NoError(init.Initialize(ctx))
 		cancel()
 		eg.Wait()
 	}
-
-	// Cleanup.
-	r.NoError(init.Reset())
 }
 
 func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	r := require.New(t)
-	log := testLogger{t: t}
 
-	cfg, opts := getTestConfig(t)
-	opts.NumUnits++
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits + 1
 	opts.NumFiles = 2
-	commitment := make([]byte, 32)
+	opts.ComputeProviderID = CPUProviderID()
 
-	init, err := NewInitializer(cfg, opts, commitment)
+	init, err := NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
-	init.SetLogger(log)
 
 	{
 		ctx, cancel := context.WithCancel(context.Background())
@@ -214,7 +225,7 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
-		r.NoError(init.Initialize())
+		r.NoError(init.Initialize(ctx))
 		cancel()
 		eg.Wait()
 	}
@@ -223,112 +234,138 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 
 	// Increase `opts.NumUnits` while `opts.NumFiles` > 1.
 	opts.NumUnits = prevNumUnits + 1
-	init, err = NewInitializer(cfg, opts, commitment)
+	init, err = NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
 	cfgMissErr := &shared.ConfigMismatchError{}
-	r.ErrorAs(init.Initialize(), cfgMissErr)
+	r.ErrorAs(init.Initialize(context.Background()), cfgMissErr)
 	r.Equal("NumUnits", cfgMissErr.Param)
 
 	// Decrease `opts.NumUnits` while `opts.NumFiles` > 1.
 	opts.NumUnits = prevNumUnits - 1
-	init, err = NewInitializer(cfg, opts, commitment)
+	init, err = NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
-	r.ErrorAs(init.Initialize(), cfgMissErr)
+	r.ErrorAs(init.Initialize(context.Background()), cfgMissErr)
 	r.Equal("NumUnits", cfgMissErr.Param)
-
-	// Cleanup.
-	r.NoError(init.Reset())
 }
 
 func TestInitialize_MultipleFiles(t *testing.T) {
 	r := require.New(t)
 
-	cfg, opts := getTestConfig(t)
-	commitment := make([]byte, 32)
-	init, err := NewInitializer(cfg, opts, commitment)
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
+	opts.NumFiles = 2
+	opts.ComputeProviderID = CPUProviderID()
+
+	init, err := NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
-	r.NoError(init.Initialize())
+	r.NoError(init.Initialize(context.Background()))
 
 	oneFileData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
 	r.NoError(err)
 
-	// Cleanup.
-	r.NoError(init.Reset())
-
 	for numFiles := uint32(2); numFiles <= 16; numFiles <<= 1 {
-		opts := opts
-		opts.NumFiles = numFiles
+		t.Run(fmt.Sprintf("NumFiles=%d", numFiles), func(t *testing.T) {
+			opts := opts
+			opts.NumFiles = numFiles
+			opts.DataDir = t.TempDir()
 
-		init, err := NewInitializer(cfg, opts, commitment)
-		r.NoError(err)
-		r.NoError(init.Initialize())
+			init, err := NewInitializer(
+				WithCommitment(make([]byte, 32)),
+				WithConfig(cfg),
+				WithInitOpts(opts),
+				WithLogger(testLogger{t: t}),
+			)
+			r.NoError(err)
+			r.NoError(init.Initialize(context.Background()))
 
-		multipleFilesData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
-		r.NoError(err)
+			multipleFilesData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
+			r.NoError(err)
 
-		r.Equal(multipleFilesData, oneFileData)
-
-		// Cleanup.
-		r.NoError(init.Reset())
+			r.Equal(multipleFilesData, oneFileData)
+		})
 	}
 }
 
 func TestNumLabelsWritten(t *testing.T) {
-	req := require.New(t)
+	r := require.New(t)
 
-	cfg, opts := getTestConfig(t)
-	commitment := make([]byte, 32)
-	init, err := NewInitializer(cfg, opts, commitment)
-	req.NoError(err)
+	opts := getTestOptions(t)
+	init, err := NewInitializer(opts...)
+	r.NoError(err)
 
 	// Check initial state.
 	numLabelsWritten, err := init.diskState.NumLabelsWritten()
-	req.NoError(err)
-	req.Equal(uint64(0), numLabelsWritten)
+	r.NoError(err)
+	r.Equal(uint64(0), numLabelsWritten)
 
 	// Initialize.
-	err = init.Initialize()
-	req.NoError(err)
+	r.NoError(init.Initialize(context.Background()))
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
-	req.NoError(err)
-	req.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
+	r.NoError(err)
+	r.Equal(uint64(init.opts.NumUnits)*init.cfg.LabelsPerUnit, numLabelsWritten)
 
 	// Initialize repeated.
-	err = init.Initialize()
-	req.NoError(err)
+	r.NoError(init.Initialize(context.Background()))
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
-	req.NoError(err)
-	req.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
+	r.NoError(err)
+	r.Equal(uint64(init.opts.NumUnits)*init.cfg.LabelsPerUnit, numLabelsWritten)
 
 	// Initialize repeated, using a new instance.
-	init, err = NewInitializer(cfg, opts, commitment)
-	req.NoError(err)
+	init, err = NewInitializer(opts...)
+	r.NoError(err)
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
-	req.NoError(err)
-	req.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
-	err = init.Initialize()
-	req.NoError(err)
+	r.NoError(err)
+	r.Equal(uint64(init.opts.NumUnits)*init.cfg.LabelsPerUnit, numLabelsWritten)
+	r.NoError(init.Initialize(context.Background()))
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
-	req.NoError(err)
-	req.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
-
-	// Cleanup.
-	req.NoError(init.Reset())
+	r.NoError(err)
+	r.Equal(uint64(init.opts.NumUnits)*init.cfg.LabelsPerUnit, numLabelsWritten)
 }
 
 func TestValidateMetadata(t *testing.T) {
 	r := require.New(t)
 
-	cfg, opts := getTestConfig(t)
-	commitment := make([]byte, 32)
-	init, err := NewInitializer(cfg, opts, commitment)
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
+	opts.NumFiles = 2
+	opts.ComputeProviderID = CPUProviderID()
+
+	init, err := NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
 
 	m, err := init.loadMetadata()
 	r.Equal(ErrStateMetadataFileMissing, err)
 	r.Nil(m)
 
-	r.NoError(init.Initialize())
+	r.NoError(init.Initialize(context.Background()))
 	m, err = init.loadMetadata()
 	r.NoError(err)
 	r.NoError(init.verifyMetadata(m))
@@ -336,58 +373,76 @@ func TestValidateMetadata(t *testing.T) {
 	// Attempt to initialize with different `Commitment`.
 	newCommitment := make([]byte, 32)
 	newCommitment[0] = newCommitment[0] + 1
-	init, err = NewInitializer(cfg, opts, newCommitment)
+	init, err = NewInitializer(
+		WithCommitment(newCommitment),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
-	err = init.Initialize()
-	errConfigMismatch, ok := err.(ConfigMismatchError)
-	r.True(ok)
+	var errConfigMismatch ConfigMismatchError
+	r.ErrorAs(init.Initialize(context.Background()), &errConfigMismatch)
 	r.Equal("Commitment", errConfigMismatch.Param)
 
 	// Attempt to initialize with different `cfg.BitsPerLabel`.
 	newCfg := cfg
 	newCfg.BitsPerLabel = cfg.BitsPerLabel + 1
-	init, err = NewInitializer(newCfg, opts, commitment)
+	init, err = NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(newCfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
-	err = init.Initialize()
-	errConfigMismatch, ok = err.(ConfigMismatchError)
-	r.True(ok)
+	r.ErrorAs(init.Initialize(context.Background()), &errConfigMismatch)
 	r.Equal("BitsPerLabel", errConfigMismatch.Param)
 
 	// Attempt to initialize with different `opts.NumFiles`.
 	newOpts := opts
 	newOpts.NumFiles = 4
-	init, err = NewInitializer(cfg, newOpts, commitment)
+	init, err = NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(newOpts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
-	err = init.Initialize()
-	errConfigMismatch, ok = err.(ConfigMismatchError)
-	r.True(ok)
+	r.ErrorAs(init.Initialize(context.Background()), &errConfigMismatch)
 	r.Equal("NumFiles", errConfigMismatch.Param)
 
 	// Attempt to initialize with different `opts.NumUnits` while `opts.NumFiles` > 1.
 	newOpts = opts
 	newOpts.NumUnits++
-	init, err = NewInitializer(cfg, newOpts, commitment)
+	init, err = NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(newOpts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
-	err = init.Initialize()
-	errConfigMismatch, ok = err.(ConfigMismatchError)
-	r.True(ok)
+	r.ErrorAs(init.Initialize(context.Background()), &errConfigMismatch)
 	r.Equal("NumUnits", errConfigMismatch.Param)
-
-	// Cleanup.
-	r.NoError(init.Reset())
 }
 
 func TestStop(t *testing.T) {
 	r := require.New(t)
-	log := testLogger{t: t}
 
-	cfg, opts := getTestConfig(t)
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
 	opts.NumUnits = 10
-	commitment := make([]byte, 32)
+	opts.NumFiles = 2
+	opts.ComputeProviderID = CPUProviderID()
 
-	init, err := NewInitializer(cfg, opts, commitment)
+	init, err := NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
-	init.SetLogger(log)
 
 	// Start initialization and stop it after a short while.
 	{
@@ -397,16 +452,15 @@ func TestStop(t *testing.T) {
 		var eg errgroup.Group
 		eg.Go(func() error {
 			time.Sleep(2 * time.Second)
-			return init.Stop()
+			cancel()
+			return nil
 		})
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
-		r.ErrorIs(init.Initialize(), ErrStopped)
-		cancel()
+		r.ErrorIs(init.Initialize(ctx), context.Canceled)
 		eg.Wait()
 
-		c, err := init.Completed()
-		assert.False(t, c)
-		assert.NoError(t, err)
+		status := init.Status()
+		assert.Equal(t, StatusStarted, status)
 	}
 
 	// Continue the initialization to completion.
@@ -416,17 +470,13 @@ func TestStop(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
-		r.NoError(init.Initialize())
+		r.NoError(init.Initialize(ctx))
 		cancel()
 		eg.Wait()
 
-		c, err := init.Completed()
-		assert.True(t, c)
-		assert.NoError(t, err)
+		status := init.Status()
+		assert.Equal(t, StatusCompleted, status)
 	}
-
-	// Cleanup.
-	r.NoError(init.Reset())
 }
 
 func assertNumLabelsWritten(ctx context.Context, t *testing.T, init *Initializer) func() error {

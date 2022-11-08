@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -29,11 +28,19 @@ type (
 	ComputeProvider     = gpu.ComputeProvider
 )
 
+type Status int
+
+const (
+	StatusNotStarted Status = iota
+	StatusStarted
+	StatusInitializing
+	StatusCompleted
+	StatusError
+)
+
 var (
-	ErrNotInitializing              = errors.New("not initializing")
 	ErrAlreadyInitializing          = errors.New("already initializing")
 	ErrCannotResetWhileInitializing = errors.New("cannot reset while initializing")
-	ErrStopped                      = errors.New("gpu-post: stopped")
 	ErrStateMetadataFileMissing     = errors.New("metadata file is missing")
 )
 
@@ -43,6 +50,86 @@ func Providers() []ComputeProvider {
 
 func CPUProviderID() int {
 	return gpu.CPUProviderID()
+}
+
+func RemoveDataFiles(dataDir string) error {
+	files, err := os.ReadDir(dataDir)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		info, err := file.Info()
+		if err != nil {
+			continue
+		}
+		if shared.IsInitFile(info) || file.Name() == metadataFileName {
+			path := filepath.Join(dataDir, file.Name())
+			if err := os.Remove(path); err != nil {
+				return fmt.Errorf("failed to delete file (%v): %w", path, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+type initializeOption struct {
+	commitment []byte
+	cfg        *Config
+	initOpts   *config.InitOpts
+	logger     Logger
+}
+
+func (opts *initializeOption) verify() error {
+	if opts.cfg == nil {
+		return errors.New("no config provided")
+	}
+
+	if opts.initOpts == nil {
+		return errors.New("no init options provided")
+	}
+
+	if err := config.Validate(*opts.cfg, *opts.initOpts); err != nil {
+		return err
+	}
+	return nil
+}
+
+type initializeOptionFunc func(*initializeOption) error
+
+func WithCommitment(commitment []byte) initializeOptionFunc {
+	return func(opts *initializeOption) error {
+		if len(commitment) != 32 {
+			return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(commitment))
+		}
+		opts.commitment = commitment
+		return nil
+	}
+}
+
+func WithInitOpts(initOpts config.InitOpts) initializeOptionFunc {
+	return func(opts *initializeOption) error {
+		opts.initOpts = &initOpts
+		return nil
+	}
+}
+
+func WithConfig(cfg Config) initializeOptionFunc {
+	return func(opts *initializeOption) error {
+		opts.cfg = &cfg
+		return nil
+	}
+}
+
+func WithLogger(logger Logger) initializeOptionFunc {
+	return func(opts *initializeOption) error {
+		if logger == nil {
+			return errors.New("logger is nil")
+		}
+		opts.logger = logger
+		return nil
+	}
 }
 
 type Initializer struct {
@@ -56,42 +143,42 @@ type Initializer struct {
 	initializing bool
 	mtx          sync.RWMutex
 
-	stopChan chan struct{}
-	doneChan chan struct{}
-
 	logger Logger
 }
 
-func NewInitializer(cfg Config, opts config.InitOpts, commitment []byte) (*Initializer, error) {
-	if len(commitment) != 32 {
-		return nil, fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(commitment))
+func NewInitializer(opts ...initializeOptionFunc) (*Initializer, error) {
+	options := &initializeOption{
+		logger: shared.DisabledLogger{},
 	}
 
-	if err := config.Validate(cfg, opts); err != nil {
+	for _, opt := range opts {
+		if err := opt(options); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := options.verify(); err != nil {
 		return nil, err
 	}
 
 	return &Initializer{
-		cfg:        cfg,
-		opts:       opts,
-		commitment: commitment,
-		diskState:  NewDiskState(opts.DataDir, uint(cfg.BitsPerLabel)),
-		logger:     shared.DisabledLogger{},
+		cfg:        *options.cfg,
+		opts:       *options.initOpts,
+		commitment: options.commitment,
+		diskState:  NewDiskState(options.initOpts.DataDir, uint(options.cfg.BitsPerLabel)),
+		logger:     options.logger,
 	}, nil
 }
 
 // Initialize is the process in which the prover commits to store some data, by having its storage filled with
 // pseudo-random data with respect to a specific id. This data is the result of a computationally-expensive operation.
-func (init *Initializer) Initialize() error {
+func (init *Initializer) Initialize(ctx context.Context) error {
 	init.mtx.Lock()
 
 	if init.initializing {
 		init.mtx.Unlock()
 		return ErrAlreadyInitializing
 	}
-
-	init.stopChan = make(chan struct{})
-	init.doneChan = make(chan struct{})
 
 	init.initializing = true
 	init.mtx.Unlock()
@@ -100,8 +187,6 @@ func (init *Initializer) Initialize() error {
 		init.mtx.Lock()
 		defer init.mtx.Unlock()
 		init.initializing = false
-
-		close(init.doneChan)
 	}()
 
 	if numLabelsWritten, err := init.diskState.NumLabelsWritten(); err != nil {
@@ -127,7 +212,7 @@ func (init *Initializer) Initialize() error {
 		init.opts.NumFiles, init.opts.NumUnits, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel, init.opts.DataDir)
 
 	for i := 0; i < int(init.opts.NumFiles); i++ {
-		if err := init.initFile(uint(init.opts.ComputeProviderID), i, numLabels, fileNumLabels); err != nil {
+		if err := init.initFile(ctx, uint(init.opts.ComputeProviderID), i, numLabels, fileNumLabels); err != nil {
 			return err
 		}
 	}
@@ -141,36 +226,17 @@ func (init *Initializer) isInitializing() bool {
 	return init.initializing
 }
 
-func (init *Initializer) Stop() error {
-	if !init.isInitializing() {
-		return ErrNotInitializing
-	}
-
-	close(init.stopChan)
-	if res := gpu.Stop(); res != gpu.StopResultOk {
-		return fmt.Errorf("gpu stop error: %s", res)
-	}
-
-	select {
-	case <-init.doneChan:
-	case <-time.After(5 * time.Second):
-		return errors.New("stop timeout")
-	}
-
-	return nil
-}
-
 func (init *Initializer) SessionNumLabelsWritten() uint64 {
 	return init.numLabelsWritten.Load()
 }
 
 func (init *Initializer) Reset() error {
-	if init.isInitializing() {
-		return ErrCannotResetWhileInitializing
-	}
 
-	if err := init.VerifyStarted(); err != nil {
-		return err
+	switch init.Status() {
+	case StatusInitializing:
+		return ErrCannotResetWhileInitializing
+	case StatusError:
+		return fmt.Errorf("cannot determine status of initialization")
 	}
 
 	files, err := os.ReadDir(init.opts.DataDir)
@@ -194,38 +260,29 @@ func (init *Initializer) Reset() error {
 	return nil
 }
 
-func (init *Initializer) Started() (bool, error) {
-	numLabelsWritten, err := init.diskState.NumLabelsWritten()
-	if err != nil {
-		return false, err
+func (init *Initializer) Status() Status {
+	if init.isInitializing() {
+		return StatusInitializing
 	}
 
-	return numLabelsWritten > 0, nil
-}
-
-func (init *Initializer) Completed() (bool, error) {
 	numLabelsWritten, err := init.diskState.NumLabelsWritten()
 	if err != nil {
-		return false, err
+		return StatusError
 	}
 
 	target := uint64(init.opts.NumUnits) * uint64(init.cfg.LabelsPerUnit)
-	return numLabelsWritten == target, nil
-}
-
-func (init *Initializer) VerifyStarted() error {
-	ok, err := init.Started()
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return shared.ErrInitNotStarted
+	if numLabelsWritten == target {
+		return StatusCompleted
 	}
 
-	return nil
+	if numLabelsWritten > 0 {
+		return StatusStarted
+	}
+
+	return StatusNotStarted
 }
 
-func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabels uint64, fileNumLabels uint64) error {
+func (init *Initializer) initFile(ctx context.Context, computeProviderID uint, fileIndex int, numLabels uint64, fileNumLabels uint64) error {
 	fileOffset := uint64(fileIndex) * fileNumLabels
 	fileTargetPosition := fileOffset + fileNumLabels
 	batchSize := uint64(config.DefaultComputeBatchSize)
@@ -266,7 +323,7 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 	currentPosition := numLabelsWritten
 	outputChan := make(chan []byte, 1024)
 
-	errGroup, ctx := errgroup.WithContext(context.Background())
+	errGroup, ctx := errgroup.WithContext(ctx)
 
 	// Start compute worker.
 	errGroup.Go(func() error {
@@ -274,9 +331,14 @@ func (init *Initializer) initFile(computeProviderID uint, fileIndex int, numLabe
 
 		for currentPosition < fileNumLabels {
 			select {
-			case <-init.stopChan:
+			case <-ctx.Done():
 				init.logger.Info("initialization: stopped")
-				return ErrStopped
+
+				if res := gpu.Stop(); res != gpu.StopResultOk {
+					return fmt.Errorf("gpu stop error: %s", res)
+				}
+
+				return ctx.Err()
 			default:
 			}
 
@@ -398,8 +460,4 @@ func (init *Initializer) saveMetadata() error {
 
 func (init *Initializer) loadMetadata() (*Metadata, error) {
 	return LoadMetadata(init.opts.DataDir)
-}
-
-func (init *Initializer) SetLogger(logger Logger) {
-	init.logger = logger
 }
