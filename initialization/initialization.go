@@ -52,28 +52,6 @@ func CPUProviderID() int {
 	return gpu.CPUProviderID()
 }
 
-func RemoveDataFiles(dataDir string) error {
-	files, err := os.ReadDir(dataDir)
-	if err != nil {
-		return err
-	}
-
-	for _, file := range files {
-		info, err := file.Info()
-		if err != nil {
-			continue
-		}
-		if shared.IsInitFile(info) || file.Name() == metadataFileName {
-			path := filepath.Join(dataDir, file.Name())
-			if err := os.Remove(path); err != nil {
-				return fmt.Errorf("failed to delete file (%v): %w", path, err)
-			}
-		}
-	}
-
-	return nil
-}
-
 type initializeOption struct {
 	commitment []byte
 	cfg        *Config
