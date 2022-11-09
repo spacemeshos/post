@@ -188,12 +188,10 @@ func (init *Initializer) SessionNumLabelsWritten() uint64 {
 }
 
 func (init *Initializer) Reset() error {
-	switch init.Status() {
-	case StatusInitializing:
+	if !init.mtx.TryLock() {
 		return ErrCannotResetWhileInitializing
-	case StatusError:
-		return fmt.Errorf("cannot determine status of initialization")
 	}
+	defer init.mtx.Unlock()
 
 	files, err := os.ReadDir(init.opts.DataDir)
 	if err != nil {

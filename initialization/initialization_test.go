@@ -60,6 +60,40 @@ func TestInitialize(t *testing.T) {
 	}
 }
 
+func TestReset_WhileInitializing(t *testing.T) {
+	r := require.New(t)
+
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
+	opts.NumFiles = 2
+	opts.ComputeProviderID = CPUProviderID()
+
+	init, err := NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+
+	{
+		var eg errgroup.Group
+		eg.Go(func() error {
+			r.Eventually(func() bool { return init.SessionNumLabelsWritten() > 0 }, 5*time.Second, 50*time.Millisecond)
+			r.ErrorIs(init.Reset(), ErrCannotResetWhileInitializing)
+			return nil
+		})
+		eg.Go(func() error { return init.Initialize(context.Background()) })
+		eg.Wait()
+
+		r.NoError(init.Reset())
+	}
+}
+
 func TestInitialize_Repeated(t *testing.T) {
 	r := require.New(t)
 
