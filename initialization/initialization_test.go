@@ -17,24 +17,6 @@ import (
 	"github.com/spacemeshos/post/shared"
 )
 
-func getTestOptions(t *testing.T) []initializeOptionFunc {
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
-
-	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
-	opts.NumUnits = cfg.MinNumUnits
-	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
-
-	return []initializeOptionFunc{
-		WithCommitment(make([]byte, 32)),
-		WithConfig(cfg),
-		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
-	}
-}
-
 type testLogger struct {
 	shared.Logger
 
@@ -46,7 +28,22 @@ func (l testLogger) Debug(msg string, args ...interface{}) { l.t.Logf("\tDEBUG\t
 
 func TestInitialize(t *testing.T) {
 	r := require.New(t)
-	init, err := NewInitializer(getTestOptions(t)...)
+
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
+	opts.NumFiles = 2
+	opts.ComputeProviderID = CPUProviderID()
+
+	init, err := NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
 
 	{
@@ -58,13 +55,29 @@ func TestInitialize(t *testing.T) {
 		r.NoError(init.Initialize(ctx))
 		cancel()
 		eg.Wait()
+
+		r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
 	}
 }
 
 func TestInitialize_Repeated(t *testing.T) {
 	r := require.New(t)
-	opts := getTestOptions(t)
-	init, err := NewInitializer(opts...)
+
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
+	opts.NumFiles = 2
+	opts.ComputeProviderID = CPUProviderID()
+
+	init, err := NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
 
 	{
@@ -79,7 +92,12 @@ func TestInitialize_Repeated(t *testing.T) {
 	}
 
 	// Initialize again using the same config & opts.
-	init, err = NewInitializer(opts...)
+	init, err = NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
 
 	{
@@ -308,8 +326,21 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 func TestNumLabelsWritten(t *testing.T) {
 	r := require.New(t)
 
-	opts := getTestOptions(t)
-	init, err := NewInitializer(opts...)
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
+	opts.NumFiles = 2
+	opts.ComputeProviderID = CPUProviderID()
+
+	init, err := NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
 
 	// Check initial state.
@@ -321,24 +352,29 @@ func TestNumLabelsWritten(t *testing.T) {
 	r.NoError(init.Initialize(context.Background()))
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	r.NoError(err)
-	r.Equal(uint64(init.opts.NumUnits)*init.cfg.LabelsPerUnit, numLabelsWritten)
+	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
 
 	// Initialize repeated.
 	r.NoError(init.Initialize(context.Background()))
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	r.NoError(err)
-	r.Equal(uint64(init.opts.NumUnits)*init.cfg.LabelsPerUnit, numLabelsWritten)
+	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
 
 	// Initialize repeated, using a new instance.
-	init, err = NewInitializer(opts...)
+	init, err = NewInitializer(
+		WithCommitment(make([]byte, 32)),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
 	r.NoError(err)
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	r.NoError(err)
-	r.Equal(uint64(init.opts.NumUnits)*init.cfg.LabelsPerUnit, numLabelsWritten)
+	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
 	r.NoError(init.Initialize(context.Background()))
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	r.NoError(err)
-	r.Equal(uint64(init.opts.NumUnits)*init.cfg.LabelsPerUnit, numLabelsWritten)
+	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
 }
 
 func TestValidateMetadata(t *testing.T) {
