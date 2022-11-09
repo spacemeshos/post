@@ -78,7 +78,7 @@ type WorkOracleResult struct {
 // TODO(mafa): use this to verify incoming nonce.
 // use the found index of the Pow as position
 // to compare the result with the difficulty use bitsPerLabel = 32 * 8 (32 bytes)
-// if output is less or equal to difficulty it passes the check
+// if output is less or equal to difficulty it passes the check.
 func WorkOracle(opts ...workOracleOptionFunc) (WorkOracleResult, error) {
 	options := &workOracleOption{
 		computeProviderID: uint(gpu.CPUProviderID()),
