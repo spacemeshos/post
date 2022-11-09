@@ -90,14 +90,14 @@ func TestLabelsCorrectness(t *testing.T) {
 				startPosition := uint64(numBatch * batchSize)
 				endPosition := startPosition + uint64(batchSize) - 1
 
-				labels, err := oracle.WorkOracle(
+				res, err := oracle.WorkOracle(
 					oracle.WithComputeProviderID(uint(CPUProviderID())),
 					oracle.WithCommitment(commitment),
 					oracle.WithStartAndEndPosition(startPosition, endPosition),
 					oracle.WithBitsPerLabel(bitsPerLabel),
 				)
 				req.NoError(err)
-				req.NoError(writer.Write(labels))
+				req.NoError(writer.Write(res.Output))
 			}
 			_, err = writer.Close()
 			req.NoError(err)
