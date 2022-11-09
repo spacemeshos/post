@@ -48,7 +48,9 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 		}
 		indicesSet[index] = true
 
-		label, err := WorkOracle(
+		// TODO(mafa): verification of nonce happens here
+		// create a new verify method that checks if the index of PoW fullfils the difficulty
+		res, err := WorkOracle(
 			oracle.WithCommitment(m.Commitment),
 			oracle.WithPosition(index),
 			oracle.WithBitsPerLabel(uint32(m.BitsPerLabel)),
@@ -56,11 +58,11 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 		if err != nil {
 			return err
 		}
-		hash := FastOracle(m.Challenge, p.Nonce, label)
+		hash := FastOracle(m.Challenge, p.Nonce, res.Output)
 		hashNum := UInt64LE(hash[:])
 		if hashNum > difficulty {
 			return fmt.Errorf("fast oracle output is above the threshold; index: %d, label: %x, hash: %x, hashNum: %d, difficulty: %d",
-				index, label, hash, hashNum, difficulty)
+				index, res.Output, hash, hashNum, difficulty)
 		}
 	}
 

@@ -70,7 +70,16 @@ func WithBitsPerLabel(bitsPerLabel uint32) workOracleOptionFunc {
 	}
 }
 
-func WorkOracle(opts ...workOracleOptionFunc) ([]byte, error) {
+type WorkOracleResult struct {
+	Output []byte
+	Nonce  uint64
+}
+
+// TODO(mafa): use this to verify incoming nonce.
+// use the found index of the Pow as position
+// to compare the result with the difficulty use bitsPerLabel = 32 * 8 (32 bytes)
+// if output is less or equal to difficulty it passes the check
+func WorkOracle(opts ...workOracleOptionFunc) (WorkOracleResult, error) {
 	options := &workOracleOption{
 		computeProviderID: uint(gpu.CPUProviderID()),
 		salt:              make([]byte, 32), // TODO(moshababo): apply salt
@@ -78,7 +87,7 @@ func WorkOracle(opts ...workOracleOptionFunc) ([]byte, error) {
 
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
-			return nil, err
+			return WorkOracleResult{}, err
 		}
 	}
 
@@ -90,10 +99,13 @@ func WorkOracle(opts ...workOracleOptionFunc) ([]byte, error) {
 		gpu.WithBitsPerLabel(options.bitsPerLabel),
 	)
 	if err != nil {
-		return nil, err
+		return WorkOracleResult{}, err
 	}
 
-	return res.Output, nil
+	return WorkOracleResult{
+		Output: res.Output,
+		Nonce:  res.IdxSolution,
+	}, nil
 }
 
 func FastOracle(ch Challenge, nonce uint32, label []byte) [32]byte {
