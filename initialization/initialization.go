@@ -114,9 +114,8 @@ type Initializer struct {
 	opts       InitOpts
 	commitment []byte
 
-	diskState    *DiskState
-	initializing bool
-	mtx          sync.RWMutex
+	diskState *DiskState
+	mtx       sync.RWMutex
 
 	logger Logger
 }
@@ -148,21 +147,10 @@ func NewInitializer(opts ...initializeOptionFunc) (*Initializer, error) {
 // Initialize is the process in which the prover commits to store some data, by having its storage filled with
 // pseudo-random data with respect to a specific id. This data is the result of a computationally-expensive operation.
 func (init *Initializer) Initialize(ctx context.Context) error {
-	init.mtx.Lock()
-
-	if init.initializing {
-		init.mtx.Unlock()
+	if !init.mtx.TryLock() {
 		return ErrAlreadyInitializing
 	}
-
-	init.initializing = true
-	init.mtx.Unlock()
-
-	defer func() {
-		init.mtx.Lock()
-		defer init.mtx.Unlock()
-		init.initializing = false
-	}()
+	defer init.mtx.Unlock()
 
 	if numLabelsWritten, err := init.diskState.NumLabelsWritten(); err != nil {
 		return err
@@ -193,12 +181,6 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (init *Initializer) isInitializing() bool {
-	init.mtx.RLock()
-	defer init.mtx.RUnlock()
-	return init.initializing
 }
 
 func (init *Initializer) SessionNumLabelsWritten() uint64 {
@@ -235,9 +217,10 @@ func (init *Initializer) Reset() error {
 }
 
 func (init *Initializer) Status() Status {
-	if init.isInitializing() {
+	if !init.mtx.TryLock() {
 		return StatusInitializing
 	}
+	defer init.mtx.Unlock()
 
 	numLabelsWritten, err := init.diskState.NumLabelsWritten()
 	if err != nil {

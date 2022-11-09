@@ -479,6 +479,7 @@ func TestStop(t *testing.T) {
 		WithLogger(testLogger{t: t}),
 	)
 	r.NoError(err)
+	r.Equal(StatusNotStarted, init.Status())
 
 	// Start initialization and stop it after it has written some labels
 	{
@@ -494,8 +495,7 @@ func TestStop(t *testing.T) {
 		r.ErrorIs(init.Initialize(ctx), context.Canceled)
 		eg.Wait()
 
-		status := init.Status()
-		assert.Equal(t, StatusStarted, status)
+		r.Equal(StatusStarted, init.Status())
 	}
 
 	// Continue the initialization to completion.
@@ -505,12 +505,15 @@ func TestStop(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
+		eg.Go(func() error {
+			r.Eventually(func() bool { return init.Status() == StatusInitializing }, 5*time.Second, 50*time.Millisecond)
+			return nil
+		})
 		r.NoError(init.Initialize(ctx))
 		cancel()
 		eg.Wait()
 
-		status := init.Status()
-		assert.Equal(t, StatusCompleted, status)
+		r.Equal(StatusCompleted, init.Status())
 	}
 }
 
