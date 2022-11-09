@@ -161,6 +161,11 @@ func WithComputeLeafs(enabled bool) scryptPositionOptionFunc {
 // By default computing proof of work is disabled.
 func WithComputePow(difficulty []byte) scryptPositionOptionFunc {
 	return func(opts *scryptPositionOption) error {
+		if difficulty == nil {
+			opts.computePow = false
+			return nil
+		}
+
 		if len(difficulty) != 32 {
 			return fmt.Errorf("invalid `difficulty` length; expected: 32, given: %v", len(difficulty))
 		}
