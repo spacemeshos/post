@@ -73,10 +73,10 @@ type InitOpts struct {
 
 func DefaultInitOpts() InitOpts {
 	return InitOpts{
-		DataDir:           DefaultDataDir,
-		NumUnits:          DefaultMinNumUnits + 1,
-		NumFiles:          DefaultNumFiles,
-		Throttle:          false,
+		DataDir:  DefaultDataDir,
+		NumUnits: DefaultMinNumUnits + 1,
+		NumFiles: DefaultNumFiles,
+		Throttle: false,
 	}
 }
 
