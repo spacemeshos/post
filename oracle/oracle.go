@@ -81,7 +81,7 @@ type WorkOracleResult struct {
 // if output is less or equal to difficulty it passes the check.
 func WorkOracle(opts ...workOracleOptionFunc) (WorkOracleResult, error) {
 	options := &workOracleOption{
-		computeProviderID: uint(gpu.CPUProviderID()),
+		computeProviderID: *gpu.CPUProviderID(),
 		salt:              make([]byte, 32), // TODO(moshababo): apply salt
 	}
 

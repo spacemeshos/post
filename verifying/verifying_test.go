@@ -91,7 +91,7 @@ func TestLabelsCorrectness(t *testing.T) {
 				endPosition := startPosition + uint64(batchSize) - 1
 
 				res, err := oracle.WorkOracle(
-					oracle.WithComputeProviderID(uint(CPUProviderID())),
+					oracle.WithComputeProviderID(*CPUProviderID()),
 					oracle.WithCommitment(commitment),
 					oracle.WithStartAndEndPosition(startPosition, endPosition),
 					oracle.WithBitsPerLabel(bitsPerLabel),

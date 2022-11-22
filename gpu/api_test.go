@@ -21,9 +21,18 @@ var (
 func TestCPUProviderExists(t *testing.T) {
 	r := require.New(t)
 
-	p := filterCPUProvider(providers)
-	r.Equal("CPU", p.Model)
-	r.Equal(ComputeAPIClassCPU, p.ComputeAPI)
+	id := CPUProviderID()
+	r.NotNil(id, "CPU provider not found")
+
+	for _, p := range Providers() {
+		if p.ID == *id {
+			r.Equal("CPU", p.Model)
+			r.Equal(ComputeAPIClassCPU, p.ComputeAPI)
+			return
+		}
+	}
+
+	r.Fail("CPU provider doesn't exist")
 }
 
 // TestScryptPositions is an output correctness sanity test. It doesn't cover many cases.

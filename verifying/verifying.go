@@ -49,7 +49,7 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 		indicesSet[index] = true
 
 		// TODO(mafa): verification of nonce happens here
-		// create a new verify method that checks if the index of PoW fullfils the difficulty
+		// create a new verify method that checks if the index of PoW fulfils the required difficulty
 		res, err := WorkOracle(
 			oracle.WithCommitment(m.Commitment),
 			oracle.WithPosition(index),

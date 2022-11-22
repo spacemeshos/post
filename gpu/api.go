@@ -16,19 +16,25 @@ type ComputeProvider struct {
 
 var (
 	providers     []ComputeProvider
-	cpuProviderID int
+	cpuProviderID *uint
 )
 
 func init() {
 	providers = cGetProviders()
-	cpuProviderID = int(filterCPUProvider(providers).ID)
+	for _, p := range providers {
+		if p.ComputeAPI == ComputeAPIClassCPU {
+			cpuProviderID = new(uint)
+			*cpuProviderID = p.ID
+			break
+		}
+	}
 }
 
 func Providers() []ComputeProvider {
 	return providers
 }
 
-func CPUProviderID() int {
+func CPUProviderID() *uint {
 	return cpuProviderID
 }
 

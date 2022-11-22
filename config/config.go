@@ -67,20 +67,15 @@ type InitOpts struct {
 	DataDir           string
 	NumUnits          uint32
 	NumFiles          uint32
-	ComputeProviderID int
+	ComputeProviderID *uint
 	Throttle          bool
 }
-
-// BestProviderID can be used for selecting the most performant provider
-// based on a short benchmarking session.
-const BestProviderID = -1
 
 func DefaultInitOpts() InitOpts {
 	return InitOpts{
 		DataDir:           DefaultDataDir,
 		NumUnits:          DefaultMinNumUnits + 1,
 		NumFiles:          DefaultNumFiles,
-		ComputeProviderID: BestProviderID,
 		Throttle:          false,
 	}
 }

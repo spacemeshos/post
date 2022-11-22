@@ -176,7 +176,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		init.opts.NumFiles, init.opts.NumUnits, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel, init.opts.DataDir)
 
 	for i := 0; i < int(init.opts.NumFiles); i++ {
-		if err := init.initFile(ctx, uint(init.opts.ComputeProviderID), i, numLabels, fileNumLabels); err != nil {
+		if err := init.initFile(ctx, *init.opts.ComputeProviderID, i, numLabels, fileNumLabels); err != nil {
 			return err
 		}
 	}
