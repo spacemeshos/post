@@ -44,11 +44,13 @@ var (
 	ErrStateMetadataFileMissing     = errors.New("metadata file is missing")
 )
 
+// Providers returns a list of available compute providers.
 func Providers() []ComputeProvider {
 	return gpu.Providers()
 }
 
-func CPUProviderID() int {
+// CPUProviderID returns the ID of the CPU provider or nil if the CPU provider is not available.
+func CPUProviderID() *uint {
 	return gpu.CPUProviderID()
 }
 
@@ -73,6 +75,7 @@ func (opts *initializeOption) verify() error {
 
 type initializeOptionFunc func(*initializeOption) error
 
+// WithCommitment sets the commitment for the initializer.
 func WithCommitment(commitment []byte) initializeOptionFunc {
 	return func(opts *initializeOption) error {
 		if len(commitment) != 32 {
@@ -83,6 +86,7 @@ func WithCommitment(commitment []byte) initializeOptionFunc {
 	}
 }
 
+// WithInitOpts sets the init options for the initializer.
 func WithInitOpts(initOpts config.InitOpts) initializeOptionFunc {
 	return func(opts *initializeOption) error {
 		opts.initOpts = &initOpts
@@ -90,6 +94,7 @@ func WithInitOpts(initOpts config.InitOpts) initializeOptionFunc {
 	}
 }
 
+// WithConfig sets the config for the initializer.
 func WithConfig(cfg Config) initializeOptionFunc {
 	return func(opts *initializeOption) error {
 		opts.cfg = &cfg
@@ -97,6 +102,7 @@ func WithConfig(cfg Config) initializeOptionFunc {
 	}
 }
 
+// WithLogger sets the logger for the initializer.
 func WithLogger(logger Logger) initializeOptionFunc {
 	return func(opts *initializeOption) error {
 		if logger == nil {

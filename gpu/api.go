@@ -30,23 +30,17 @@ func init() {
 	}
 }
 
+// Providers returns a list of available compute providers.
 func Providers() []ComputeProvider {
 	return providers
 }
 
+// CPUProviderID returns the ID of the CPU provider or nil if the CPU provider is not available.
 func CPUProviderID() *uint {
 	return cpuProviderID
 }
 
-func filterCPUProvider(providers []ComputeProvider) ComputeProvider {
-	for _, p := range providers {
-		if p.Model == "CPU" {
-			return p
-		}
-	}
-	panic("unreachable")
-}
-
+// Benchmark returns the hashes per second the selected compute provider achieves on the current machine.
 func Benchmark(p ComputeProvider) (int, error) {
 	endPosition := uint64(1 << 17)
 	if p.Model == "CPU" {
@@ -67,11 +61,12 @@ func Benchmark(p ComputeProvider) (int, error) {
 	return res.HashesPerSec, nil
 }
 
+// ScryptPositionsResult is the result of a ScryptPositions call.
 type ScryptPositionsResult struct {
-	Output       []byte
-	IdxSolution  uint64
-	HashesPerSec int
-	Stopped      bool
+	Output       []byte // The output of the scrypt computation.
+	IdxSolution  uint64 // The index of a solution to the proof of work (if checked for).
+	HashesPerSec int    // The number of hashes computed per second.
+	Stopped      bool   // Whether the computation was stopped.
 }
 
 type scryptPositionOption struct {
@@ -105,6 +100,7 @@ func (o *scryptPositionOption) optionBits() uint32 {
 
 type scryptPositionOptionFunc func(*scryptPositionOption) error
 
+// WithComputeProviderID instructs scrypt to use the specified compute provider.
 func WithComputeProviderID(id uint) scryptPositionOptionFunc {
 	return func(opts *scryptPositionOption) error {
 		opts.computeProviderID = id
@@ -112,6 +108,7 @@ func WithComputeProviderID(id uint) scryptPositionOptionFunc {
 	}
 }
 
+// WithCommitment instructs scrypt to use the specified commitment (seed) to calculate the output.
 func WithCommitment(commitment []byte) scryptPositionOptionFunc {
 	return func(opts *scryptPositionOption) error {
 		if len(commitment) != 32 {
@@ -123,6 +120,7 @@ func WithCommitment(commitment []byte) scryptPositionOptionFunc {
 	}
 }
 
+// WithSalt instructs scrypt to use the specified salt to calculate the output.
 func WithSalt(salt []byte) scryptPositionOptionFunc {
 	return func(opts *scryptPositionOption) error {
 		if len(salt) != 32 {
@@ -134,6 +132,7 @@ func WithSalt(salt []byte) scryptPositionOptionFunc {
 	}
 }
 
+// WithStartAndEndPosition instructs scrypt to compute the scrypt output for the specified range of positions.
 func WithStartAndEndPosition(start, end uint64) scryptPositionOptionFunc {
 	return func(opts *scryptPositionOption) error {
 		opts.startPosition = start
@@ -142,6 +141,7 @@ func WithStartAndEndPosition(start, end uint64) scryptPositionOptionFunc {
 	}
 }
 
+// WithBitsPerLabel instructs scrypt to use the specified number of bits per label.
 func WithBitsPerLabel(bitsPerLabel uint32) scryptPositionOptionFunc {
 	return func(opts *scryptPositionOption) error {
 		if bitsPerLabel < config.MinBitsPerLabel || bitsPerLabel > config.MaxBitsPerLabel {
@@ -182,6 +182,7 @@ func WithComputePow(difficulty []byte) scryptPositionOptionFunc {
 	}
 }
 
+// ScryptPositions computes the scrypt output for the given options.
 func ScryptPositions(opts ...scryptPositionOptionFunc) (*ScryptPositionsResult, error) {
 	options := &scryptPositionOption{
 		n:            512,
