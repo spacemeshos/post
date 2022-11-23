@@ -5,12 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/gpu"
@@ -175,7 +174,6 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 
 	numLabels := uint64(init.opts.NumUnits) * uint64(init.cfg.LabelsPerUnit)
-	// TODO (mafa): target difficulty = 0xffffffffffffffff (32 bytes) divided by numLabels
 	fileNumLabels := numLabels / uint64(init.opts.NumFiles)
 
 	init.logger.Info("initialization: starting to write %v file(s); number of units: %v, number of labels per unit: %v, number of bits per label: %v, datadir: %v",
@@ -244,10 +242,26 @@ func (init *Initializer) Status() Status {
 	return StatusNotStarted
 }
 
+// getDifficulty returns the difficulty of the initialization process.
+// It is calculated such that one computed labels is expected to be below the difficulty threshold.
+// The difficulty is calculated as follows:
+//
+//	difficulty = 2^256 / numLabels
+//
+// With this difficulty we expect one label in numLabels to be below the threshold.
+func (init *Initializer) getDifficulty(numLabels uint64) []byte {
+	difficulty := make([]byte, 33)
+	difficulty[0] = 0x01
+	x := new(big.Int).SetBytes(difficulty)
+	x.Div(x, big.NewInt(int64(numLabels)))
+	return x.FillBytes(difficulty[1:])
+}
+
 func (init *Initializer) initFile(ctx context.Context, computeProviderID uint, fileIndex int, numLabels uint64, fileNumLabels uint64) error {
 	fileOffset := uint64(fileIndex) * fileNumLabels
 	fileTargetPosition := fileOffset + fileNumLabels
 	batchSize := uint64(config.DefaultComputeBatchSize)
+	difficulty := init.getDifficulty(numLabels)
 
 	// Initialize the labels file writer.
 	writer, err := persistence.NewLabelsWriter(init.opts.DataDir, fileIndex, uint(init.cfg.BitsPerLabel))
@@ -282,77 +296,58 @@ func (init *Initializer) initFile(ctx context.Context, computeProviderID uint, f
 		init.logger.Info("initialization: starting to write file #%v; target number of labels: %v, start position: %v", fileIndex, fileNumLabels, fileOffset)
 	}
 
-	currentPosition := numLabelsWritten
-	outputChan := make(chan []byte, 1024)
-
-	errGroup, ctx := errgroup.WithContext(ctx)
-
-	// Start compute worker.
-	errGroup.Go(func() error {
-		defer close(outputChan)
-
-		for currentPosition < fileNumLabels {
-			select {
-			case <-ctx.Done():
-				init.logger.Info("initialization: stopped")
-
-				if res := gpu.Stop(); res != gpu.StopResultOk {
-					return fmt.Errorf("gpu stop error: %s", res)
-				}
-
-				return ctx.Err()
-			default:
+	for currentPosition := numLabelsWritten; currentPosition < fileNumLabels; currentPosition += uint64(batchSize) {
+		select {
+		case <-ctx.Done():
+			init.logger.Info("initialization: stopped")
+			if res := gpu.Stop(); res != gpu.StopResultOk {
+				return fmt.Errorf("gpu stop error: %s", res)
 			}
-
-			// The last batch might need to be smaller.
-			remaining := fileNumLabels - currentPosition
-			if remaining < batchSize {
-				batchSize = remaining
-			}
-
-			init.logger.Debug("initialization: file #%v current position: %v, remaining: %v", fileIndex, currentPosition, remaining)
-
-			// Calculate labels of the batch position range.
-			startPosition := fileOffset + currentPosition
-			endPosition := startPosition + uint64(batchSize) - 1
-			res, err := oracle.WorkOracle(
-				oracle.WithComputeProviderID(computeProviderID),
-				oracle.WithCommitment(init.commitment),
-				oracle.WithStartAndEndPosition(startPosition, endPosition),
-				oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
-			)
-			// TODO(mafa): check output for a nonce that is below the threshold
-			if err != nil {
+			if err := writer.Flush(); err != nil {
 				return err
 			}
-			outputChan <- res.Output
-			currentPosition += uint64(batchSize)
-
-			init.numLabelsWritten.Store(fileOffset + currentPosition)
+			return ctx.Err()
+		default:
+			// continue initialization
 		}
-		return nil
-	})
 
-	// Start IO worker.
-	errGroup.Go(func() error {
-		for {
-			select {
-			case <-ctx.Done():
-				return writer.Flush()
-			case batch, ok := <-outputChan:
-				if !ok {
-					return writer.Flush()
-				}
-
-				// Write labels batch to disk.
-				if err := writer.Write(batch); err != nil {
-					return err
-				}
-			}
+		// The last batch might need to be smaller.
+		remaining := fileNumLabels - currentPosition
+		if remaining < batchSize {
+			batchSize = remaining
 		}
-	})
 
-	if err := errGroup.Wait(); err != nil {
+		init.logger.Debug("initialization: file #%v current position: %v, remaining: %v", fileIndex, currentPosition, remaining)
+
+		// Calculate labels of the batch position range.
+		startPosition := fileOffset + currentPosition
+		endPosition := startPosition + uint64(batchSize) - 1
+		res, err := oracle.WorkOracle(
+			oracle.WithComputeProviderID(computeProviderID),
+			oracle.WithCommitment(init.commitment),
+			oracle.WithStartAndEndPosition(startPosition, endPosition),
+			oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
+			oracle.WithComputePow(difficulty),
+		)
+		if err != nil {
+			return err
+		}
+
+		if res.Nonce != 0 {
+			init.logger.Debug("initialization: file #%v, found nonce: %v", fileIndex, res.Nonce)
+
+			// TODO(mafa): store in initializer state if first found nonce and save in saveMetadata()
+		}
+
+		// Write labels batch to disk.
+		if err := writer.Write(res.Output); err != nil {
+			return err
+		}
+
+		init.numLabelsWritten.Store(fileOffset + currentPosition + uint64(batchSize))
+	}
+
+	if err := writer.Flush(); err != nil {
 		return err
 	}
 

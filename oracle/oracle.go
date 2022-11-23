@@ -22,6 +22,8 @@ type workOracleOption struct {
 	endPosition   uint64
 
 	bitsPerLabel uint32
+
+	difficulty []byte
 }
 
 type workOracleOptionFunc func(*workOracleOption) error
@@ -70,6 +72,21 @@ func WithBitsPerLabel(bitsPerLabel uint32) workOracleOptionFunc {
 	}
 }
 
+// WithComputePow instructs the oracle to compute a proof of work or not.
+// If difficulty is nil, no PoW will be computed. Otherwise it specifies the difficulty
+// of the PoW to be computed (higher values are more difficult).
+// By default computing proof of work is disabled.
+func WithComputePow(difficulty []byte) workOracleOptionFunc {
+	return func(opts *workOracleOption) error {
+		if len(difficulty) != 32 {
+			return fmt.Errorf("invalid `difficulty` length; expected: 32, given: %v", len(difficulty))
+		}
+
+		opts.difficulty = difficulty
+		return nil
+	}
+}
+
 type WorkOracleResult struct {
 	Output []byte
 	Nonce  uint64
@@ -97,6 +114,7 @@ func WorkOracle(opts ...workOracleOptionFunc) (WorkOracleResult, error) {
 		gpu.WithSalt(options.salt),
 		gpu.WithStartAndEndPosition(options.startPosition, options.endPosition),
 		gpu.WithBitsPerLabel(options.bitsPerLabel),
+		gpu.WithComputePow(options.difficulty),
 	)
 	if err != nil {
 		return WorkOracleResult{}, err

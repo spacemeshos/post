@@ -55,9 +55,8 @@ func TestInitialize(t *testing.T) {
 		r.NoError(init.Initialize(ctx))
 		cancel()
 		eg.Wait()
-
-		r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
 	}
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
 }
 
 func TestReset_WhileInitializing(t *testing.T) {
