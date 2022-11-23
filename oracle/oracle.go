@@ -105,7 +105,7 @@ type WorkOracleResult struct {
 
 func WorkOracle(opts ...workOracleOptionFunc) (WorkOracleResult, error) {
 	options := &workOracleOption{
-		computeProviderID: *gpu.CPUProviderID(),
+		computeProviderID: gpu.CPUProviderID(),
 		salt:              make([]byte, 32), // TODO(moshababo): apply salt
 		computeLeaves:     true,
 	}

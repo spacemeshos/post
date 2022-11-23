@@ -16,18 +16,18 @@ type ComputeProvider struct {
 
 var (
 	providers     []ComputeProvider
-	cpuProviderID *uint
+	cpuProviderID uint
 )
 
 func init() {
 	providers = cGetProviders()
 	for _, p := range providers {
 		if p.ComputeAPI == ComputeAPIClassCPU {
-			cpuProviderID = new(uint)
-			*cpuProviderID = p.ID
-			break
+			cpuProviderID = p.ID
+			return
 		}
 	}
+	panic("no CPU provider available")
 }
 
 // Providers returns a list of available compute providers.
@@ -36,7 +36,7 @@ func Providers() []ComputeProvider {
 }
 
 // CPUProviderID returns the ID of the CPU provider or nil if the CPU provider is not available.
-func CPUProviderID() *uint {
+func CPUProviderID() uint {
 	return cpuProviderID
 }
 

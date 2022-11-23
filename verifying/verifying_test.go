@@ -33,7 +33,7 @@ func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	return cfg, opts
 }
@@ -91,7 +91,7 @@ func TestLabelsCorrectness(t *testing.T) {
 				endPosition := startPosition + uint64(batchSize) - 1
 
 				res, err := oracle.WorkOracle(
-					oracle.WithComputeProviderID(*CPUProviderID()),
+					oracle.WithComputeProviderID(CPUProviderID()),
 					oracle.WithCommitment(commitment),
 					oracle.WithStartAndEndPosition(startPosition, endPosition),
 					oracle.WithBitsPerLabel(bitsPerLabel),

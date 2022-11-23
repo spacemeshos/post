@@ -38,7 +38,7 @@ func TestInitialize(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithCommitment(make([]byte, 32)),
@@ -74,7 +74,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	// commitment where no label in the first uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit satisfies the PoW requirement.
 	commitment, err := hex.DecodeString("c6fb0a2798491faf96247cd4f8005077a48089a06697c6835f7deb69756e9431")
@@ -108,7 +108,7 @@ func TestReset_WhileInitializing(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithCommitment(make([]byte, 32)),
@@ -142,7 +142,7 @@ func TestInitialize_Repeated(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithCommitment(make([]byte, 32)),
@@ -194,7 +194,7 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 1
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithCommitment(make([]byte, 32)),
@@ -247,7 +247,7 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits + 1
 	opts.NumFiles = 1
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithCommitment(make([]byte, 32)),
@@ -299,7 +299,7 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits + 1
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithCommitment(make([]byte, 32)),
@@ -358,7 +358,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithCommitment(make([]byte, 32)),
@@ -405,7 +405,7 @@ func TestNumLabelsWritten(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithCommitment(make([]byte, 32)),
@@ -459,7 +459,7 @@ func TestValidateMetadata(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithCommitment(make([]byte, 32)),
@@ -542,7 +542,7 @@ func TestStop(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = 10
 	opts.NumFiles = 5
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithCommitment(make([]byte, 32)),

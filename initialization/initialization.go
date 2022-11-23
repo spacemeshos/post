@@ -48,7 +48,7 @@ func Providers() []ComputeProvider {
 }
 
 // CPUProviderID returns the ID of the CPU provider or nil if the CPU provider is not available.
-func CPUProviderID() *uint {
+func CPUProviderID() uint {
 	return gpu.CPUProviderID()
 }
 
@@ -189,7 +189,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	if init.nonce == nil {
 		// continue searching for a nonce
 		res, err := oracle.WorkOracle(
-			oracle.WithComputeProviderID(*init.opts.ComputeProviderID),
+			oracle.WithComputeProviderID(uint(init.opts.ComputeProviderID)),
 			oracle.WithCommitment(init.commitment),
 			oracle.WithStartAndEndPosition(numLabels, 8*numLabels),
 			oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
@@ -333,7 +333,7 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, numLabels,
 		}
 
 		res, err := oracle.WorkOracle(
-			oracle.WithComputeProviderID(*init.opts.ComputeProviderID),
+			oracle.WithComputeProviderID(uint(init.opts.ComputeProviderID)),
 			oracle.WithCommitment(init.commitment),
 			oracle.WithStartAndEndPosition(startPosition, endPosition),
 			oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
