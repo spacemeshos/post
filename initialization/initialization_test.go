@@ -3,6 +3,7 @@ package initialization
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
+	"github.com/spacemeshos/post/verifying"
 )
 
 type testLogger struct {
@@ -57,6 +59,44 @@ func TestInitialize(t *testing.T) {
 		eg.Wait()
 	}
 	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+	r.NotNil(init.nonce)
+
+	r.NoError(verifying.VerifyPoW(*init.nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), init.commitment))
+}
+
+func TestInitialize_PowOutOfRange(t *testing.T) {
+	r := require.New(t)
+
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
+	opts.NumFiles = 2
+	opts.ComputeProviderID = CPUProviderID()
+
+	// commitment where no label in the first uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit satisfies the PoW requirement.
+	commitment, err := hex.DecodeString("c6fb0a2798491faf96247cd4f8005077a48089a06697c6835f7deb69756e9431")
+	r.NoError(err)
+
+	init, err := NewInitializer(
+		WithCommitment(commitment),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+
+	r.NoError(init.Initialize(context.Background()))
+
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+	r.NotNil(init.nonce)
+
+	// check that the found nonce is outside of the range for calculating labels
+	r.Less(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *init.nonce)
+
+	r.NoError(verifying.VerifyPoW(*init.nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), init.commitment))
 }
 
 func TestReset_WhileInitializing(t *testing.T) {

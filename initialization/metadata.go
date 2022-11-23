@@ -18,6 +18,7 @@ type Metadata struct {
 	LabelsPerUnit uint64
 	NumUnits      uint32
 	NumFiles      uint32
+	Nonce         *uint64 `json:",omitempty"`
 }
 
 func SaveMetadata(dir string, v *Metadata) error {

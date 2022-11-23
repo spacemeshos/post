@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 	"path/filepath"
 	"sync"
@@ -118,6 +117,7 @@ type Initializer struct {
 	cfg        Config
 	opts       InitOpts
 	commitment []byte
+	nonce      *uint64
 
 	diskState *DiskState
 	mtx       sync.RWMutex
@@ -175,14 +175,35 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 
 	numLabels := uint64(init.opts.NumUnits) * uint64(init.cfg.LabelsPerUnit)
 	fileNumLabels := numLabels / uint64(init.opts.NumFiles)
+	difficulty := shared.PowDifficulty(numLabels)
 
 	init.logger.Info("initialization: starting to write %v file(s); number of units: %v, number of labels per unit: %v, number of bits per label: %v, datadir: %v",
 		init.opts.NumFiles, init.opts.NumUnits, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel, init.opts.DataDir)
 
 	for i := 0; i < int(init.opts.NumFiles); i++ {
-		if err := init.initFile(ctx, *init.opts.ComputeProviderID, i, numLabels, fileNumLabels); err != nil {
+		if err := init.initFile(ctx, i, numLabels, fileNumLabels, difficulty); err != nil {
 			return err
 		}
+	}
+
+	if init.nonce == nil {
+		// continue searching for a nonce
+		res, err := oracle.WorkOracle(
+			oracle.WithComputeProviderID(*init.opts.ComputeProviderID),
+			oracle.WithCommitment(init.commitment),
+			oracle.WithStartAndEndPosition(numLabels, 8*numLabels),
+			oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
+			oracle.WithComputePow(difficulty),
+			oracle.WithComputeLeaves(false),
+		)
+		if err != nil {
+			return err
+		}
+		if res.Nonce == nil {
+			return fmt.Errorf("no nonce found")
+		}
+		init.nonce = new(uint64)
+		*init.nonce = *res.Nonce
 	}
 
 	return nil
@@ -242,26 +263,10 @@ func (init *Initializer) Status() Status {
 	return StatusNotStarted
 }
 
-// getDifficulty returns the difficulty of the initialization process.
-// It is calculated such that one computed labels is expected to be below the difficulty threshold.
-// The difficulty is calculated as follows:
-//
-//	difficulty = 2^256 / numLabels
-//
-// With this difficulty we expect one label in numLabels to be below the threshold.
-func (init *Initializer) getDifficulty(numLabels uint64) []byte {
-	difficulty := make([]byte, 33)
-	difficulty[0] = 0x01
-	x := new(big.Int).SetBytes(difficulty)
-	x.Div(x, big.NewInt(int64(numLabels)))
-	return x.FillBytes(difficulty[1:])
-}
-
-func (init *Initializer) initFile(ctx context.Context, computeProviderID uint, fileIndex int, numLabels uint64, fileNumLabels uint64) error {
+func (init *Initializer) initFile(ctx context.Context, fileIndex int, numLabels, fileNumLabels uint64, difficulty []byte) error {
 	fileOffset := uint64(fileIndex) * fileNumLabels
 	fileTargetPosition := fileOffset + fileNumLabels
 	batchSize := uint64(config.DefaultComputeBatchSize)
-	difficulty := init.getDifficulty(numLabels)
 
 	// Initialize the labels file writer.
 	writer, err := persistence.NewLabelsWriter(init.opts.DataDir, fileIndex, uint(init.cfg.BitsPerLabel))
@@ -322,8 +327,13 @@ func (init *Initializer) initFile(ctx context.Context, computeProviderID uint, f
 		// Calculate labels of the batch position range.
 		startPosition := fileOffset + currentPosition
 		endPosition := startPosition + uint64(batchSize) - 1
+		if init.nonce != nil {
+			// don't look for a nonce, when we already have one
+			difficulty = nil
+		}
+
 		res, err := oracle.WorkOracle(
-			oracle.WithComputeProviderID(computeProviderID),
+			oracle.WithComputeProviderID(*init.opts.ComputeProviderID),
 			oracle.WithCommitment(init.commitment),
 			oracle.WithStartAndEndPosition(startPosition, endPosition),
 			oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
@@ -333,10 +343,10 @@ func (init *Initializer) initFile(ctx context.Context, computeProviderID uint, f
 			return err
 		}
 
-		if res.Nonce != 0 {
-			init.logger.Debug("initialization: file #%v, found nonce: %v", fileIndex, res.Nonce)
-
-			// TODO(mafa): store in initializer state if first found nonce and save in saveMetadata()
+		if res.Nonce != nil {
+			init.logger.Debug("initialization: file #%v, found nonce: %d", fileIndex, *res.Nonce)
+			init.nonce = new(uint64)
+			*init.nonce = *res.Nonce
 		}
 
 		// Write labels batch to disk.
@@ -417,7 +427,7 @@ func (init *Initializer) saveMetadata() error {
 		LabelsPerUnit: init.cfg.LabelsPerUnit,
 		NumUnits:      init.opts.NumUnits,
 		NumFiles:      init.opts.NumFiles,
-		// TODO(mafa): include the index of the found PoW nonce.
+		Nonce:         init.nonce,
 	}
 	return SaveMetadata(init.opts.DataDir, &v)
 }

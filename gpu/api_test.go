@@ -281,6 +281,8 @@ func Test_ScryptPositions_Pow(t *testing.T) {
 	d, err := hex.DecodeString("00003fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 	require.NoError(t, err)
 
+	nonce := uint64(126202)
+
 	for _, p := range Providers() {
 		t.Run(fmt.Sprintf("Only PoW, Provider %s", p.Model), func(t *testing.T) {
 			res, err := ScryptPositions(
@@ -290,11 +292,12 @@ func Test_ScryptPositions_Pow(t *testing.T) {
 				WithStartAndEndPosition(0, 128*1024),
 				WithBitsPerLabel(8),
 				WithComputePow(d),
-				WithComputeLeafs(false),
+				WithComputeLeaves(false),
 			)
 
 			assert.NoError(t, err)
-			assert.Equal(t, uint64(126202), res.IdxSolution)
+			assert.NotNil(t, res.IdxSolution)
+			assert.Equal(t, nonce, *res.IdxSolution)
 		})
 
 		t.Run(fmt.Sprintf("PoW + Leafs, Provider %s", p.Model), func(t *testing.T) {
@@ -305,12 +308,13 @@ func Test_ScryptPositions_Pow(t *testing.T) {
 				WithStartAndEndPosition(0, 128*1024),
 				WithBitsPerLabel(8),
 				WithComputePow(d),
-				WithComputeLeafs(true),
+				WithComputeLeaves(true),
 			)
 
 			assert.NoError(t, err)
 			assert.NotNil(t, res.Output)
-			assert.Equal(t, uint64(126202), res.IdxSolution)
+			assert.NotNil(t, res.IdxSolution)
+			assert.Equal(t, nonce, *res.IdxSolution)
 		})
 	}
 }

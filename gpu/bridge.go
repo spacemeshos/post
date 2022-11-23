@@ -22,11 +22,15 @@ const (
 	ComputeAPIClassCuda        = ComputeAPIClass((C.ComputeApiClass)(C.COMPUTE_API_CLASS_CUDA))
 	ComputeAPIClassVulkan      = ComputeAPIClass((C.ComputeApiClass)(C.COMPUTE_API_CLASS_VULKAN))
 
-	StopResultOk             = StopResult(C.SPACEMESH_API_ERROR_NONE)
-	StopResultError          = StopResult(C.SPACEMESH_API_ERROR)
-	StopResultErrorTimeout   = StopResult(C.SPACEMESH_API_ERROR_TIMEOUT)
-	StopResultErrorAlready   = StopResult(C.SPACEMESH_API_ERROR_ALREADY)
-	StopResultErrorCancelled = StopResult(C.SPACEMESH_API_ERROR_CANCELED)
+	StopResultPowFound              = StopResult(C.SPACEMESH_API_POW_SOLUTION_FOUND)
+	StopResultOk                    = StopResult(C.SPACEMESH_API_ERROR_NONE)
+	StopResultError                 = StopResult(C.SPACEMESH_API_ERROR)
+	StopResultErrorTimeout          = StopResult(C.SPACEMESH_API_ERROR_TIMEOUT)
+	StopResultErrorAlready          = StopResult(C.SPACEMESH_API_ERROR_ALREADY)
+	StopResultErrorCancelled        = StopResult(C.SPACEMESH_API_ERROR_CANCELED)
+	StopResultErrorNoCompoteOptions = StopResult(C.SPACEMESH_API_ERROR_NO_COMPOTE_OPTIONS)
+	StopResultErrorInvalidParameter = StopResult(C.SPACEMESH_API_ERROR_INVALID_PARAMETER)
+	StopResultErrorInvalidProvider  = StopResult(C.SPACEMESH_API_ERROR_INVALID_PROVIDER_ID)
 )
 
 type ComputeAPIClass uint

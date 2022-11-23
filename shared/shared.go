@@ -3,6 +3,7 @@ package shared
 import (
 	"encoding/binary"
 	"math"
+	"math/big"
 	"os"
 )
 
@@ -33,6 +34,21 @@ func ProvingDifficulty(numLabels uint64, k1 uint64) uint64 {
 	x := maxTarget / numLabels
 	y := maxTarget % numLabels
 	return x*k1 + (y*k1)/numLabels
+}
+
+// PowDifficulty returns the target difficulty of finding a nonce in `numLabels` labels. 
+// It is calculated such that one computed label is expected to be below the difficulty threshold.
+// The difficulty is calculated as follows:
+//
+//	difficulty = 2^256 / numLabels
+//
+// With this difficulty we expect one label in numLabels to be below the threshold.
+func PowDifficulty(numLabels uint64) []byte {
+	difficulty := make([]byte, 33)
+	difficulty[0] = 0x01
+	x := new(big.Int).SetBytes(difficulty)
+	x.Div(x, big.NewInt(int64(numLabels)))
+	return x.FillBytes(difficulty[1:])
 }
 
 func Uint64MulOverflow(a, b uint64) bool {

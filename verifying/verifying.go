@@ -3,6 +3,7 @@ package verifying
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/oracle"
@@ -18,6 +19,32 @@ var (
 	FastOracle = oracle.FastOracle
 	UInt64LE   = shared.UInt64LE
 )
+
+func VerifyPoW(nonce, numUnits, bitsPerLabel uint64, commitment []byte) error {
+	if len(commitment) != 32 {
+		return fmt.Errorf("invalid `commitment` length; expected: 32, given: %v", len(commitment))
+	}
+
+	numLabels := numUnits * bitsPerLabel
+	difficulty := shared.PowDifficulty(numLabels)
+	threshold := new(big.Int).SetBytes(difficulty)
+
+	res, err := WorkOracle(
+		oracle.WithCommitment(commitment),
+		oracle.WithPosition(nonce),
+		oracle.WithBitsPerLabel(uint32(bitsPerLabel)*32),
+	)
+	if err != nil {
+		return err
+	}
+
+	label := new(big.Int).SetBytes(res.Output)
+	if label.Cmp(threshold) > 0 {
+		return fmt.Errorf("label is above the threshold; label: %#32x, threshold: %#32x", label, threshold)
+	}
+
+	return nil
+}
 
 // Verify ensures the validity of a proof in respect to its metadata.
 // It returns nil if the proof is valid or an error describing the failure, otherwise.
@@ -48,8 +75,6 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 		}
 		indicesSet[index] = true
 
-		// TODO(mafa): verification of nonce happens here
-		// create a new verify method that checks if the index of PoW fulfills the required difficulty
 		res, err := WorkOracle(
 			oracle.WithCommitment(m.Commitment),
 			oracle.WithPosition(index),

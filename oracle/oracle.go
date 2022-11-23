@@ -23,7 +23,8 @@ type workOracleOption struct {
 
 	bitsPerLabel uint32
 
-	difficulty []byte
+	computeLeaves bool
+	difficulty    []byte
 }
 
 type workOracleOptionFunc func(*workOracleOption) error
@@ -72,13 +73,23 @@ func WithBitsPerLabel(bitsPerLabel uint32) workOracleOptionFunc {
 	}
 }
 
+// WithComputeLeaves instructs the oracle to compute the labels for PoST or not.
+// By default computing leaves is enabled. It can be switched off to save time
+// when continuing a run to compute a proof of work.
+func WithComputeLeaves(enabled bool) workOracleOptionFunc {
+	return func(opts *workOracleOption) error {
+		opts.computeLeaves = enabled
+		return nil
+	}
+}
+
 // WithComputePow instructs the oracle to compute a proof of work or not.
 // If difficulty is nil, no PoW will be computed. Otherwise it specifies the difficulty
 // of the PoW to be computed (higher values are more difficult).
 // By default computing proof of work is disabled.
 func WithComputePow(difficulty []byte) workOracleOptionFunc {
 	return func(opts *workOracleOption) error {
-		if len(difficulty) != 32 {
+		if difficulty != nil && len(difficulty) != 32 {
 			return fmt.Errorf("invalid `difficulty` length; expected: 32, given: %v", len(difficulty))
 		}
 
@@ -89,17 +100,14 @@ func WithComputePow(difficulty []byte) workOracleOptionFunc {
 
 type WorkOracleResult struct {
 	Output []byte
-	Nonce  uint64
+	Nonce  *uint64
 }
 
-// TODO(mafa): use this to verify incoming nonce.
-// use the found index of the Pow as position
-// to compare the result with the difficulty use bitsPerLabel = 32 * 8 (32 bytes)
-// if output is less or equal to difficulty it passes the check.
 func WorkOracle(opts ...workOracleOptionFunc) (WorkOracleResult, error) {
 	options := &workOracleOption{
 		computeProviderID: *gpu.CPUProviderID(),
 		salt:              make([]byte, 32), // TODO(moshababo): apply salt
+		computeLeaves:     true,
 	}
 
 	for _, opt := range opts {
@@ -114,6 +122,7 @@ func WorkOracle(opts ...workOracleOptionFunc) (WorkOracleResult, error) {
 		gpu.WithSalt(options.salt),
 		gpu.WithStartAndEndPosition(options.startPosition, options.endPosition),
 		gpu.WithBitsPerLabel(options.bitsPerLabel),
+		gpu.WithComputeLeaves(options.computeLeaves),
 		gpu.WithComputePow(options.difficulty),
 	)
 	if err != nil {

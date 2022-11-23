@@ -63,10 +63,10 @@ func Benchmark(p ComputeProvider) (int, error) {
 
 // ScryptPositionsResult is the result of a ScryptPositions call.
 type ScryptPositionsResult struct {
-	Output       []byte // The output of the scrypt computation.
-	IdxSolution  uint64 // The index of a solution to the proof of work (if checked for).
-	HashesPerSec int    // The number of hashes computed per second.
-	Stopped      bool   // Whether the computation was stopped.
+	Output       []byte  // The output of the scrypt computation.
+	IdxSolution  *uint64 // The index of a solution to the proof of work (if checked for).
+	HashesPerSec int     // The number of hashes computed per second.
+	Stopped      bool    // Whether the computation was stopped.
 }
 
 type scryptPositionOption struct {
@@ -154,7 +154,7 @@ func WithBitsPerLabel(bitsPerLabel uint32) scryptPositionOptionFunc {
 
 // WithComputeLeafs instructs scrypt to compute leafs or not.
 // By default computing leafs is enabled.
-func WithComputeLeafs(enabled bool) scryptPositionOptionFunc {
+func WithComputeLeaves(enabled bool) scryptPositionOptionFunc {
 	return func(opts *scryptPositionOption) error {
 		opts.computeLeafs = enabled
 		return nil
@@ -214,24 +214,24 @@ func ScryptPositions(opts ...scryptPositionOptionFunc) (*ScryptPositionsResult, 
 
 	output, idxSolution, hashesPerSec, retVal := cScryptPositions(options)
 
-	switch retVal {
-	case 1:
-		return &ScryptPositionsResult{output, idxSolution, hashesPerSec, false}, nil
-	case 0:
-		return &ScryptPositionsResult{output, idxSolution, hashesPerSec, false}, nil
-	case -1:
+	switch StopResult(retVal) {
+	case StopResultPowFound:
+		return &ScryptPositionsResult{output, &idxSolution, hashesPerSec, false}, nil
+	case StopResultOk:
+		return &ScryptPositionsResult{output, nil, hashesPerSec, false}, nil
+	case StopResultError:
 		return nil, fmt.Errorf("gpu-post error")
-	case -2:
+	case StopResultErrorTimeout:
 		return nil, fmt.Errorf("gpu-post error: timeout")
-	case -3:
+	case StopResultErrorAlready:
 		return nil, fmt.Errorf("gpu-post error: already stopped")
-	case -4:
-		return &ScryptPositionsResult{output, idxSolution, hashesPerSec, true}, nil
-	case -5:
+	case StopResultErrorCancelled:
+		return &ScryptPositionsResult{output, nil, hashesPerSec, true}, nil
+	case StopResultErrorNoCompoteOptions:
 		return nil, fmt.Errorf("gpu-post error: no compute options")
-	case -6:
+	case StopResultErrorInvalidParameter:
 		return nil, fmt.Errorf("gpu-post error: invalid param")
-	case -7:
+	case StopResultErrorInvalidProvider:
 		return nil, fmt.Errorf("gpu-post error: invalid provider")
 	default:
 		panic(fmt.Sprintf("unreachable reVal %d", retVal))
