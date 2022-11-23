@@ -59,8 +59,8 @@ func TestInitialize(t *testing.T) {
 		eg.Wait()
 	}
 	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
-	r.NotNil(init.nonce)
 
+	r.NotNil(init.nonce)
 	r.NoError(verifying.VerifyPoW(*init.nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), init.commitment))
 }
 
@@ -91,11 +91,10 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	r.NoError(init.Initialize(context.Background()))
 
 	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
-	r.NotNil(init.nonce)
 
 	// check that the found nonce is outside of the range for calculating labels
+	r.NotNil(init.nonce)
 	r.Less(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *init.nonce)
-
 	r.NoError(verifying.VerifyPoW(*init.nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), init.commitment))
 }
 

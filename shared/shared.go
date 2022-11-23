@@ -36,7 +36,7 @@ func ProvingDifficulty(numLabels uint64, k1 uint64) uint64 {
 	return x*k1 + (y*k1)/numLabels
 }
 
-// PowDifficulty returns the target difficulty of finding a nonce in `numLabels` labels. 
+// PowDifficulty returns the target difficulty of finding a nonce in `numLabels` labels.
 // It is calculated such that one computed label is expected to be below the difficulty threshold.
 // The difficulty is calculated as follows:
 //
