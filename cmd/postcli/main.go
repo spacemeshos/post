@@ -14,6 +14,7 @@ import (
 
 	"github.com/spacemeshos/ed25519"
 	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/gpu"
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
@@ -73,6 +74,8 @@ func main() {
 
 	atxId := make([]byte, 32) // TODO(mafa): get this as a flag like the id.
 	commitment := GetCommitmentBytes(id, atxId)
+
+	opts.ComputeProviderID = gpu.CPUProviderID() // TODO(mafa): select best provider.
 
 	init, err := initialization.NewInitializer(
 		initialization.WithConfig(cfg),
