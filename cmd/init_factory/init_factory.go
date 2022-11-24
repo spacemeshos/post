@@ -95,7 +95,11 @@ func main() {
 
 	if err := init.Initialize(ctx); err != nil {
 		if err == shared.ErrInitCompleted {
-			log.Print(err)
+			log.Println(err)
+			return
+		}
+		if err == context.Canceled {
+			log.Println("initialization interrupted")
 			return
 		}
 		log.Fatalf("initialization error: %v", err)
