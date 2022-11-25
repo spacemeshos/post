@@ -5,12 +5,11 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"log"
+	"github.com/davecgh/go-spew/spew"
+	baseLog "log"
 	"os"
 	"os/signal"
 	"path/filepath"
-
-	"github.com/minio/sha256-simd"
 
 	"github.com/spacemeshos/ed25519"
 	"github.com/spacemeshos/post/config"
@@ -22,74 +21,95 @@ import (
 )
 
 var (
-	cfg   = config.DefaultConfig()
-	opts  = config.DefaultInitOpts()
-	id    []byte
-	reset bool
+	cfg             = config.DefaultConfig()
+	opts            = config.DefaultInitOpts()
+	log             = logger{}
+	printProviders  bool
+	printConfig     bool
+	id              []byte
+	commitmentAtxId []byte
+	reset           bool
 )
 
 func parseFlags() error {
+	flag.BoolVar(&printProviders, "printProviders", false, "print the list of compute providers")
+	flag.BoolVar(&printProviders, "printConfig", false, "print the used config and options")
 	flag.StringVar(&opts.DataDir, "datadir", opts.DataDir, "filesystem datadir path")
+	flag.IntVar(&opts.ComputeProviderID, "provider", opts.ComputeProviderID, "compute provider id (required)")
+	flag.Uint64Var(&cfg.LabelsPerUnit, "labelsPerUnit", cfg.LabelsPerUnit, "the number of labels per unit")
+	flag.BoolVar(&reset, "reset", false, "whether to reset the datadir before starting")
+	idHex := flag.String("id", "", "miner's id (public key), in hex (will be auto-generated if not provided)")
+	commitmentAtxIdHex := flag.String("commitmentAtxId", "", "commitment atx id, in hex (required)")
 
 	var numUnits uint64
 	flag.Uint64Var(&numUnits, "numUnits", uint64(opts.NumUnits), "number of units") // workaround the missing type support for uint32
 	opts.NumUnits = uint32(numUnits)
 
-	flag.BoolVar(&reset, "reset", false, "whether to reset the datadir before starting")
-	idHex := flag.String("id", "", "id (public key) in hex")
-
-	// TODO: expose more cfg/opts to cmd flags
 	flag.Parse()
 
-	if *idHex != "" {
+	if opts.ComputeProviderID < 0 {
+		baseLog.Fatal("-provider flag is required")
+	}
+
+	if *commitmentAtxIdHex == "" {
+		baseLog.Fatalf("-commitmentAtxId flag is required")
+	}
+	var err error
+	commitmentAtxId, err = hex.DecodeString(*commitmentAtxIdHex)
+	if err != nil {
+		return fmt.Errorf("invalid commitmentAtxId: %w", err)
+	}
+
+	if *idHex == "" {
+		pub, priv, err := ed25519.GenerateKey(nil)
+		if err != nil {
+			return fmt.Errorf("failed to generate identity: %w", err)
+		}
+		id = pub
+		log.Info("cli: generated id: %x", id)
+		saveKey(priv) // The key will need to be loaded in clients for the PoST data to be usable.
+	} else {
 		var err error
 		id, err = hex.DecodeString(*idHex)
 		if err != nil {
 			return fmt.Errorf("invalid id: %w", err)
 		}
-		return nil
 	}
 
-	pub, priv, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		return fmt.Errorf("failed to generate identity: %w", err)
-	}
-
-	id = pub
-	log.Printf("generated id: %x\n", id)
-
-	return saveKey(priv) // The key will need to be loaded in clients for the data to be usable.
-}
-
-// TODO(mafa): add "WithId" and "WithCommitmentATX" options to the initializer and do this within the initializer.
-func GetCommitmentBytes(id []byte, commitmentAtxId []byte) []byte {
-	h := sha256.Sum256(append(id, commitmentAtxId...))
-	return h[:]
+	return nil
 }
 
 func main() {
 	if err := parseFlags(); err != nil {
-		log.Fatalf("failed to parse flags: %v", err)
+		log.Panic("cli: failed to parse flags: %v", err)
 	}
 
-	atxId := make([]byte, 32) // TODO(mafa): get this as a flag like the id.
-	commitment := GetCommitmentBytes(id, atxId)
+	if printProviders {
+		spew.Dump(gpu.Providers())
+		return
+	}
 
-	opts.ComputeProviderID = gpu.CPUProviderID() // TODO(mafa): select best provider.
+	if printConfig {
+		spew.Dump(cfg)
+		spew.Dump(opts)
+		return
+	}
 
+	commitment := GetCommitmentBytes(id, commitmentAtxId)
+	log.Info("cli: commitment: %x", commitment)
 	init, err := initialization.NewInitializer(
 		initialization.WithConfig(cfg),
 		initialization.WithInitOpts(opts),
 		initialization.WithCommitment(commitment),
-		//initialization.WithLogger() // TODO: add wrapper for zap logger.
+		initialization.WithLogger(log),
 	)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err.Error())
 	}
 
 	if reset {
 		if err := init.Reset(); err != nil {
-			log.Fatalf("reset error: %v", err)
+			log.Panic("reset error: %v", err)
 		}
 	}
 
@@ -98,29 +118,38 @@ func main() {
 
 	if err := init.Initialize(ctx); err != nil {
 		if err == shared.ErrInitCompleted {
-			log.Println(err)
+			log.Panic(err.Error())
 			return
 		}
 		if err == context.Canceled {
-			log.Println("initialization interrupted")
+			log.Info("cli: initialization interrupted")
 			return
 		}
-		log.Fatalf("initialization error: %v", err)
+		log.Error("cli: initialization error: %v", err)
+		return
 	}
 
-	// Initialization is done. Try to generate a valid proof as a sanity check.
+	log.Info("cli: initialization completed, generating a proof as a sanity test")
 	prover, err := proving.NewProver(cfg, opts.DataDir, commitment)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err.Error())
 	}
-	// prover.SetLogger() // TODO: add wrapper for zap logger.
+	prover.SetLogger(log)
 	proof, proofMetadata, err := prover.GenerateProof(shared.ZeroChallenge)
 	if err != nil {
-		log.Fatalf("proof generation error: %v", err)
+		log.Panic("proof generation error: %v", err)
 	}
 	if err := verifying.Verify(proof, proofMetadata); err != nil {
-		log.Fatalf("failed to verify test proof: %v", err)
+		log.Panic("failed to verify test proof: %v", err)
 	}
+
+	log.Info("cli: proof is valid")
+}
+
+// TODO(mafa): add "WithId" and "WithCommitmentATX" options to the initializer and do this within the initializer.
+func GetCommitmentBytes(id []byte, commitmentAtxId []byte) []byte {
+	h := sha256.Sum256(append(id, commitmentAtxId...))
+	return h[:]
 }
 
 func saveKey(key []byte) error {
@@ -133,3 +162,11 @@ func saveKey(key []byte) error {
 	}
 	return nil
 }
+
+type logger struct{}
+
+func (l logger) Info(msg string, args ...interface{})    { baseLog.Printf("\tINFO\t"+msg, args...) }
+func (l logger) Debug(msg string, args ...interface{})   { baseLog.Printf("\tDEBUG\t"+msg, args...) }
+func (l logger) Warning(msg string, args ...interface{}) { baseLog.Printf("\tWARN\t"+msg, args...) }
+func (l logger) Error(msg string, args ...interface{})   { baseLog.Printf("\tERROR\t"+msg, args...) }
+func (l logger) Panic(msg string, args ...interface{})   { baseLog.Fatalf("\tPANIC\t"+msg, args...) }
