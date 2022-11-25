@@ -7,7 +7,6 @@ import (
 
 	"github.com/minio/sha256-simd"
 
-	"github.com/spacemeshos/go-spacemesh/hash"
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/gpu"
 	"github.com/spacemeshos/post/shared"
@@ -174,11 +173,9 @@ func WorkOracle(opts ...OptionFunc) (WorkOracleResult, error) {
 		return WorkOracleResult{}, err
 	}
 
-	commitment := hash.Sum(append(options.nodeId, options.atxId...))
-
 	res, err := gpu.ScryptPositions(
 		gpu.WithComputeProviderID(options.computeProviderID),
-		gpu.WithCommitment(commitment[:]),
+		gpu.WithCommitment(getCommitment(options.nodeId, options.atxId)),
 		gpu.WithSalt(options.salt),
 		gpu.WithStartAndEndPosition(options.startPosition, options.endPosition),
 		gpu.WithBitsPerLabel(options.bitsPerLabel),
@@ -203,4 +200,11 @@ func FastOracle(ch Challenge, nonce uint32, label []byte) [32]byte {
 	copy(input[36:], label[:])
 
 	return sha256.Sum256(input)
+}
+
+func getCommitment(nodeId, atxId []byte) []byte {
+	hh := sha256.New()
+	hh.Write(nodeId)
+	hh.Write(atxId)
+	return hh.Sum(nil)
 }
