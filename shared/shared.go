@@ -42,7 +42,8 @@ func ProvingDifficulty(numLabels uint64, k1 uint64) uint64 {
 //
 //	difficulty = 2^256 / numLabels
 //
-// With this difficulty we expect one label in numLabels to be below the threshold.
+// TODO(mafa): this difficulty calculation is unfit. There is only a ~ 63% chance to find a nonce
+// in the first `numLabels`	labels and only a ~ 90% chance to find a nonce in the first `2*numLabels` labels.
 func PowDifficulty(numLabels uint64) []byte {
 	difficulty := make([]byte, 33)
 	difficulty[0] = 0x01
