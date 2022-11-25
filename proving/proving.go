@@ -38,22 +38,25 @@ var (
 )
 
 type Prover struct {
-	cfg        Config
-	datadir    string
-	commitment []byte
+	nodeId []byte
+	atxId  []byte
+
+	cfg     Config
+	datadir string
 
 	diskState *DiskState
 
 	logger Logger
 }
 
-func NewProver(cfg Config, datadir string, commitment []byte) (*Prover, error) {
+func NewProver(cfg Config, datadir string, nodeId, atxId []byte) (*Prover, error) {
 	return &Prover{
-		cfg:        cfg,
-		datadir:    datadir,
-		commitment: commitment,
-		diskState:  initialization.NewDiskState(datadir, uint(cfg.BitsPerLabel)),
-		logger:     shared.DisabledLogger{},
+		cfg:       cfg,
+		datadir:   datadir,
+		nodeId:    nodeId,
+		atxId:     atxId,
+		diskState: initialization.NewDiskState(datadir, uint(cfg.BitsPerLabel)),
+		logger:    shared.DisabledLogger{},
 	}, nil
 }
 
@@ -92,7 +95,8 @@ func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, err
 				Indices: solutionNonceResult.indices,
 			}
 			proofMetadata := &ProofMetadata{
-				Commitment:    p.commitment,
+				NodeId:        p.nodeId,
+				AtxId:         p.atxId,
 				Challenge:     challenge,
 				BitsPerLabel:  p.cfg.BitsPerLabel,
 				LabelsPerUnit: p.cfg.LabelsPerUnit,
@@ -150,11 +154,20 @@ func (p *Prover) loadMetadata() (*initialization.Metadata, error) {
 }
 
 func (p *Prover) verifyMetadata(m *Metadata) error {
-	if !bytes.Equal(p.commitment, m.Commitment) {
+	if !bytes.Equal(p.nodeId, m.NodeId) {
 		return ConfigMismatchError{
-			Param:    "Commitment",
-			Expected: fmt.Sprintf("%x", p.commitment),
-			Found:    fmt.Sprintf("%x", m.Commitment),
+			Param:    "NodeId",
+			Expected: fmt.Sprintf("%x", p.nodeId),
+			Found:    fmt.Sprintf("%x", m.NodeId),
+			DataDir:  p.datadir,
+		}
+	}
+
+	if !bytes.Equal(p.atxId, m.AtxId) {
+		return ConfigMismatchError{
+			Param:    "AtxId",
+			Expected: fmt.Sprintf("%x", p.atxId),
+			Found:    fmt.Sprintf("%x", m.AtxId),
 			DataDir:  p.datadir,
 		}
 	}

@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	commitment = make([]byte, 32)
-	ch         = make(proving.Challenge, 32)
+	nodeId = make([]byte, 32)
+	atxId  = make([]byte, 32)
+	ch     = make(proving.Challenge, 32)
 
 	NewInitializer = initialization.NewInitializer
 	NewProver      = proving.NewProver
@@ -43,14 +44,15 @@ func TestVerify(t *testing.T) {
 
 	cfg, opts := getTestConfig(t)
 	init, err := NewInitializer(
-		initialization.WithCommitment(commitment),
+		initialization.WithNodeId(nodeId),
+		initialization.WithAtxId(atxId),
 		initialization.WithConfig(cfg),
 		initialization.WithInitOpts(opts),
 	)
 	req.NoError(err)
 	req.NoError(init.Initialize(context.Background()))
 
-	p, err := NewProver(cfg, opts.DataDir, commitment)
+	p, err := NewProver(cfg, opts.DataDir, nodeId, atxId)
 	req.NoError(err)
 	proof, proofMetadata, err := p.GenerateProof(ch)
 	req.NoError(err)
@@ -75,7 +77,6 @@ func TestLabelsCorrectness(t *testing.T) {
 	numFiles := 2
 	numFileBatches := 2
 	batchSize := 256
-	commitment := make([]byte, 32)
 	datadir := t.TempDir()
 
 	for bitsPerLabel := uint32(config.MinBitsPerLabel); bitsPerLabel <= config.MaxBitsPerLabel; bitsPerLabel++ {
@@ -92,7 +93,8 @@ func TestLabelsCorrectness(t *testing.T) {
 
 				res, err := oracle.WorkOracle(
 					oracle.WithComputeProviderID(CPUProviderID()),
-					oracle.WithCommitment(commitment),
+					oracle.WithNodeId(nodeId),
+					oracle.WithAtxId(atxId),
 					oracle.WithStartAndEndPosition(startPosition, endPosition),
 					oracle.WithBitsPerLabel(bitsPerLabel),
 				)
@@ -121,7 +123,8 @@ func TestLabelsCorrectness(t *testing.T) {
 
 			// Verify correctness.
 			labelCompute, err := oracle.WorkOracle(
-				oracle.WithCommitment(commitment),
+				oracle.WithNodeId(nodeId),
+				oracle.WithAtxId(atxId),
 				oracle.WithPosition(position),
 				oracle.WithBitsPerLabel(bitsPerLabel),
 			)

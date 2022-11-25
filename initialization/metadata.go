@@ -13,7 +13,9 @@ const metadataFileName = "postdata_metadata.json"
 
 // metadata is the data associated with the PoST init procedure, persisted in the datadir next to the init files.
 type Metadata struct {
-	Commitment    []byte
+	NodeId []byte
+	AtxId  []byte
+
 	BitsPerLabel  uint8
 	LabelsPerUnit uint64
 	NumUnits      uint32

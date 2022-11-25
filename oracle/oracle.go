@@ -2,6 +2,7 @@ package oracle
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/minio/sha256-simd"
@@ -33,15 +34,15 @@ type option struct {
 
 func (o *option) validate() error {
 	if o.nodeId == nil {
-		return fmt.Errorf("`nodeId` is required")
+		return errors.New("`nodeId` is required")
 	}
 
 	if o.atxId == nil {
-		return fmt.Errorf("`atxId` is required")
+		return errors.New("`atxId` is required")
 	}
 
 	if o.bitsPerLabel == 0 {
-		return fmt.Errorf("`bitsPerLabel` is required")
+		return errors.New("`bitsPerLabel` is required")
 	}
 
 	return nil

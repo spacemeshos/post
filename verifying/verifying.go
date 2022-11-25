@@ -20,9 +20,13 @@ var (
 	UInt64LE   = shared.UInt64LE
 )
 
-func VerifyPoW(nonce, numUnits, bitsPerLabel uint64, commitment []byte) error {
-	if len(commitment) != 32 {
-		return fmt.Errorf("invalid `commitment` length; expected: 32, given: %v", len(commitment))
+func VerifyPoW(nonce, numUnits, bitsPerLabel uint64, nodeId, atxId []byte) error {
+	if len(nodeId) != 32 {
+		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(nodeId))
+	}
+
+	if len(atxId) != 32 {
+		return fmt.Errorf("invalid `atxId` length; expected: 32, given: %v", len(atxId))
 	}
 
 	numLabels := numUnits * bitsPerLabel
@@ -30,7 +34,8 @@ func VerifyPoW(nonce, numUnits, bitsPerLabel uint64, commitment []byte) error {
 	threshold := new(big.Int).SetBytes(difficulty)
 
 	res, err := WorkOracle(
-		oracle.WithCommitment(commitment),
+		oracle.WithNodeId(nodeId),
+		oracle.WithAtxId(atxId),
 		oracle.WithPosition(nonce),
 		oracle.WithBitsPerLabel(uint32(bitsPerLabel)*32),
 	)
@@ -49,8 +54,12 @@ func VerifyPoW(nonce, numUnits, bitsPerLabel uint64, commitment []byte) error {
 // Verify ensures the validity of a proof in respect to its metadata.
 // It returns nil if the proof is valid or an error describing the failure, otherwise.
 func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
-	if len(m.Commitment) != 32 {
-		return fmt.Errorf("invalid `commitment` length; expected: 32, given: %v", len(m.Commitment))
+	if len(m.NodeId) != 32 {
+		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(m.NodeId))
+	}
+
+	if len(m.AtxId) != 32 {
+		return fmt.Errorf("invalid `atxId` length; expected: 32, given: %v", len(m.AtxId))
 	}
 
 	numLabels := uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
@@ -76,7 +85,8 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 		indicesSet[index] = true
 
 		res, err := WorkOracle(
-			oracle.WithCommitment(m.Commitment),
+			oracle.WithNodeId(m.NodeId),
+			oracle.WithAtxId(m.AtxId),
 			oracle.WithPosition(index),
 			oracle.WithBitsPerLabel(uint32(m.BitsPerLabel)),
 		)

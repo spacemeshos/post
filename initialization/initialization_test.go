@@ -19,6 +19,11 @@ import (
 	"github.com/spacemeshos/post/verifying"
 )
 
+var (
+	nodeId = make([]byte, 32)
+	atxId  = make([]byte, 32)
+)
+
 type testLogger struct {
 	shared.Logger
 
@@ -41,7 +46,8 @@ func TestInitialize(t *testing.T) {
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -61,7 +67,7 @@ func TestInitialize(t *testing.T) {
 	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
 
 	r.NotNil(init.nonce)
-	r.NoError(verifying.VerifyPoW(*init.nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), init.commitment))
+	r.NoError(verifying.VerifyPoW(*init.nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
 }
 
 func TestInitialize_PowOutOfRange(t *testing.T) {
@@ -76,12 +82,13 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	opts.NumFiles = 2
 	opts.ComputeProviderID = int(CPUProviderID())
 
-	// commitment where no label in the first uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit satisfies the PoW requirement.
-	commitment, err := hex.DecodeString("c6fb0a2798491faf96247cd4f8005077a48089a06697c6835f7deb69756e9431")
+	// nodeId where no label in the first uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit satisfies the PoW requirement.
+	nodeId, err := hex.DecodeString("52fdfc072182654f163f5f0f9a621d729566c74d10037c4d7bbb0407d1e2c649")
 	r.NoError(err)
 
 	init, err := NewInitializer(
-		WithCommitment(commitment),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -89,13 +96,12 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	r.NoError(err)
 
 	r.NoError(init.Initialize(context.Background()))
-
 	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
 
 	// check that the found nonce is outside of the range for calculating labels
 	r.NotNil(init.nonce)
 	r.Less(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *init.nonce)
-	r.NoError(verifying.VerifyPoW(*init.nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), init.commitment))
+	r.NoError(verifying.VerifyPoW(*init.nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
 }
 
 func TestReset_WhileInitializing(t *testing.T) {
@@ -111,7 +117,8 @@ func TestReset_WhileInitializing(t *testing.T) {
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -145,7 +152,8 @@ func TestInitialize_Repeated(t *testing.T) {
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -165,7 +173,8 @@ func TestInitialize_Repeated(t *testing.T) {
 
 	// Initialize again using the same config & opts.
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -197,7 +206,8 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -218,7 +228,8 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	// Increase `opts.NumUnits`.
 	opts.NumUnits++
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -250,7 +261,8 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -271,7 +283,8 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	// Decrease `opts.NumUnits`.
 	opts.NumUnits--
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -302,7 +315,8 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -325,7 +339,8 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	// Increase `opts.NumUnits` while `opts.NumFiles` > 1.
 	opts.NumUnits = prevNumUnits + 1
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -338,7 +353,8 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	// Decrease `opts.NumUnits` while `opts.NumFiles` > 1.
 	opts.NumUnits = prevNumUnits - 1
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -361,7 +377,8 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -379,7 +396,8 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			opts.DataDir = t.TempDir()
 
 			init, err := NewInitializer(
-				WithCommitment(make([]byte, 32)),
+				WithNodeId(nodeId),
+				WithAtxId(atxId),
 				WithConfig(cfg),
 				WithInitOpts(opts),
 				WithLogger(testLogger{t: t}),
@@ -408,7 +426,8 @@ func TestNumLabelsWritten(t *testing.T) {
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -434,7 +453,8 @@ func TestNumLabelsWritten(t *testing.T) {
 
 	// Initialize repeated, using a new instance.
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -462,7 +482,8 @@ func TestValidateMetadata(t *testing.T) {
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -478,11 +499,12 @@ func TestValidateMetadata(t *testing.T) {
 	r.NoError(err)
 	r.NoError(init.verifyMetadata(m))
 
-	// Attempt to initialize with different `Commitment`.
-	newCommitment := make([]byte, 32)
-	newCommitment[0] = newCommitment[0] + 1
+	// Attempt to initialize with different `NodeId`.
+	newNodeId := make([]byte, 32)
+	newNodeId[0] = newNodeId[0] + 1
 	init, err = NewInitializer(
-		WithCommitment(newCommitment),
+		WithNodeId(newNodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -490,13 +512,28 @@ func TestValidateMetadata(t *testing.T) {
 	r.NoError(err)
 	var errConfigMismatch ConfigMismatchError
 	r.ErrorAs(init.Initialize(context.Background()), &errConfigMismatch)
-	r.Equal("Commitment", errConfigMismatch.Param)
+	r.Equal("NodeId", errConfigMismatch.Param)
+
+	// Attempt to initialize with different `AtxId`.
+	newAtxId := make([]byte, 32)
+	newAtxId[0] = newAtxId[0] + 1
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithAtxId(newAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+	r.ErrorAs(init.Initialize(context.Background()), &errConfigMismatch)
+	r.Equal("AtxId", errConfigMismatch.Param)
 
 	// Attempt to initialize with different `cfg.BitsPerLabel`.
 	newCfg := cfg
 	newCfg.BitsPerLabel = cfg.BitsPerLabel + 1
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(newCfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -509,7 +546,8 @@ func TestValidateMetadata(t *testing.T) {
 	newOpts := opts
 	newOpts.NumFiles = 4
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(newOpts),
 		WithLogger(testLogger{t: t}),
@@ -522,7 +560,8 @@ func TestValidateMetadata(t *testing.T) {
 	newOpts = opts
 	newOpts.NumUnits++
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(newOpts),
 		WithLogger(testLogger{t: t}),
@@ -545,7 +584,8 @@ func TestStop(t *testing.T) {
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithAtxId(atxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),

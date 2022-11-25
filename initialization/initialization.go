@@ -52,57 +52,80 @@ func CPUProviderID() uint {
 	return gpu.CPUProviderID()
 }
 
-type initializeOption struct {
-	commitment []byte
-	cfg        *Config
-	initOpts   *config.InitOpts
-	logger     Logger
+type option struct {
+	nodeId []byte
+	atxId  []byte
+
+	cfg      *Config
+	initOpts *config.InitOpts
+	logger   Logger
 }
 
-func (opts *initializeOption) verify() error {
-	if opts.cfg == nil {
+func (o *option) verify() error {
+	if o.nodeId == nil {
+		return errors.New("`nodeId` is required")
+	}
+
+	if o.atxId == nil {
+		return errors.New("`atxId` is required")
+	}
+
+	if o.cfg == nil {
 		return errors.New("no config provided")
 	}
 
-	if opts.initOpts == nil {
+	if o.initOpts == nil {
 		return errors.New("no init options provided")
 	}
 
-	return config.Validate(*opts.cfg, *opts.initOpts)
+	return config.Validate(*o.cfg, *o.initOpts)
 }
 
-type initializeOptionFunc func(*initializeOption) error
+type OptionFunc func(*option) error
 
-// WithCommitment sets the commitment for the initializer.
-func WithCommitment(commitment []byte) initializeOptionFunc {
-	return func(opts *initializeOption) error {
-		if len(commitment) != 32 {
-			return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(commitment))
+// WithNodeId sets the ID of the Node.
+func WithNodeId(nodeId []byte) OptionFunc {
+	return func(opts *option) error {
+		if len(nodeId) != 32 {
+			return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(nodeId))
 		}
-		opts.commitment = commitment
+
+		opts.nodeId = nodeId
+		return nil
+	}
+}
+
+// WithAtxId sets the ID of the CommitmentATX.
+func WithAtxId(atxId []byte) OptionFunc {
+	return func(opts *option) error {
+		if len(atxId) != 32 {
+			return fmt.Errorf("invalid `commitmentAtx` length; expected: 32, given: %v", len(atxId))
+		}
+
+		opts.atxId = atxId
 		return nil
 	}
 }
 
 // WithInitOpts sets the init options for the initializer.
-func WithInitOpts(initOpts config.InitOpts) initializeOptionFunc {
-	return func(opts *initializeOption) error {
+func WithInitOpts(initOpts config.InitOpts) OptionFunc {
+	return func(opts *option) error {
 		opts.initOpts = &initOpts
 		return nil
 	}
 }
 
 // WithConfig sets the config for the initializer.
-func WithConfig(cfg Config) initializeOptionFunc {
-	return func(opts *initializeOption) error {
+func WithConfig(cfg Config) OptionFunc {
+	return func(opts *option) error {
 		opts.cfg = &cfg
 		return nil
 	}
 }
 
 // WithLogger sets the logger for the initializer.
-func WithLogger(logger Logger) initializeOptionFunc {
-	return func(opts *initializeOption) error {
+func WithLogger(logger Logger) OptionFunc {
+	return func(opts *option) error {
 		if logger == nil {
 			return errors.New("logger is nil")
 		}
@@ -111,13 +134,16 @@ func WithLogger(logger Logger) initializeOptionFunc {
 	}
 }
 
+// Initializer is responsible for initializing a new PoST commitment.
 type Initializer struct {
-	numLabelsWritten atomic.Uint64
+	nodeId []byte
+	atxId  []byte
 
-	cfg        Config
-	opts       InitOpts
-	commitment []byte
-	nonce      *uint64
+	cfg  Config
+	opts InitOpts
+
+	nonce            *uint64
+	numLabelsWritten atomic.Uint64
 
 	diskState *DiskState
 	mtx       sync.RWMutex
@@ -125,8 +151,8 @@ type Initializer struct {
 	logger Logger
 }
 
-func NewInitializer(opts ...initializeOptionFunc) (*Initializer, error) {
-	options := &initializeOption{
+func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
+	options := &option{
 		logger: shared.DisabledLogger{},
 	}
 
@@ -141,11 +167,12 @@ func NewInitializer(opts ...initializeOptionFunc) (*Initializer, error) {
 	}
 
 	return &Initializer{
-		cfg:        *options.cfg,
-		opts:       *options.initOpts,
-		commitment: options.commitment,
-		diskState:  NewDiskState(options.initOpts.DataDir, uint(options.cfg.BitsPerLabel)),
-		logger:     options.logger,
+		cfg:       *options.cfg,
+		opts:      *options.initOpts,
+		nodeId:    options.nodeId,
+		atxId:     options.atxId,
+		diskState: NewDiskState(options.initOpts.DataDir, uint(options.cfg.BitsPerLabel)),
+		logger:    options.logger,
 	}, nil
 }
 
@@ -190,7 +217,8 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		// continue searching for a nonce
 		res, err := oracle.WorkOracle(
 			oracle.WithComputeProviderID(uint(init.opts.ComputeProviderID)),
-			oracle.WithCommitment(init.commitment),
+			oracle.WithNodeId(init.nodeId),
+			oracle.WithAtxId(init.atxId),
 			oracle.WithStartAndEndPosition(numLabels, 8*numLabels),
 			oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
 			oracle.WithComputePow(difficulty),
@@ -334,7 +362,8 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, numLabels,
 
 		res, err := oracle.WorkOracle(
 			oracle.WithComputeProviderID(uint(init.opts.ComputeProviderID)),
-			oracle.WithCommitment(init.commitment),
+			oracle.WithNodeId(init.nodeId),
+			oracle.WithAtxId(init.atxId),
 			oracle.WithStartAndEndPosition(startPosition, endPosition),
 			oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
 			oracle.WithComputePow(difficulty),
@@ -371,11 +400,20 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, numLabels,
 }
 
 func (init *Initializer) verifyMetadata(m *Metadata) error {
-	if !bytes.Equal(init.commitment, m.Commitment) {
+	if !bytes.Equal(init.nodeId, m.NodeId) {
 		return ConfigMismatchError{
-			Param:    "Commitment",
-			Expected: fmt.Sprintf("%x", init.commitment),
-			Found:    fmt.Sprintf("%x", m.Commitment),
+			Param:    "NodeId",
+			Expected: fmt.Sprintf("%x", init.nodeId),
+			Found:    fmt.Sprintf("%x", m.NodeId),
+			DataDir:  init.opts.DataDir,
+		}
+	}
+
+	if !bytes.Equal(init.atxId, m.AtxId) {
+		return ConfigMismatchError{
+			Param:    "AtxId",
+			Expected: fmt.Sprintf("%x", init.atxId),
+			Found:    fmt.Sprintf("%x", m.AtxId),
 			DataDir:  init.opts.DataDir,
 		}
 	}
@@ -422,7 +460,8 @@ func (init *Initializer) verifyMetadata(m *Metadata) error {
 
 func (init *Initializer) saveMetadata() error {
 	v := Metadata{
-		Commitment:    init.commitment,
+		NodeId:        init.nodeId,
+		AtxId:         init.atxId,
 		BitsPerLabel:  init.cfg.BitsPerLabel,
 		LabelsPerUnit: init.cfg.LabelsPerUnit,
 		NumUnits:      init.opts.NumUnits,

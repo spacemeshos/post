@@ -47,7 +47,14 @@ func (t *Proof) DecodeScale(dec *scale.Decoder) (total int, err error) {
 
 func (t *ProofMetadata) EncodeScale(enc *scale.Encoder) (total int, err error) {
 	{
-		n, err := scale.EncodeByteSlice(enc, t.Commitment)
+		n, err := scale.EncodeByteSlice(enc, t.NodeId)
+		if err != nil {
+			return total, err
+		}
+		total += n
+	}
+	{
+		n, err := scale.EncodeByteSlice(enc, t.AtxId)
 		if err != nil {
 			return total, err
 		}
@@ -105,7 +112,15 @@ func (t *ProofMetadata) DecodeScale(dec *scale.Decoder) (total int, err error) {
 			return total, err
 		}
 		total += n
-		t.Commitment = field
+		t.NodeId = field
+	}
+	{
+		field, n, err := scale.DecodeByteSlice(dec)
+		if err != nil {
+			return total, err
+		}
+		total += n
+		t.AtxId = field
 	}
 	{
 		field, n, err := scale.DecodeByteSlice(dec)
