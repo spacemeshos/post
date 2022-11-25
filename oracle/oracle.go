@@ -1,9 +1,10 @@
 package oracle
 
 import (
-	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+
+	"github.com/minio/sha256-simd"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/gpu"

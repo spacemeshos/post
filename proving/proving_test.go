@@ -2,12 +2,12 @@ package proving
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"math"
 	"testing"
 
+	"github.com/minio/sha256-simd"
 	"github.com/stretchr/testify/require"
 
 	"github.com/spacemeshos/post/config"
