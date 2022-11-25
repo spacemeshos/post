@@ -66,8 +66,10 @@ func TestInitialize(t *testing.T) {
 	}
 	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
 
-	r.NotNil(init.nonce)
-	r.NoError(verifying.VerifyPoW(*init.nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
+	m, err := LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.NotNil(m.Nonce)
+	r.NoError(verifying.VerifyPoW(*m.Nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
 }
 
 func TestInitialize_PowOutOfRange(t *testing.T) {
@@ -98,10 +100,13 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	r.NoError(init.Initialize(context.Background()))
 	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
 
+	m, err := LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.NotNil(m.Nonce)
+	r.NoError(verifying.VerifyPoW(*m.Nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
+
 	// check that the found nonce is outside of the range for calculating labels
-	r.NotNil(init.nonce)
-	r.Less(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *init.nonce)
-	r.NoError(verifying.VerifyPoW(*init.nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
+	r.Less(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.Nonce)
 }
 
 func TestReset_WhileInitializing(t *testing.T) {
@@ -290,6 +295,7 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 		WithLogger(testLogger{t: t}),
 	)
 	r.NoError(err)
+
 	{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -389,6 +395,12 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	oneFileData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
 	r.NoError(err)
 
+	m, err := LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.NotNil(m.Nonce)
+	r.NoError(verifying.VerifyPoW(*m.Nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
+	oneFileNonce := *m.Nonce
+
 	for numFiles := uint32(2); numFiles <= 16; numFiles <<= 1 {
 		t.Run(fmt.Sprintf("NumFiles=%d", numFiles), func(t *testing.T) {
 			opts := opts
@@ -409,6 +421,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			r.NoError(err)
 
 			r.Equal(multipleFilesData, oneFileData)
+			r.Equal(oneFileNonce, *init.nonce)
 		})
 	}
 }

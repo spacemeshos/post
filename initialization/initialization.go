@@ -194,6 +194,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		if err := init.verifyMetadata(m); err != nil {
 			return err
 		}
+		init.nonce = m.Nonce
 	}
 
 	if err := init.saveMetadata(); err != nil {
@@ -232,6 +233,8 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		}
 		init.nonce = new(uint64)
 		*init.nonce = *res.Nonce
+
+		init.saveMetadata()
 	}
 
 	return nil
@@ -376,6 +379,8 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, numLabels,
 			init.logger.Debug("initialization: file #%v, found nonce: %d", fileIndex, *res.Nonce)
 			init.nonce = new(uint64)
 			*init.nonce = *res.Nonce
+
+			init.saveMetadata()
 		}
 
 		// Write labels batch to disk.
