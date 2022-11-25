@@ -20,7 +20,9 @@ var (
 	UInt64LE   = shared.UInt64LE
 )
 
-func VerifyPoW(nonce, numUnits, bitsPerLabel uint64, nodeId, atxId []byte) error {
+// VerifyPow ensures the validity of a nonce for a given node.
+// AtxId is the id of the ATX that was selected by the node for its commitment.
+func VerifyPow(nonce, numUnits, bitsPerLabel uint64, nodeId, atxId []byte) error {
 	if len(nodeId) != 32 {
 		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(nodeId))
 	}

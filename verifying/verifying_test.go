@@ -40,7 +40,7 @@ func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
 }
 
 func TestVerify(t *testing.T) {
-	req := require.New(t)
+	r := require.New(t)
 
 	cfg, opts := getTestConfig(t)
 	init, err := NewInitializer(
@@ -49,15 +49,34 @@ func TestVerify(t *testing.T) {
 		initialization.WithConfig(cfg),
 		initialization.WithInitOpts(opts),
 	)
-	req.NoError(err)
-	req.NoError(init.Initialize(context.Background()))
+	r.NoError(err)
+	r.NoError(init.Initialize(context.Background()))
 
 	p, err := NewProver(cfg, opts.DataDir, nodeId, atxId)
-	req.NoError(err)
+	r.NoError(err)
 	proof, proofMetadata, err := p.GenerateProof(ch)
-	req.NoError(err)
+	r.NoError(err)
 
-	req.NoError(Verify(proof, proofMetadata))
+	r.NoError(Verify(proof, proofMetadata))
+}
+
+func TestVerifyPow(t *testing.T) {
+	r := require.New(t)
+
+	cfg, opts := getTestConfig(t)
+	init, err := NewInitializer(
+		initialization.WithNodeId(nodeId),
+		initialization.WithAtxId(atxId),
+		initialization.WithConfig(cfg),
+		initialization.WithInitOpts(opts),
+	)
+	r.NoError(err)
+	r.NoError(init.Initialize(context.Background()))
+
+	m, err := initialization.LoadMetadata(opts.DataDir)
+	r.NoError(err)
+
+	r.NoError(VerifyPow(*m.Nonce, uint64(opts.NumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
 }
 
 // TestLabelsCorrectness tests, for variation of label sizes, the correctness of

@@ -69,7 +69,7 @@ func TestInitialize(t *testing.T) {
 	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
 	r.NotNil(m.Nonce)
-	r.NoError(verifying.VerifyPoW(*m.Nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
+	r.NoError(verifying.VerifyPow(*m.Nonce, uint64(opts.NumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
 }
 
 func TestInitialize_PowOutOfRange(t *testing.T) {
@@ -103,7 +103,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
 	r.NotNil(m.Nonce)
-	r.NoError(verifying.VerifyPoW(*m.Nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
+	r.NoError(verifying.VerifyPow(*m.Nonce, uint64(opts.NumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
 
 	// check that the found nonce is outside of the range for calculating labels
 	r.Less(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.Nonce)
@@ -398,7 +398,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
 	r.NotNil(m.Nonce)
-	r.NoError(verifying.VerifyPoW(*m.Nonce, uint64(cfg.MinNumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
+	r.NoError(verifying.VerifyPow(*m.Nonce, uint64(opts.NumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
 	oneFileNonce := *m.Nonce
 
 	for numFiles := uint32(2); numFiles <= 16; numFiles <<= 1 {
