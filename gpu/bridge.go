@@ -69,34 +69,34 @@ func (s StopResult) String() string {
 	}
 }
 
-func cScryptPositions(options *scryptPositionOption) ([]byte, uint64, int, int) {
+func cScryptPositions(opt *option) ([]byte, uint64, int, int) {
 	mtx.Lock()
 	defer mtx.Unlock()
 
-	outputSize := shared.DataSize(uint64(options.endPosition-options.startPosition+1), uint(options.bitsPerLabel))
-	cProviderId := C.uint(options.computeProviderID)
+	outputSize := shared.DataSize(uint64(opt.endPosition-opt.startPosition+1), uint(opt.bitsPerLabel))
+	cProviderId := C.uint(opt.computeProviderID)
 
-	cCommitment := C.CBytes(options.commitment)
+	cCommitment := C.CBytes(opt.commitment)
 	defer C.free(cCommitment)
 
-	cStartPosition := C.uint64_t(options.startPosition)
-	cEndPosition := C.uint64_t(options.endPosition)
-	cHashLenBits := C.uint32_t(options.bitsPerLabel)
+	cStartPosition := C.uint64_t(opt.startPosition)
+	cEndPosition := C.uint64_t(opt.endPosition)
+	cHashLenBits := C.uint32_t(opt.bitsPerLabel)
 
-	cSalt := C.CBytes(options.salt)
+	cSalt := C.CBytes(opt.salt)
 	defer C.free(cSalt)
 
-	cOptions := C.uint(options.optionBits())
+	cOptions := C.uint(opt.optionBits())
 	cOutputSize := C.size_t(outputSize)
 
 	cOut := (C.calloc(cOutputSize, 1))
 	defer C.free(cOut)
 
-	cN := C.uint(options.n)
-	cR := C.uint(options.r)
-	cP := C.uint(options.p)
+	cN := C.uint(opt.n)
+	cR := C.uint(opt.r)
+	cP := C.uint(opt.p)
 
-	cD := C.CBytes(options.d)
+	cD := C.CBytes(opt.d)
 	defer C.free(cD)
 
 	var cIdxSolution C.uint64_t
@@ -122,7 +122,7 @@ func cScryptPositions(options *scryptPositionOption) ([]byte, uint64, int, int) 
 	)
 
 	// Output size could be smaller than anticipated if `C.stop` was called while `C.scryptPositions` was blocking.
-	outputSize = shared.DataSize(uint64(cHashesComputed), uint(options.bitsPerLabel))
+	outputSize = shared.DataSize(uint64(cHashesComputed), uint(opt.bitsPerLabel))
 	output := C.GoBytes(cOut, C.int(outputSize))
 
 	return output, uint64(cIdxSolution), int(cHashesPerSec), int(retVal)

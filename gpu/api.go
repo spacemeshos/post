@@ -69,7 +69,7 @@ type ScryptPositionsResult struct {
 	Stopped      bool    // Whether the computation was stopped.
 }
 
-type scryptPositionOption struct {
+type option struct {
 	computeProviderID uint
 
 	commitment []byte
@@ -87,7 +87,7 @@ type scryptPositionOption struct {
 	d       []byte
 }
 
-func (o *scryptPositionOption) optionBits() uint32 {
+func (o *option) optionBits() uint32 {
 	var bits uint32
 	if o.computeLeafs {
 		bits |= (1 << 0)
@@ -98,19 +98,19 @@ func (o *scryptPositionOption) optionBits() uint32 {
 	return bits
 }
 
-type scryptPositionOptionFunc func(*scryptPositionOption) error
+type OptionFunc func(*option) error
 
 // WithComputeProviderID instructs scrypt to use the specified compute provider.
-func WithComputeProviderID(id uint) scryptPositionOptionFunc {
-	return func(opts *scryptPositionOption) error {
+func WithComputeProviderID(id uint) OptionFunc {
+	return func(opts *option) error {
 		opts.computeProviderID = id
 		return nil
 	}
 }
 
 // WithCommitment instructs scrypt to use the specified commitment (seed) to calculate the output.
-func WithCommitment(commitment []byte) scryptPositionOptionFunc {
-	return func(opts *scryptPositionOption) error {
+func WithCommitment(commitment []byte) OptionFunc {
+	return func(opts *option) error {
 		if len(commitment) != 32 {
 			return fmt.Errorf("invalid `commitment` length; expected: 32, given: %v", len(commitment))
 		}
@@ -121,8 +121,8 @@ func WithCommitment(commitment []byte) scryptPositionOptionFunc {
 }
 
 // WithSalt instructs scrypt to use the specified salt to calculate the output.
-func WithSalt(salt []byte) scryptPositionOptionFunc {
-	return func(opts *scryptPositionOption) error {
+func WithSalt(salt []byte) OptionFunc {
+	return func(opts *option) error {
 		if len(salt) != 32 {
 			return fmt.Errorf("invalid `salt` length; expected: 32, given: %v", len(salt))
 		}
@@ -133,8 +133,8 @@ func WithSalt(salt []byte) scryptPositionOptionFunc {
 }
 
 // WithStartAndEndPosition instructs scrypt to compute the scrypt output for the specified range of positions.
-func WithStartAndEndPosition(start, end uint64) scryptPositionOptionFunc {
-	return func(opts *scryptPositionOption) error {
+func WithStartAndEndPosition(start, end uint64) OptionFunc {
+	return func(opts *option) error {
 		opts.startPosition = start
 		opts.endPosition = end
 		return nil
@@ -142,8 +142,8 @@ func WithStartAndEndPosition(start, end uint64) scryptPositionOptionFunc {
 }
 
 // WithBitsPerLabel instructs scrypt to use the specified number of bits per label.
-func WithBitsPerLabel(bitsPerLabel uint32) scryptPositionOptionFunc {
-	return func(opts *scryptPositionOption) error {
+func WithBitsPerLabel(bitsPerLabel uint32) OptionFunc {
+	return func(opts *option) error {
 		if bitsPerLabel < config.MinBitsPerLabel || bitsPerLabel > config.MaxBitsPerLabel {
 			return fmt.Errorf("invalid `bitsPerLabel`; expected: %d-%d, given: %v", config.MinBitsPerLabel, config.MaxBitsPerLabel, bitsPerLabel)
 		}
@@ -154,8 +154,8 @@ func WithBitsPerLabel(bitsPerLabel uint32) scryptPositionOptionFunc {
 
 // WithComputeLeafs instructs scrypt to compute leafs or not.
 // By default computing leafs is enabled.
-func WithComputeLeaves(enabled bool) scryptPositionOptionFunc {
-	return func(opts *scryptPositionOption) error {
+func WithComputeLeaves(enabled bool) OptionFunc {
+	return func(opts *option) error {
 		opts.computeLeafs = enabled
 		return nil
 	}
@@ -165,8 +165,8 @@ func WithComputeLeaves(enabled bool) scryptPositionOptionFunc {
 // If difficulty is nil, no PoW will be computed. Otherwise it specifies the difficulty
 // of the PoW to be computed (higher values are more difficult).
 // By default computing proof of work is disabled.
-func WithComputePow(difficulty []byte) scryptPositionOptionFunc {
-	return func(opts *scryptPositionOption) error {
+func WithComputePow(difficulty []byte) OptionFunc {
+	return func(opts *option) error {
 		if difficulty == nil {
 			opts.computePow = false
 			return nil
@@ -183,8 +183,8 @@ func WithComputePow(difficulty []byte) scryptPositionOptionFunc {
 }
 
 // ScryptPositions computes the scrypt output for the given options.
-func ScryptPositions(opts ...scryptPositionOptionFunc) (*ScryptPositionsResult, error) {
-	options := &scryptPositionOption{
+func ScryptPositions(opts ...OptionFunc) (*ScryptPositionsResult, error) {
+	options := &option{
 		n:            512,
 		r:            1,
 		p:            1,
