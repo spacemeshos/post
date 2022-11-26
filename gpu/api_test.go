@@ -20,7 +20,7 @@ func TestCPUProviderExists(t *testing.T) {
 	r := require.New(t)
 
 	p := filterCPUProvider(providers)
-	r.Equal("CPU", p.Model)
+	r.Equal(CPUProviderName, p.Model)
 	r.Equal(ComputeAPIClassCPU, p.ComputeAPI)
 }
 

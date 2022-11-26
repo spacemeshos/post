@@ -19,6 +19,8 @@ var (
 	cpuProviderID int
 )
 
+const CPUProviderName = "CPU"
+
 func init() {
 	providers = cGetProviders()
 	cpuProviderID = int(filterCPUProvider(providers).ID)
@@ -34,7 +36,7 @@ func CPUProviderID() int {
 
 func filterCPUProvider(providers []ComputeProvider) ComputeProvider {
 	for _, p := range providers {
-		if p.Model == "CPU" {
+		if p.Model == CPUProviderName {
 			return p
 		}
 	}
@@ -47,7 +49,7 @@ func Benchmark(p ComputeProvider) (int, error) {
 	hashLenBits := uint32(8)
 	startPosition := uint64(1)
 	endPosition := uint64(1 << 17)
-	if p.Model == "CPU" {
+	if p.Model == CPUProviderName {
 		endPosition = uint64(1 << 14)
 	}
 
