@@ -227,6 +227,8 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		return nil
 	}
 
+	init.logger.Info("initialization: no nonce found while computing leaves, continue searching")
+
 	// continue searching for a nonce
 	// TODO(mafa): depending on the difficulty function this can take a VERY long time, with the current difficulty function
 	// ~ 37% of all smeshers won't find a nonce while computing leaves
@@ -245,6 +247,8 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 			// continue looking for a nonce
 		}
 
+		init.logger.Debug("initialization: continue looking for a nonce: start position: %v, batch size: %v", i, batchSize)
+
 		res, err := oracle.WorkOracle(
 			oracle.WithComputeProviderID(uint(init.opts.ComputeProviderID)),
 			oracle.WithCommitment(init.commitment),
@@ -256,6 +260,8 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 			return err
 		}
 		if res.Nonce != nil {
+			init.logger.Debug("initialization: found nonce: %d", *res.Nonce)
+
 			init.nonce = new(uint64)
 			*init.nonce = *res.Nonce
 
@@ -401,7 +407,7 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 		}
 
 		if res.Nonce != nil {
-			init.logger.Debug("initialization: file #%v, found nonce: %d", fileIndex, *res.Nonce)
+			init.logger.Info("initialization: file #%v, found nonce: %d", fileIndex, *res.Nonce)
 			init.nonce = new(uint64)
 			*init.nonce = *res.Nonce
 
