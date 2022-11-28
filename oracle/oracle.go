@@ -23,10 +23,10 @@ type option struct {
 	startPosition uint64
 	endPosition   uint64
 
-	bitsPerLabel uint32
-
+	bitsPerLabel  uint32
 	computeLeaves bool
-	difficulty    []byte
+
+	difficulty []byte
 }
 
 func (o *option) validate() error {
@@ -34,8 +34,8 @@ func (o *option) validate() error {
 		return errors.New("`commitment` is required")
 	}
 
-	if o.bitsPerLabel == 0 {
-		return errors.New("`bitsPerLabel` is required")
+	if o.computeLeaves && (o.bitsPerLabel < config.MinBitsPerLabel || o.bitsPerLabel > config.MaxBitsPerLabel) {
+		return fmt.Errorf("invalid `bitsPerLabel`; expected: %d-%d, given: %v", config.MinBitsPerLabel, config.MaxBitsPerLabel, o.bitsPerLabel)
 	}
 
 	return nil
@@ -96,9 +96,6 @@ func WithStartAndEndPosition(start, end uint64) OptionFunc {
 // WithBitsPerLabel sets the number of bits per label.
 func WithBitsPerLabel(bitsPerLabel uint32) OptionFunc {
 	return func(opts *option) error {
-		if bitsPerLabel < config.MinBitsPerLabel || bitsPerLabel > config.MaxBitsPerLabel {
-			return fmt.Errorf("invalid `bitsPerLabel`; expected: %d-%d, given: %v", config.MinBitsPerLabel, config.MaxBitsPerLabel, bitsPerLabel)
-		}
 		opts.bitsPerLabel = bitsPerLabel
 		return nil
 	}

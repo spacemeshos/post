@@ -80,8 +80,8 @@ type option struct {
 
 	bitsPerLabel uint32
 
-	computeLeafs bool
-	computePow   bool
+	computeLeaves bool
+	computePow    bool
 
 	n, r, p uint32
 	d       []byte
@@ -89,13 +89,21 @@ type option struct {
 
 func (o *option) optionBits() uint32 {
 	var bits uint32
-	if o.computeLeafs {
+	if o.computeLeaves {
 		bits |= (1 << 0)
 	}
 	if o.computePow {
 		bits |= (1 << 1)
 	}
 	return bits
+}
+
+func (o *option) validate() error {
+	if o.computeLeaves && (o.bitsPerLabel < config.MinBitsPerLabel || o.bitsPerLabel > config.MaxBitsPerLabel) {
+		return fmt.Errorf("invalid `bitsPerLabel`; expected: %d-%d, given: %v", config.MinBitsPerLabel, config.MaxBitsPerLabel, o.bitsPerLabel)
+	}
+
+	return nil
 }
 
 type OptionFunc func(*option) error
@@ -144,9 +152,6 @@ func WithStartAndEndPosition(start, end uint64) OptionFunc {
 // WithBitsPerLabel instructs scrypt to use the specified number of bits per label.
 func WithBitsPerLabel(bitsPerLabel uint32) OptionFunc {
 	return func(opts *option) error {
-		if bitsPerLabel < config.MinBitsPerLabel || bitsPerLabel > config.MaxBitsPerLabel {
-			return fmt.Errorf("invalid `bitsPerLabel`; expected: %d-%d, given: %v", config.MinBitsPerLabel, config.MaxBitsPerLabel, bitsPerLabel)
-		}
 		opts.bitsPerLabel = bitsPerLabel
 		return nil
 	}
@@ -156,7 +161,7 @@ func WithBitsPerLabel(bitsPerLabel uint32) OptionFunc {
 // By default computing leafs is enabled.
 func WithComputeLeaves(enabled bool) OptionFunc {
 	return func(opts *option) error {
-		opts.computeLeafs = enabled
+		opts.computeLeaves = enabled
 		return nil
 	}
 }
@@ -185,11 +190,11 @@ func WithComputePow(difficulty []byte) OptionFunc {
 // ScryptPositions computes the scrypt output for the given options.
 func ScryptPositions(opts ...OptionFunc) (*ScryptPositionsResult, error) {
 	options := &option{
-		n:            512,
-		r:            1,
-		p:            1,
-		computeLeafs: true,
-		d:            make([]byte, 32),
+		n:             512,
+		r:             1,
+		p:             1,
+		computeLeaves: true,
+		d:             make([]byte, 32),
 	}
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
