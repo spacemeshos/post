@@ -5,11 +5,13 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	baseLog "log"
 	"os"
 	"os/signal"
 	"path/filepath"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/minio/sha256-simd"
 
 	"github.com/spacemeshos/ed25519"
 	"github.com/spacemeshos/post/config"
