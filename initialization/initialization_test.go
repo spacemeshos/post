@@ -109,6 +109,123 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	r.Less(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.Nonce)
 }
 
+func TestInitialize_ContinueWithLastPos(t *testing.T) {
+	r := require.New(t)
+
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
+	opts.NumFiles = 2
+	opts.ComputeProviderID = int(CPUProviderID())
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+
+	r.NoError(init.Initialize(context.Background()))
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+
+	m, err := LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.NotNil(m.Nonce)
+	r.NoError(verifying.VerifyPow(*m.Nonce, uint64(opts.NumUnits), uint64(cfg.BitsPerLabel), nodeId, commitmentAtxId))
+
+	// trying again returns same nonce
+	origNonce := *m.Nonce
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+
+	r.NoError(init.Initialize(context.Background()))
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+
+	m, err = LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.Equal(origNonce, *m.Nonce)
+
+	// lastPos lower than numLabels is ignored
+	m.LastPosition = new(uint64)
+	*m.LastPosition = uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit - 10
+	r.NoError(SaveMetadata(opts.DataDir, m))
+
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+
+	r.NoError(init.Initialize(context.Background()))
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+
+	m, err = LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.Equal(origNonce, *m.Nonce)
+
+	// no nonce found and lastPos not set finds a higher nonce than numLabels
+	m.Nonce = nil
+	r.NoError(SaveMetadata(opts.DataDir, m))
+
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+
+	r.NoError(init.Initialize(context.Background()))
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+
+	m, err = LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.NotNil(m.Nonce)
+
+	r.NotEqual(origNonce, *m.Nonce)
+	r.NoError(verifying.VerifyPow(*m.Nonce, uint64(opts.NumUnits), uint64(cfg.BitsPerLabel), nodeId, commitmentAtxId))
+
+	// lastPos sets lower bound for searching for nonce if none was found
+	lastPos := *m.Nonce + 10
+	*m.LastPosition = lastPos
+	m.Nonce = nil
+	r.NoError(SaveMetadata(opts.DataDir, m))
+
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+
+	r.NoError(init.Initialize(context.Background()))
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+
+	m, err = LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.NotNil(m.Nonce)
+
+	r.Less(lastPos, *m.Nonce)
+	r.NoError(verifying.VerifyPow(*m.Nonce, uint64(opts.NumUnits), uint64(cfg.BitsPerLabel), nodeId, commitmentAtxId))
+}
+
 func TestReset_WhileInitializing(t *testing.T) {
 	r := require.New(t)
 

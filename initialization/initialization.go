@@ -149,11 +149,12 @@ type Initializer struct {
 	cfg  Config
 	opts InitOpts
 
-	nonce            *uint64
-	numLabelsWritten atomic.Uint64
+	nonce        *uint64
+	lastPosition *uint64
 
-	diskState *DiskState
-	mtx       sync.RWMutex
+	numLabelsWritten atomic.Uint64
+	diskState        *DiskState
+	mtx              sync.RWMutex
 
 	logger Logger
 }
@@ -203,6 +204,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 			return err
 		}
 		init.nonce = m.Nonce
+		init.lastPosition = m.LastPosition
 	}
 
 	if err := init.saveMetadata(); err != nil {
@@ -228,14 +230,18 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 
 	init.logger.Info("initialization: no nonce found while computing leaves, continue searching")
+	if init.lastPosition == nil || *init.lastPosition < numLabels {
+		init.lastPosition = new(uint64)
+		*init.lastPosition = numLabels
+	}
 
 	// continue searching for a nonce
-	// TODO(mafa): depending on the difficulty function this can take a VERY long time, with the current difficulty function
+	// TODO(mafa): PM-195 depending on the difficulty function this can take a VERY long time, with the current difficulty function
 	// ~ 37% of all smeshers won't find a nonce while computing leaves
-	// ~ 14% of all smeshers won't find a nonce even after checking 2x numLabels
-	// ~  5% of all smeshers won't find a nonce even after checking 3x numLabels
 	// ~  2% of all smeshers won't find a nonce even after checking 4x numLabels
-	for i := numLabels; i < math.MaxUint64; i += batchSize {
+	for i := *init.lastPosition; i < math.MaxUint64; i += batchSize {
+		defer init.saveMetadata()
+
 		select {
 		case <-ctx.Done():
 			init.logger.Info("initialization: stopped")
@@ -264,8 +270,6 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 
 			init.nonce = new(uint64)
 			*init.nonce = *res.Nonce
-
-			init.saveMetadata()
 			return nil
 		}
 	}
@@ -343,24 +347,24 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 		return err
 	}
 
-	if numLabelsWritten > 0 {
-		if numLabelsWritten == fileNumLabels {
-			init.logger.Info("initialization: file #%v already initialized; number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileOffset)
-			init.numLabelsWritten.Store(fileTargetPosition)
-			return nil
-		}
+	switch {
+	case numLabelsWritten == fileNumLabels:
+		init.logger.Info("initialization: file #%v already initialized; number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileOffset)
+		init.numLabelsWritten.Store(fileTargetPosition)
+		return nil
 
-		if numLabelsWritten > fileNumLabels {
-			init.logger.Info("initialization: truncating file #%v; current number of labels: %v, target number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileNumLabels, fileOffset)
-			if err := writer.Truncate(fileNumLabels); err != nil {
-				return err
-			}
-			init.numLabelsWritten.Store(fileTargetPosition)
-			return nil
+	case numLabelsWritten > fileNumLabels:
+		init.logger.Info("initialization: truncating file #%v; current number of labels: %v, target number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileNumLabels, fileOffset)
+		if err := writer.Truncate(fileNumLabels); err != nil {
+			return err
 		}
+		init.numLabelsWritten.Store(fileTargetPosition)
+		return nil
 
+	case numLabelsWritten > 0:
 		init.logger.Info("initialization: continuing to write file #%v; current number of labels: %v, target number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileNumLabels, fileOffset)
-	} else {
+
+	default:
 		init.logger.Info("initialization: starting to write file #%v; target number of labels: %v, start position: %v", fileIndex, fileNumLabels, fileOffset)
 	}
 
@@ -503,6 +507,7 @@ func (init *Initializer) saveMetadata() error {
 		NumUnits:        init.opts.NumUnits,
 		NumFiles:        init.opts.NumFiles,
 		Nonce:           init.nonce,
+		LastPosition:    init.lastPosition,
 	}
 	return SaveMetadata(init.opts.DataDir, &v)
 }

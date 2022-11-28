@@ -11,7 +11,7 @@ import (
 
 const metadataFileName = "postdata_metadata.json"
 
-// metadata is the data associated with the PoST init procedure, persisted in the datadir next to the init files.
+// Metadata is the data associated with the PoST init procedure, persisted in the datadir next to the init files.
 type Metadata struct {
 	NodeId          []byte
 	CommitmentAtxId []byte
@@ -21,6 +21,7 @@ type Metadata struct {
 	NumUnits      uint32
 	NumFiles      uint32
 	Nonce         *uint64 `json:",omitempty"`
+	LastPosition  *uint64 `json:",omitempty"`
 }
 
 func SaveMetadata(dir string, v *Metadata) error {
