@@ -202,6 +202,10 @@ func ScryptPositions(opts ...OptionFunc) (*ScryptPositionsResult, error) {
 		}
 	}
 
+	if err := options.validate(); err != nil {
+		return nil, err
+	}
+
 	// Wait for the stop flag clearance for avoiding a race condition which can
 	// occur if ScryptPositions is called immediately after a prior Stop call.
 	var i int

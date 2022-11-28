@@ -64,7 +64,7 @@ type option struct {
 	logger   Logger
 }
 
-func (o *option) verify() error {
+func (o *option) validate() error {
 	if o.nodeId == nil {
 		return errors.New("`nodeId` is required")
 	}
@@ -169,7 +169,7 @@ func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 		}
 	}
 
-	if err := options.verify(); err != nil {
+	if err := options.validate(); err != nil {
 		return nil, err
 	}
 

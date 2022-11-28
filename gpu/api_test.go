@@ -290,7 +290,6 @@ func Test_ScryptPositions_Pow(t *testing.T) {
 				WithCommitment(commitment),
 				WithSalt(salt),
 				WithStartAndEndPosition(0, 128*1024),
-				WithBitsPerLabel(8),
 				WithComputePow(d),
 				WithComputeLeaves(false),
 			)
