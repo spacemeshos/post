@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -211,39 +212,59 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	numLabels := uint64(init.opts.NumUnits) * uint64(init.cfg.LabelsPerUnit)
 	fileNumLabels := numLabels / uint64(init.opts.NumFiles)
 	difficulty := shared.PowDifficulty(numLabels)
+	batchSize := uint64(config.DefaultComputeBatchSize)
 
 	init.logger.Info("initialization: starting to write %v file(s); number of units: %v, number of labels per unit: %v, number of bits per label: %v, datadir: %v",
 		init.opts.NumFiles, init.opts.NumUnits, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel, init.opts.DataDir)
 
 	for i := 0; i < int(init.opts.NumFiles); i++ {
-		if err := init.initFile(ctx, i, numLabels, fileNumLabels, difficulty); err != nil {
+		if err := init.initFile(ctx, i, batchSize, numLabels, fileNumLabels, difficulty); err != nil {
 			return err
 		}
 	}
 
-	if init.nonce == nil {
-		// continue searching for a nonce
+	if init.nonce != nil {
+		return nil
+	}
+
+	// continue searching for a nonce
+	// TODO(mafa): depending on the difficulty function this can take a VERY long time, with the current difficulty function
+	// ~ 37% of all smeshers won't find a nonce while computing leaves
+	// ~ 14% of all smeshers won't find a nonce even after checking 2x numLabels
+	// ~  5% of all smeshers won't find a nonce even after checking 3x numLabels
+	// ~  2% of all smeshers won't find a nonce even after checking 4x numLabels
+	for i := numLabels; i < math.MaxUint64; i += batchSize {
+		select {
+		case <-ctx.Done():
+			init.logger.Info("initialization: stopped")
+			if res := gpu.Stop(); res != gpu.StopResultOk {
+				return fmt.Errorf("gpu stop error: %s", res)
+			}
+			return ctx.Err()
+		default:
+			// continue looking for a nonce
+		}
+
 		res, err := oracle.WorkOracle(
 			oracle.WithComputeProviderID(uint(init.opts.ComputeProviderID)),
 			oracle.WithCommitment(init.commitment),
-			oracle.WithStartAndEndPosition(numLabels, 8*numLabels),
-			oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
+			oracle.WithStartAndEndPosition(i, i+batchSize-1),
 			oracle.WithComputePow(difficulty),
 			oracle.WithComputeLeaves(false),
 		)
 		if err != nil {
 			return err
 		}
-		if res.Nonce == nil {
-			return fmt.Errorf("no nonce found")
-		}
-		init.nonce = new(uint64)
-		*init.nonce = *res.Nonce
+		if res.Nonce != nil {
+			init.nonce = new(uint64)
+			*init.nonce = *res.Nonce
 
-		init.saveMetadata()
+			init.saveMetadata()
+			return nil
+		}
 	}
 
-	return nil
+	return fmt.Errorf("no nonce found")
 }
 
 func (init *Initializer) SessionNumLabelsWritten() uint64 {
@@ -300,10 +321,9 @@ func (init *Initializer) Status() Status {
 	return StatusNotStarted
 }
 
-func (init *Initializer) initFile(ctx context.Context, fileIndex int, numLabels, fileNumLabels uint64, difficulty []byte) error {
+func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize, numLabels, fileNumLabels uint64, difficulty []byte) error {
 	fileOffset := uint64(fileIndex) * fileNumLabels
 	fileTargetPosition := fileOffset + fileNumLabels
-	batchSize := uint64(config.DefaultComputeBatchSize)
 
 	// Initialize the labels file writer.
 	writer, err := persistence.NewLabelsWriter(init.opts.DataDir, fileIndex, uint(init.cfg.BitsPerLabel))
@@ -338,7 +358,7 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, numLabels,
 		init.logger.Info("initialization: starting to write file #%v; target number of labels: %v, start position: %v", fileIndex, fileNumLabels, fileOffset)
 	}
 
-	for currentPosition := numLabelsWritten; currentPosition < fileNumLabels; currentPosition += uint64(batchSize) {
+	for currentPosition := numLabelsWritten; currentPosition < fileNumLabels; currentPosition += batchSize {
 		select {
 		case <-ctx.Done():
 			init.logger.Info("initialization: stopped")
