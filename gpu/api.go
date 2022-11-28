@@ -35,7 +35,7 @@ func Providers() []ComputeProvider {
 	return providers
 }
 
-// CPUProviderID returns the ID of the CPU provider or nil if the CPU provider is not available.
+// CPUProviderID returns the ID of the CPU provider.
 func CPUProviderID() uint {
 	return cpuProviderID
 }

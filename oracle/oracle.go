@@ -17,10 +17,8 @@ type Challenge = shared.Challenge
 type option struct {
 	computeProviderID uint
 
-	nodeId []byte
-	atxId  []byte
-
-	salt []byte
+	commitment []byte
+	salt       []byte
 
 	startPosition uint64
 	endPosition   uint64
@@ -32,12 +30,8 @@ type option struct {
 }
 
 func (o *option) validate() error {
-	if o.nodeId == nil {
-		return errors.New("`nodeId` is required")
-	}
-
-	if o.atxId == nil {
-		return errors.New("`atxId` is required")
+	if o.commitment == nil {
+		return errors.New("`commitment` is required")
 	}
 
 	if o.bitsPerLabel == 0 {
@@ -57,26 +51,14 @@ func WithComputeProviderID(id uint) OptionFunc {
 	}
 }
 
-// WithNodeId sets the ID of the Node.
-func WithNodeId(nodeId []byte) OptionFunc {
+// WithCommitment sets the commitment to use for the oracle.
+func WithCommitment(commitment []byte) OptionFunc {
 	return func(opts *option) error {
-		if len(nodeId) != 32 {
-			return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(nodeId))
+		if len(commitment) != 32 {
+			return fmt.Errorf("invalid `commitment` length; expected: 32, given: %v", len(commitment))
 		}
 
-		opts.nodeId = nodeId
-		return nil
-	}
-}
-
-// WithAtxId sets the ID of the CommitmentATX.
-func WithAtxId(atxId []byte) OptionFunc {
-	return func(opts *option) error {
-		if len(atxId) != 32 {
-			return fmt.Errorf("invalid `commitmentAtx` length; expected: 32, given: %v", len(atxId))
-		}
-
-		opts.atxId = atxId
+		opts.commitment = commitment
 		return nil
 	}
 }
@@ -175,7 +157,7 @@ func WorkOracle(opts ...OptionFunc) (WorkOracleResult, error) {
 
 	res, err := gpu.ScryptPositions(
 		gpu.WithComputeProviderID(options.computeProviderID),
-		gpu.WithCommitment(getCommitment(options.nodeId, options.atxId)),
+		gpu.WithCommitment(options.commitment),
 		gpu.WithSalt(options.salt),
 		gpu.WithStartAndEndPosition(options.startPosition, options.endPosition),
 		gpu.WithBitsPerLabel(options.bitsPerLabel),
@@ -200,11 +182,4 @@ func FastOracle(ch Challenge, nonce uint32, label []byte) [32]byte {
 	copy(input[36:], label[:])
 
 	return sha256.Sum256(input)
-}
-
-func getCommitment(nodeId, atxId []byte) []byte {
-	hh := sha256.New()
-	hh.Write(nodeId)
-	hh.Write(atxId)
-	return hh.Sum(nil)
 }

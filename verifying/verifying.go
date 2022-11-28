@@ -22,13 +22,13 @@ var (
 
 // VerifyPow ensures the validity of a nonce for a given node.
 // AtxId is the id of the ATX that was selected by the node for its commitment.
-func VerifyPow(nonce, numUnits, bitsPerLabel uint64, nodeId, atxId []byte) error {
+func VerifyPow(nonce, numUnits, bitsPerLabel uint64, nodeId, commitmentAtxId []byte) error {
 	if len(nodeId) != 32 {
 		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(nodeId))
 	}
 
-	if len(atxId) != 32 {
-		return fmt.Errorf("invalid `atxId` length; expected: 32, given: %v", len(atxId))
+	if len(commitmentAtxId) != 32 {
+		return fmt.Errorf("invalid `commitmentAtxId` length; expected: 32, given: %v", len(commitmentAtxId))
 	}
 
 	numLabels := numUnits * bitsPerLabel
@@ -36,8 +36,7 @@ func VerifyPow(nonce, numUnits, bitsPerLabel uint64, nodeId, atxId []byte) error
 	threshold := new(big.Int).SetBytes(difficulty)
 
 	res, err := WorkOracle(
-		oracle.WithNodeId(nodeId),
-		oracle.WithAtxId(atxId),
+		oracle.WithCommitment(oracle.CommitmentBytes(nodeId, commitmentAtxId)),
 		oracle.WithPosition(nonce),
 		oracle.WithBitsPerLabel(uint32(bitsPerLabel)*32),
 	)
@@ -60,8 +59,8 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(m.NodeId))
 	}
 
-	if len(m.AtxId) != 32 {
-		return fmt.Errorf("invalid `atxId` length; expected: 32, given: %v", len(m.AtxId))
+	if len(m.CommitmentAtxId) != 32 {
+		return fmt.Errorf("invalid `atxId` length; expected: 32, given: %v", len(m.CommitmentAtxId))
 	}
 
 	numLabels := uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
@@ -87,8 +86,7 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 		indicesSet[index] = true
 
 		res, err := WorkOracle(
-			oracle.WithNodeId(m.NodeId),
-			oracle.WithAtxId(m.AtxId),
+			oracle.WithCommitment(oracle.CommitmentBytes(m.NodeId, m.CommitmentAtxId)),
 			oracle.WithPosition(index),
 			oracle.WithBitsPerLabel(uint32(m.BitsPerLabel)),
 		)

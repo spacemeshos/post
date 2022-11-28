@@ -44,8 +44,8 @@ func (p *Proof) Decode(data []byte) error {
 }
 
 type ProofMetadata struct {
-	NodeId []byte
-	AtxId  []byte
+	NodeId          []byte
+	CommitmentAtxId []byte
 
 	Challenge     Challenge
 	NumUnits      uint32

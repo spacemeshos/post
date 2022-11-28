@@ -38,8 +38,8 @@ var (
 )
 
 type Prover struct {
-	nodeId []byte
-	atxId  []byte
+	nodeId          []byte
+	commitmentAtxId []byte
 
 	cfg     Config
 	datadir string
@@ -49,14 +49,14 @@ type Prover struct {
 	logger Logger
 }
 
-func NewProver(cfg Config, datadir string, nodeId, atxId []byte) (*Prover, error) {
+func NewProver(cfg Config, datadir string, nodeId, commitmentAtxId []byte) (*Prover, error) {
 	return &Prover{
-		cfg:       cfg,
-		datadir:   datadir,
-		nodeId:    nodeId,
-		atxId:     atxId,
-		diskState: initialization.NewDiskState(datadir, uint(cfg.BitsPerLabel)),
-		logger:    shared.DisabledLogger{},
+		cfg:             cfg,
+		datadir:         datadir,
+		nodeId:          nodeId,
+		commitmentAtxId: commitmentAtxId,
+		diskState:       initialization.NewDiskState(datadir, uint(cfg.BitsPerLabel)),
+		logger:          shared.DisabledLogger{},
 	}, nil
 }
 
@@ -95,14 +95,14 @@ func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, err
 				Indices: solutionNonceResult.indices,
 			}
 			proofMetadata := &ProofMetadata{
-				NodeId:        p.nodeId,
-				AtxId:         p.atxId,
-				Challenge:     challenge,
-				BitsPerLabel:  p.cfg.BitsPerLabel,
-				LabelsPerUnit: p.cfg.LabelsPerUnit,
-				NumUnits:      m.NumUnits,
-				K1:            p.cfg.K1,
-				K2:            p.cfg.K2,
+				NodeId:          p.nodeId,
+				CommitmentAtxId: p.commitmentAtxId,
+				Challenge:       challenge,
+				BitsPerLabel:    p.cfg.BitsPerLabel,
+				LabelsPerUnit:   p.cfg.LabelsPerUnit,
+				NumUnits:        m.NumUnits,
+				K1:              p.cfg.K1,
+				K2:              p.cfg.K2,
 			}
 			return proof, proofMetadata, nil
 		}
@@ -163,11 +163,11 @@ func (p *Prover) verifyMetadata(m *Metadata) error {
 		}
 	}
 
-	if !bytes.Equal(p.atxId, m.AtxId) {
+	if !bytes.Equal(p.commitmentAtxId, m.CommitmentAtxId) {
 		return ConfigMismatchError{
-			Param:    "AtxId",
-			Expected: fmt.Sprintf("%x", p.atxId),
-			Found:    fmt.Sprintf("%x", m.AtxId),
+			Param:    "CommitmentAtxId",
+			Expected: fmt.Sprintf("%x", p.commitmentAtxId),
+			Found:    fmt.Sprintf("%x", m.CommitmentAtxId),
 			DataDir:  p.datadir,
 		}
 	}

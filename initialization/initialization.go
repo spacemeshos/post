@@ -53,8 +53,10 @@ func CPUProviderID() uint {
 }
 
 type option struct {
-	nodeId []byte
-	atxId  []byte
+	nodeId          []byte
+	commitmentAtxId []byte
+
+	commitment []byte
 
 	cfg      *Config
 	initOpts *config.InitOpts
@@ -66,9 +68,11 @@ func (o *option) verify() error {
 		return errors.New("`nodeId` is required")
 	}
 
-	if o.atxId == nil {
-		return errors.New("`atxId` is required")
+	if o.commitmentAtxId == nil {
+		return errors.New("`commitmentAtxId` is required")
 	}
+
+	o.commitment = oracle.CommitmentBytes(o.nodeId, o.commitmentAtxId)
 
 	if o.cfg == nil {
 		return errors.New("no config provided")
@@ -95,14 +99,14 @@ func WithNodeId(nodeId []byte) OptionFunc {
 	}
 }
 
-// WithAtxId sets the ID of the CommitmentATX.
-func WithAtxId(atxId []byte) OptionFunc {
+// WithCommitmentAtxId sets the ID of the CommitmentATX.
+func WithCommitmentAtxId(id []byte) OptionFunc {
 	return func(opts *option) error {
-		if len(atxId) != 32 {
-			return fmt.Errorf("invalid `commitmentAtx` length; expected: 32, given: %v", len(atxId))
+		if len(id) != 32 {
+			return fmt.Errorf("invalid `commitmentAtxId` length; expected: 32, given: %v", len(id))
 		}
 
-		opts.atxId = atxId
+		opts.commitmentAtxId = id
 		return nil
 	}
 }
@@ -136,8 +140,10 @@ func WithLogger(logger Logger) OptionFunc {
 
 // Initializer is responsible for initializing a new PoST commitment.
 type Initializer struct {
-	nodeId []byte
-	atxId  []byte
+	nodeId          []byte
+	commitmentAtxId []byte
+
+	commitment []byte
 
 	cfg  Config
 	opts InitOpts
@@ -167,12 +173,13 @@ func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 	}
 
 	return &Initializer{
-		cfg:       *options.cfg,
-		opts:      *options.initOpts,
-		nodeId:    options.nodeId,
-		atxId:     options.atxId,
-		diskState: NewDiskState(options.initOpts.DataDir, uint(options.cfg.BitsPerLabel)),
-		logger:    options.logger,
+		cfg:             *options.cfg,
+		opts:            *options.initOpts,
+		nodeId:          options.nodeId,
+		commitmentAtxId: options.commitmentAtxId,
+		commitment:      options.commitment,
+		diskState:       NewDiskState(options.initOpts.DataDir, uint(options.cfg.BitsPerLabel)),
+		logger:          options.logger,
 	}, nil
 }
 
@@ -218,8 +225,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		// continue searching for a nonce
 		res, err := oracle.WorkOracle(
 			oracle.WithComputeProviderID(uint(init.opts.ComputeProviderID)),
-			oracle.WithNodeId(init.nodeId),
-			oracle.WithAtxId(init.atxId),
+			oracle.WithCommitment(init.commitment),
 			oracle.WithStartAndEndPosition(numLabels, 8*numLabels),
 			oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
 			oracle.WithComputePow(difficulty),
@@ -365,8 +371,7 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, numLabels,
 
 		res, err := oracle.WorkOracle(
 			oracle.WithComputeProviderID(uint(init.opts.ComputeProviderID)),
-			oracle.WithNodeId(init.nodeId),
-			oracle.WithAtxId(init.atxId),
+			oracle.WithCommitment(init.commitment),
 			oracle.WithStartAndEndPosition(startPosition, endPosition),
 			oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
 			oracle.WithComputePow(difficulty),
@@ -414,11 +419,11 @@ func (init *Initializer) verifyMetadata(m *Metadata) error {
 		}
 	}
 
-	if !bytes.Equal(init.atxId, m.AtxId) {
+	if !bytes.Equal(init.commitmentAtxId, m.CommitmentAtxId) {
 		return ConfigMismatchError{
-			Param:    "AtxId",
-			Expected: fmt.Sprintf("%x", init.atxId),
-			Found:    fmt.Sprintf("%x", m.AtxId),
+			Param:    "CommitmentAtxId",
+			Expected: fmt.Sprintf("%x", init.commitmentAtxId),
+			Found:    fmt.Sprintf("%x", m.CommitmentAtxId),
 			DataDir:  init.opts.DataDir,
 		}
 	}
@@ -465,13 +470,13 @@ func (init *Initializer) verifyMetadata(m *Metadata) error {
 
 func (init *Initializer) saveMetadata() error {
 	v := Metadata{
-		NodeId:        init.nodeId,
-		AtxId:         init.atxId,
-		BitsPerLabel:  init.cfg.BitsPerLabel,
-		LabelsPerUnit: init.cfg.LabelsPerUnit,
-		NumUnits:      init.opts.NumUnits,
-		NumFiles:      init.opts.NumFiles,
-		Nonce:         init.nonce,
+		NodeId:          init.nodeId,
+		CommitmentAtxId: init.commitmentAtxId,
+		BitsPerLabel:    init.cfg.BitsPerLabel,
+		LabelsPerUnit:   init.cfg.LabelsPerUnit,
+		NumUnits:        init.opts.NumUnits,
+		NumFiles:        init.opts.NumFiles,
+		Nonce:           init.nonce,
 	}
 	return SaveMetadata(init.opts.DataDir, &v)
 }

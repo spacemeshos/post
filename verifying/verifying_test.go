@@ -17,9 +17,9 @@ import (
 )
 
 var (
-	nodeId = make([]byte, 32)
-	atxId  = make([]byte, 32)
-	ch     = make(proving.Challenge, 32)
+	nodeId          = make([]byte, 32)
+	commitmentAtxId = make([]byte, 32)
+	ch              = make(proving.Challenge, 32)
 
 	NewInitializer = initialization.NewInitializer
 	NewProver      = proving.NewProver
@@ -45,14 +45,14 @@ func TestVerify(t *testing.T) {
 	cfg, opts := getTestConfig(t)
 	init, err := NewInitializer(
 		initialization.WithNodeId(nodeId),
-		initialization.WithAtxId(atxId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
 		initialization.WithConfig(cfg),
 		initialization.WithInitOpts(opts),
 	)
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))
 
-	p, err := NewProver(cfg, opts.DataDir, nodeId, atxId)
+	p, err := NewProver(cfg, opts.DataDir, nodeId, commitmentAtxId)
 	r.NoError(err)
 	proof, proofMetadata, err := p.GenerateProof(ch)
 	r.NoError(err)
@@ -66,7 +66,7 @@ func TestVerifyPow(t *testing.T) {
 	cfg, opts := getTestConfig(t)
 	init, err := NewInitializer(
 		initialization.WithNodeId(nodeId),
-		initialization.WithAtxId(atxId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
 		initialization.WithConfig(cfg),
 		initialization.WithInitOpts(opts),
 	)
@@ -76,7 +76,7 @@ func TestVerifyPow(t *testing.T) {
 	m, err := initialization.LoadMetadata(opts.DataDir)
 	r.NoError(err)
 
-	r.NoError(VerifyPow(*m.Nonce, uint64(opts.NumUnits), uint64(cfg.BitsPerLabel), nodeId, atxId))
+	r.NoError(VerifyPow(*m.Nonce, uint64(opts.NumUnits), uint64(cfg.BitsPerLabel), nodeId, commitmentAtxId))
 }
 
 // TestLabelsCorrectness tests, for variation of label sizes, the correctness of
@@ -112,8 +112,7 @@ func TestLabelsCorrectness(t *testing.T) {
 
 				res, err := oracle.WorkOracle(
 					oracle.WithComputeProviderID(CPUProviderID()),
-					oracle.WithNodeId(nodeId),
-					oracle.WithAtxId(atxId),
+					oracle.WithCommitment(oracle.CommitmentBytes(nodeId, commitmentAtxId)),
 					oracle.WithStartAndEndPosition(startPosition, endPosition),
 					oracle.WithBitsPerLabel(bitsPerLabel),
 				)
@@ -142,8 +141,7 @@ func TestLabelsCorrectness(t *testing.T) {
 
 			// Verify correctness.
 			labelCompute, err := oracle.WorkOracle(
-				oracle.WithNodeId(nodeId),
-				oracle.WithAtxId(atxId),
+				oracle.WithCommitment(oracle.CommitmentBytes(nodeId, commitmentAtxId)),
 				oracle.WithPosition(position),
 				oracle.WithBitsPerLabel(bitsPerLabel),
 			)

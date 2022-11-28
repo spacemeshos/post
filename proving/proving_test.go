@@ -53,7 +53,7 @@ func TestProver_GenerateProof(t *testing.T) {
 			t.Parallel()
 
 			nodeId := make([]byte, 32)
-			atxId := make([]byte, 32)
+			commitmentAtxId := make([]byte, 32)
 			ch := make(Challenge, 32)
 			cfg := config.DefaultConfig()
 			cfg.LabelsPerUnit = 1 << 12
@@ -66,7 +66,7 @@ func TestProver_GenerateProof(t *testing.T) {
 
 			init, err := NewInitializer(
 				initialization.WithNodeId(nodeId),
-				initialization.WithAtxId(atxId),
+				initialization.WithCommitmentAtxId(commitmentAtxId),
 				initialization.WithConfig(cfg),
 				initialization.WithInitOpts(opts),
 				initialization.WithLogger(log),
@@ -74,7 +74,7 @@ func TestProver_GenerateProof(t *testing.T) {
 			r.NoError(err)
 			r.NoError(init.Initialize(context.Background()))
 
-			p, err := NewProver(cfg, opts.DataDir, nodeId, atxId)
+			p, err := NewProver(cfg, opts.DataDir, nodeId, commitmentAtxId)
 			r.NoError(err)
 			p.SetLogger(log)
 
@@ -85,7 +85,7 @@ func TestProver_GenerateProof(t *testing.T) {
 			r.NotNil(proofMetaData)
 
 			r.Equal(nodeId, proofMetaData.NodeId)
-			r.Equal(atxId, proofMetaData.AtxId)
+			r.Equal(commitmentAtxId, proofMetaData.CommitmentAtxId)
 			r.Equal(ch, proofMetaData.Challenge)
 			r.Equal(cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
 			r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
@@ -108,13 +108,13 @@ func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 	r := require.New(t)
 
 	nodeId := make([]byte, 32)
-	atxId := make([]byte, 32)
+	commitmentAtxId := make([]byte, 32)
 
 	ch := make(Challenge, 32)
 	cfg, opts := getTestConfig(t)
 	init, err := NewInitializer(
 		initialization.WithNodeId(nodeId),
-		initialization.WithAtxId(atxId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
 		initialization.WithConfig(cfg),
 		initialization.WithInitOpts(opts),
 		initialization.WithLogger(testLogger{t: t}),
@@ -126,7 +126,7 @@ func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 	newNodeId := make([]byte, 32)
 	copy(newNodeId, nodeId)
 	newNodeId[0] = newNodeId[0] + 1
-	p, err := NewProver(cfg, opts.DataDir, newNodeId, atxId)
+	p, err := NewProver(cfg, opts.DataDir, newNodeId, commitmentAtxId)
 	r.NoError(err)
 	_, _, err = p.GenerateProof(ch)
 	var errConfigMismatch initialization.ConfigMismatchError
@@ -135,18 +135,18 @@ func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 
 	// Attempt to generate proof with different `atxId`.
 	newAtxId := make([]byte, 32)
-	copy(newAtxId, atxId)
+	copy(newAtxId, commitmentAtxId)
 	newAtxId[0] = newAtxId[0] + 1
 	p, err = NewProver(cfg, opts.DataDir, nodeId, newAtxId)
 	r.NoError(err)
 	_, _, err = p.GenerateProof(ch)
 	r.ErrorAs(err, &errConfigMismatch)
-	r.Equal("AtxId", errConfigMismatch.Param)
+	r.Equal("CommitmentAtxId", errConfigMismatch.Param)
 
 	// Attempt to generate proof with different `BitsPerLabel`.
 	newCfg := cfg
 	newCfg.BitsPerLabel++
-	p, err = NewProver(newCfg, opts.DataDir, nodeId, atxId)
+	p, err = NewProver(newCfg, opts.DataDir, nodeId, commitmentAtxId)
 	r.NoError(err)
 	_, _, err = p.GenerateProof(ch)
 	r.ErrorAs(err, &errConfigMismatch)
@@ -155,7 +155,7 @@ func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 	// Attempt to generate proof with different `LabelsPerUnint`.
 	newCfg = cfg
 	newCfg.LabelsPerUnit++
-	p, err = NewProver(newCfg, opts.DataDir, nodeId, atxId)
+	p, err = NewProver(newCfg, opts.DataDir, nodeId, commitmentAtxId)
 	r.NoError(err)
 	_, _, err = p.GenerateProof(ch)
 	r.ErrorAs(err, &errConfigMismatch)
