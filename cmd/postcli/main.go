@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	baseLog "log"
@@ -23,46 +24,50 @@ import (
 )
 
 var (
-	cfg             = config.DefaultConfig()
-	opts            = config.DefaultInitOpts()
-	log             = logger{}
-	printProviders  bool
-	printConfig     bool
-	id              []byte
-	commitmentAtxId []byte
-	reset           bool
+	cfg                = config.DefaultConfig()
+	opts               = config.DefaultInitOpts()
+	log                = logger{}
+	printProviders     bool
+	printConfig        bool
+	idHex              string
+	id                 []byte
+	commitmentAtxIdHex string
+	commitmentAtxId    []byte
+	reset              bool
 )
 
-func parseFlags() error {
+func parseFlags() {
 	flag.BoolVar(&printProviders, "printProviders", false, "print the list of compute providers")
 	flag.BoolVar(&printProviders, "printConfig", false, "print the used config and options")
 	flag.StringVar(&opts.DataDir, "datadir", opts.DataDir, "filesystem datadir path")
 	flag.IntVar(&opts.ComputeProviderID, "provider", opts.ComputeProviderID, "compute provider id (required)")
 	flag.Uint64Var(&cfg.LabelsPerUnit, "labelsPerUnit", cfg.LabelsPerUnit, "the number of labels per unit")
 	flag.BoolVar(&reset, "reset", false, "whether to reset the datadir before starting")
-	idHex := flag.String("id", "", "miner's id (public key), in hex (will be auto-generated if not provided)")
-	commitmentAtxIdHex := flag.String("commitmentAtxId", "", "commitment atx id, in hex (required)")
+	flag.StringVar(&idHex, "id", "", "miner's id (public key), in hex (will be auto-generated if not provided)")
+	flag.StringVar(&commitmentAtxIdHex, "commitmentAtxId", "", "commitment atx id, in hex (required)")
 
 	var numUnits uint64
 	flag.Uint64Var(&numUnits, "numUnits", uint64(opts.NumUnits), "number of units") // workaround the missing type support for uint32
 	opts.NumUnits = uint32(numUnits)
 
 	flag.Parse()
+}
 
+func processFlags() error {
 	if opts.ComputeProviderID < 0 {
-		baseLog.Fatal("-provider flag is required")
+		return errors.New("-provider flag is required")
 	}
 
-	if *commitmentAtxIdHex == "" {
-		baseLog.Fatalf("-commitmentAtxId flag is required")
+	if commitmentAtxIdHex == "" {
+		return errors.New("-commitmentAtxId flag is required")
 	}
 	var err error
-	commitmentAtxId, err = hex.DecodeString(*commitmentAtxIdHex)
+	commitmentAtxId, err = hex.DecodeString(commitmentAtxIdHex)
 	if err != nil {
 		return fmt.Errorf("invalid commitmentAtxId: %w", err)
 	}
 
-	if *idHex == "" {
+	if idHex == "" {
 		pub, priv, err := ed25519.GenerateKey(nil)
 		if err != nil {
 			return fmt.Errorf("failed to generate identity: %w", err)
@@ -72,7 +77,7 @@ func parseFlags() error {
 		saveKey(priv) // The key will need to be loaded in clients for the PoST data to be usable.
 	} else {
 		var err error
-		id, err = hex.DecodeString(*idHex)
+		id, err = hex.DecodeString(idHex)
 		if err != nil {
 			return fmt.Errorf("invalid id: %w", err)
 		}
@@ -82,9 +87,7 @@ func parseFlags() error {
 }
 
 func main() {
-	if err := parseFlags(); err != nil {
-		log.Panic("cli: failed to parse flags: %v", err)
-	}
+	parseFlags()
 
 	if printProviders {
 		spew.Dump(gpu.Providers())
@@ -95,6 +98,10 @@ func main() {
 		spew.Dump(cfg)
 		spew.Dump(opts)
 		return
+	}
+
+	if err := processFlags(); err != nil {
+		log.Panic("cli: %v", err)
 	}
 
 	commitment := GetCommitmentBytes(id, commitmentAtxId)
@@ -171,4 +178,4 @@ func (l logger) Info(msg string, args ...interface{})    { baseLog.Printf("\tINF
 func (l logger) Debug(msg string, args ...interface{})   { baseLog.Printf("\tDEBUG\t"+msg, args...) }
 func (l logger) Warning(msg string, args ...interface{}) { baseLog.Printf("\tWARN\t"+msg, args...) }
 func (l logger) Error(msg string, args ...interface{})   { baseLog.Printf("\tERROR\t"+msg, args...) }
-func (l logger) Panic(msg string, args ...interface{})   { baseLog.Fatalf("\tPANIC\t"+msg, args...) }
+func (l logger) Panic(msg string, args ...interface{})   { baseLog.Fatalf(msg, args...) }
