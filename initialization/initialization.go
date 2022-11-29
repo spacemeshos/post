@@ -241,6 +241,8 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	// ~  2% of all smeshers won't find a nonce even after checking 4x numLabels
 	defer init.saveMetadata()
 	for i := *init.lastPosition; i < math.MaxUint64; i += batchSize {
+		*init.lastPosition = i
+
 		select {
 		case <-ctx.Done():
 			init.logger.Info("initialization: stopped")
