@@ -149,8 +149,8 @@ type Initializer struct {
 	cfg  Config
 	opts InitOpts
 
-	nonce        *uint64
-	lastPosition *uint64
+	nonce        atomic.Pointer[uint64]
+	lastPosition atomic.Pointer[uint64]
 
 	numLabelsWritten atomic.Uint64
 	diskState        *DiskState
@@ -203,8 +203,8 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		if err := init.verifyMetadata(m); err != nil {
 			return err
 		}
-		init.nonce = m.Nonce
-		init.lastPosition = m.LastPosition
+		init.nonce.Store(m.Nonce)
+		init.lastPosition.Store(m.LastPosition)
 	}
 
 	if err := init.saveMetadata(); err != nil {
@@ -225,14 +225,14 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		}
 	}
 
-	if init.nonce != nil {
+	if init.nonce.Load() != nil {
 		return nil
 	}
 
 	init.logger.Info("initialization: no nonce found while computing leaves, continue searching")
-	if init.lastPosition == nil || *init.lastPosition < numLabels {
-		init.lastPosition = new(uint64)
-		*init.lastPosition = numLabels
+	if init.lastPosition.Load() == nil || *init.lastPosition.Load() < numLabels {
+		lastPos := numLabels
+		init.lastPosition.Store(&lastPos)
 	}
 
 	// continue searching for a nonce
@@ -240,8 +240,9 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	// ~ 37% of all smeshers won't find a nonce while computing leaves
 	// ~  2% of all smeshers won't find a nonce even after checking 4x numLabels
 	defer init.saveMetadata()
-	for i := *init.lastPosition; i < math.MaxUint64; i += batchSize {
-		*init.lastPosition = i
+	for i := *init.lastPosition.Load(); i < math.MaxUint64; i += batchSize {
+		lastPos := i
+		init.lastPosition.Store(&lastPos)
 
 		select {
 		case <-ctx.Done():
@@ -269,8 +270,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		if res.Nonce != nil {
 			init.logger.Debug("initialization: found nonce: %d", *res.Nonce)
 
-			init.nonce = new(uint64)
-			*init.nonce = *res.Nonce
+			init.nonce.Store(res.Nonce)
 			return nil
 		}
 	}
@@ -278,8 +278,12 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	return fmt.Errorf("no nonce found")
 }
 
-func (init *Initializer) SessionNumLabelsWritten() uint64 {
+func (init *Initializer) NumLabelsWritten() uint64 {
 	return init.numLabelsWritten.Load()
+}
+
+func (init *Initializer) Nonce() *uint64 {
+	return init.nonce.Load()
 }
 
 func (init *Initializer) Reset() error {
@@ -395,7 +399,7 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 		// Calculate labels of the batch position range.
 		startPosition := fileOffset + currentPosition
 		endPosition := startPosition + uint64(batchSize) - 1
-		if init.nonce != nil {
+		if init.nonce.Load() != nil {
 			// don't look for a nonce, when we already have one
 			difficulty = nil
 		}
@@ -413,9 +417,8 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 
 		if res.Nonce != nil {
 			init.logger.Info("initialization: file #%v, found nonce: %d", fileIndex, *res.Nonce)
-			init.nonce = new(uint64)
-			*init.nonce = *res.Nonce
 
+			init.nonce.Store(res.Nonce)
 			init.saveMetadata()
 		}
 
@@ -507,8 +510,8 @@ func (init *Initializer) saveMetadata() error {
 		LabelsPerUnit:   init.cfg.LabelsPerUnit,
 		NumUnits:        init.opts.NumUnits,
 		NumFiles:        init.opts.NumFiles,
-		Nonce:           init.nonce,
-		LastPosition:    init.lastPosition,
+		Nonce:           init.nonce.Load(),
+		LastPosition:    init.lastPosition.Load(),
 	}
 	return SaveMetadata(init.opts.DataDir, &v)
 }

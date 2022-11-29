@@ -64,7 +64,7 @@ func TestInitialize(t *testing.T) {
 		cancel()
 		eg.Wait()
 	}
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
@@ -98,7 +98,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	r.NoError(err)
 
 	r.NoError(init.Initialize(context.Background()))
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
@@ -131,7 +131,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(err)
 
 	r.NoError(init.Initialize(context.Background()))
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
@@ -150,7 +150,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(err)
 
 	r.NoError(init.Initialize(context.Background()))
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err = LoadMetadata(opts.DataDir)
 	r.NoError(err)
@@ -172,7 +172,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(err)
 
 	r.NoError(init.Initialize(context.Background()))
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err = LoadMetadata(opts.DataDir)
 	r.NoError(err)
@@ -192,7 +192,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(err)
 
 	r.NoError(init.Initialize(context.Background()))
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err = LoadMetadata(opts.DataDir)
 	r.NoError(err)
@@ -219,7 +219,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(err)
 
 	r.NoError(init.Initialize(context.Background()))
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err = LoadMetadata(opts.DataDir)
 	r.NoError(err)
@@ -255,7 +255,7 @@ func TestReset_WhileInitializing(t *testing.T) {
 	{
 		var eg errgroup.Group
 		eg.Go(func() error {
-			r.Eventually(func() bool { return init.SessionNumLabelsWritten() > 0 }, 5*time.Second, 50*time.Millisecond)
+			r.Eventually(func() bool { return init.NumLabelsWritten() > 0 }, 5*time.Second, 50*time.Millisecond)
 			r.ErrorIs(init.Reset(), ErrCannotResetWhileInitializing)
 			return nil
 		})
@@ -543,7 +543,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			r.NoError(err)
 
 			r.Equal(multipleFilesData, oneFileData)
-			r.Equal(oneFileNonce, *init.nonce)
+			r.Equal(oneFileNonce, *init.Nonce())
 		})
 	}
 }
@@ -735,7 +735,7 @@ func TestStop(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(func() error {
-			r.Eventually(func() bool { return init.SessionNumLabelsWritten() > 0 }, 5*time.Second, 50*time.Millisecond)
+			r.Eventually(func() bool { return init.NumLabelsWritten() > 0 }, 5*time.Second, 50*time.Millisecond)
 			cancel()
 			return nil
 		})
@@ -775,7 +775,7 @@ func assertNumLabelsWritten(ctx context.Context, t *testing.T, init *Initializer
 			case <-ctx.Done():
 				return nil
 			case <-timer.C:
-				num := init.SessionNumLabelsWritten()
+				num := init.NumLabelsWritten()
 				t.Logf("num labels written: %v\n", num)
 				assert.GreaterOrEqual(t, num, prev)
 				prev = num
