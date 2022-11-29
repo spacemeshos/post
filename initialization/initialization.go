@@ -239,9 +239,8 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	// TODO(mafa): PM-195 depending on the difficulty function this can take a VERY long time, with the current difficulty function
 	// ~ 37% of all smeshers won't find a nonce while computing leaves
 	// ~  2% of all smeshers won't find a nonce even after checking 4x numLabels
+	defer init.saveMetadata()
 	for i := *init.lastPosition; i < math.MaxUint64; i += batchSize {
-		defer init.saveMetadata()
-
 		select {
 		case <-ctx.Done():
 			init.logger.Info("initialization: stopped")
