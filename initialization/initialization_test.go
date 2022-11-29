@@ -155,6 +155,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	m, err = LoadMetadata(opts.DataDir)
 	r.NoError(err)
 	r.Equal(origNonce, *m.Nonce)
+	r.Nil(m.LastPosition)
 
 	// lastPos lower than numLabels is ignored
 	m.LastPosition = new(uint64)
@@ -196,8 +197,10 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	m, err = LoadMetadata(opts.DataDir)
 	r.NoError(err)
 	r.NotNil(m.Nonce)
+	r.NotNil(m.LastPosition)
+	r.LessOrEqual(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.LastPosition)
 
-	r.NotEqual(origNonce, *m.Nonce)
+	r.LessOrEqual(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.Nonce)
 	r.NoError(verifying.VerifyPow(*m.Nonce, uint64(opts.NumUnits), uint64(cfg.BitsPerLabel), nodeId, commitmentAtxId))
 
 	// lastPos sets lower bound for searching for nonce if none was found
@@ -221,6 +224,8 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	m, err = LoadMetadata(opts.DataDir)
 	r.NoError(err)
 	r.NotNil(m.Nonce)
+	r.NotNil(m.LastPosition)
+	r.LessOrEqual(lastPos, *m.LastPosition)
 
 	r.Less(lastPos, *m.Nonce)
 	r.NoError(verifying.VerifyPow(*m.Nonce, uint64(opts.NumUnits), uint64(cfg.BitsPerLabel), nodeId, commitmentAtxId))
