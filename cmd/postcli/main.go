@@ -38,7 +38,7 @@ var (
 
 func parseFlags() {
 	flag.BoolVar(&printProviders, "printProviders", false, "print the list of compute providers")
-	flag.BoolVar(&printProviders, "printConfig", false, "print the used config and options")
+	flag.BoolVar(&printConfig, "printConfig", false, "print the used config and options")
 	flag.StringVar(&opts.DataDir, "datadir", opts.DataDir, "filesystem datadir path")
 	flag.IntVar(&opts.ComputeProviderID, "provider", opts.ComputeProviderID, "compute provider id (required)")
 	flag.Uint64Var(&cfg.LabelsPerUnit, "labelsPerUnit", cfg.LabelsPerUnit, "the number of labels per unit")
