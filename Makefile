@@ -47,7 +47,6 @@ clear-test-cache:
 .PHONY: clear-test-cache
 
 lint: get-gpu-setup
-	go vet ./...
 	./bin/golangci-lint run --config .golangci.yml
 .PHONY: lint
 
@@ -57,7 +56,6 @@ lint-fix: get-gpu-setup
 .PHONY: lint-fix
 
 lint-github-action: get-gpu-setup
-	go vet ./...
 	./bin/golangci-lint run --config .golangci.yml --out-format=github-actions
 .PHONY: lint-github-action
 
