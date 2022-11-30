@@ -19,6 +19,8 @@ var (
 	cpuProviderID uint
 )
 
+const CPUProviderName = "CPU"
+
 func init() {
 	providers = cGetProviders()
 	for _, p := range providers {
@@ -43,7 +45,7 @@ func CPUProviderID() uint {
 // Benchmark returns the hashes per second the selected compute provider achieves on the current machine.
 func Benchmark(p ComputeProvider) (int, error) {
 	endPosition := uint64(1 << 17)
-	if p.Model == "CPU" {
+	if p.Model == CPUProviderName {
 		endPosition = uint64(1 << 14)
 	}
 

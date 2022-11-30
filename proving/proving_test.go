@@ -40,8 +40,8 @@ type testLogger struct {
 	t *testing.T
 }
 
-func (l testLogger) Info(msg string, args ...interface{})  { l.t.Logf("\tINFO\t"+msg, args...) }
-func (l testLogger) Debug(msg string, args ...interface{}) { l.t.Logf("\tDEBUG\t"+msg, args...) }
+func (l testLogger) Info(msg string, args ...any)  { l.t.Logf("\tINFO\t"+msg, args...) }
+func (l testLogger) Debug(msg string, args ...any) { l.t.Logf("\tDEBUG\t"+msg, args...) }
 
 func TestProver_GenerateProof(t *testing.T) {
 	// TODO(moshababo): tests should range through `cfg.BitsPerLabel` as well.
