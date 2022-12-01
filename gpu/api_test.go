@@ -1,11 +1,13 @@
 package gpu
 
 import (
+	"encoding/hex"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/spacemeshos/post/shared"
@@ -19,9 +21,18 @@ var (
 func TestCPUProviderExists(t *testing.T) {
 	r := require.New(t)
 
-	p := filterCPUProvider(providers)
-	r.Equal(CPUProviderName, p.Model)
-	r.Equal(ComputeAPIClassCPU, p.ComputeAPI)
+	id := CPUProviderID()
+	r.NotNil(id, "CPU provider not found")
+
+	for _, p := range Providers() {
+		if p.ID == id {
+			r.Equal(CPUProviderName, p.Model)
+			r.Equal(ComputeAPIClassCPU, p.ComputeAPI)
+			return
+		}
+	}
+
+	r.Fail("CPU provider doesn't exist")
 }
 
 // TestScryptPositions is an output correctness sanity test. It doesn't cover many cases.
@@ -31,11 +42,14 @@ func TestScryptPositions(t *testing.T) {
 	providers := Providers()
 	var prevOutput []byte
 	for _, p := range providers {
-		providerId := uint(p.ID)
-		startPosition := uint64(1)
-		endPosition := uint64(1 << 8)
 		hashLenBits := uint32(4)
-		res, err := ScryptPositions(providerId, commitment, salt, startPosition, endPosition, hashLenBits)
+		res, err := ScryptPositions(
+			WithComputeProviderID(p.ID),
+			WithCommitment(commitment),
+			WithSalt(salt),
+			WithStartAndEndPosition(1, 1<<8),
+			WithBitsPerLabel(hashLenBits),
+		)
 		r.NoError(err)
 		r.NotNil(res)
 		r.NotNil(res.Output)
@@ -63,10 +77,13 @@ func TestScryptPositions_HashLenBits(t *testing.T) {
 	for hashLenBits := uint32(1); hashLenBits <= 256; hashLenBits++ {
 		var prevOutput []byte
 		for _, p := range providers {
-			providerId := uint(p.ID)
-			startPosition := uint64(1)
-			endPosition := uint64(1 << 12)
-			res, err := ScryptPositions(providerId, commitment, salt, startPosition, endPosition, hashLenBits)
+			res, err := ScryptPositions(
+				WithComputeProviderID(p.ID),
+				WithCommitment(commitment),
+				WithSalt(salt),
+				WithStartAndEndPosition(1, 1<<12),
+				WithBitsPerLabel(hashLenBits),
+			)
 			r.NoError(err)
 			r.NotNil(res)
 			r.NotNil(res.Output)
@@ -88,7 +105,13 @@ func TestScryptPositions_InvalidProviderId(t *testing.T) {
 	req := require.New(t)
 
 	invalidProviderId := uint(1 << 10)
-	res, err := ScryptPositions(invalidProviderId, commitment, salt, 1, 1, 8)
+	res, err := ScryptPositions(
+		WithComputeProviderID(invalidProviderId),
+		WithCommitment(commitment),
+		WithSalt(salt),
+		WithStartAndEndPosition(1, 1),
+		WithBitsPerLabel(8),
+	)
 	req.EqualError(err, "gpu-post error: invalid provider")
 	req.Nil(res)
 }
@@ -112,7 +135,13 @@ func TestStop(t *testing.T) {
 			startPosition := uint64(1)
 			endPosition := uint64(1 << 18)
 			hashLenBits := uint32(8)
-			res, err := ScryptPositions(providerId, commitment, salt, startPosition, endPosition, hashLenBits)
+			res, err := ScryptPositions(
+				WithComputeProviderID(providerId),
+				WithCommitment(commitment),
+				WithSalt(salt),
+				WithStartAndEndPosition(startPosition, endPosition),
+				WithBitsPerLabel(hashLenBits),
+			)
 			r.NoError(err)
 			r.NotNil(res)
 			r.NotNil(res.Output)
@@ -135,11 +164,16 @@ func TestStop(t *testing.T) {
 		}
 
 		// Testing that a call to `ScryptPositions` after `Stop` is working properly.
-		providerID := uint(p.ID)
 		startPosition := uint64(1)
 		endPosition := uint64(1 << 17)
 		hashLenBits := uint32(8)
-		res, err := ScryptPositions(providerID, commitment, salt, startPosition, endPosition, hashLenBits)
+		res, err := ScryptPositions(
+			WithComputeProviderID(p.ID),
+			WithCommitment(commitment),
+			WithSalt(salt),
+			WithStartAndEndPosition(startPosition, endPosition),
+			WithBitsPerLabel(hashLenBits),
+		)
 		r.NoError(err)
 		r.NotNil(res)
 		r.NotNil(res.Output)
@@ -160,11 +194,16 @@ func TestStop_SameThread(t *testing.T) {
 			res := cStop(10000)
 			r.Equal(StopResultOk, res)
 		}()
-		providerID := uint(p.ID)
 		startPosition := uint64(1)
 		endPosition := uint64(1 << 18)
 		hashLenBits := uint32(8)
-		res, err := ScryptPositions(providerID, commitment, salt, startPosition, endPosition, hashLenBits)
+		res, err := ScryptPositions(
+			WithComputeProviderID(p.ID),
+			WithCommitment(commitment),
+			WithSalt(salt),
+			WithStartAndEndPosition(startPosition, endPosition),
+			WithBitsPerLabel(hashLenBits),
+		)
 		r.NoError(err)
 		r.NotNil(res)
 		r.NotNil(res.Output)
@@ -178,7 +217,13 @@ func TestStop_SameThread(t *testing.T) {
 		// Testing that a call to `ScryptPositions` after `Stop` is working properly.
 		startPosition = uint64(1)
 		endPosition = uint64(1 << 17)
-		res, err = ScryptPositions(providerID, commitment, salt, startPosition, endPosition, hashLenBits)
+		res, err = ScryptPositions(
+			WithComputeProviderID(p.ID),
+			WithCommitment(commitment),
+			WithSalt(salt),
+			WithStartAndEndPosition(startPosition, endPosition),
+			WithBitsPerLabel(hashLenBits),
+		)
 		r.NoError(err)
 		r.NotNil(res)
 		r.NotNil(res.Output)
@@ -195,11 +240,14 @@ func TestScryptPositions_PartialByte(t *testing.T) {
 	providers := Providers()
 	var prevOutput []byte
 	for _, p := range providers {
-		providerId := uint(p.ID)
-		startPosition := uint64(1)
-		endPosition := uint64(9)
 		hashLenBits := uint32(4)
-		res, err := ScryptPositions(providerId, commitment, salt, startPosition, endPosition, hashLenBits)
+		res, err := ScryptPositions(
+			WithComputeProviderID(p.ID),
+			WithCommitment(commitment),
+			WithSalt(salt),
+			WithStartAndEndPosition(1, 9),
+			WithBitsPerLabel(hashLenBits),
+		)
 		req.NoError(err)
 		req.NotNil(res)
 		req.NotNil(res.Output)
@@ -220,5 +268,52 @@ func TestBenchmark(t *testing.T) {
 		b, err := Benchmark(p)
 		req.NoError(err)
 		req.True(b > 0)
+	}
+}
+
+func Test_ScryptPositions_Pow(t *testing.T) {
+	commitment, err := hex.DecodeString("e26b543725490682675f6f84ea7689601adeaf14caa7024ec1140c82754ca339")
+	require.NoError(t, err)
+
+	salt, err := hex.DecodeString("165310acce39719148915c356f25c5cb78e82203222cccdf3c15a9c3684e08cb")
+	require.NoError(t, err)
+
+	d, err := hex.DecodeString("00003fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+	require.NoError(t, err)
+
+	nonce := uint64(126202)
+
+	for _, p := range Providers() {
+		t.Run(fmt.Sprintf("Only PoW, Provider %s", p.Model), func(t *testing.T) {
+			res, err := ScryptPositions(
+				WithComputeProviderID(p.ID),
+				WithCommitment(commitment),
+				WithSalt(salt),
+				WithStartAndEndPosition(0, 128*1024),
+				WithComputePow(d),
+				WithComputeLeaves(false),
+			)
+
+			assert.NoError(t, err)
+			assert.NotNil(t, res.IdxSolution)
+			assert.Equal(t, nonce, *res.IdxSolution)
+		})
+
+		t.Run(fmt.Sprintf("PoW + Leafs, Provider %s", p.Model), func(t *testing.T) {
+			res, err := ScryptPositions(
+				WithComputeProviderID(p.ID),
+				WithCommitment(commitment),
+				WithSalt(salt),
+				WithStartAndEndPosition(0, 128*1024),
+				WithBitsPerLabel(8),
+				WithComputePow(d),
+				WithComputeLeaves(true),
+			)
+
+			assert.NoError(t, err)
+			assert.NotNil(t, res.Output)
+			assert.NotNil(t, res.IdxSolution)
+			assert.Equal(t, nonce, *res.IdxSolution)
+		})
 	}
 }

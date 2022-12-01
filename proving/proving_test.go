@@ -29,7 +29,7 @@ func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	return cfg, opts
 }
@@ -52,19 +52,21 @@ func TestProver_GenerateProof(t *testing.T) {
 		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
 			t.Parallel()
 
-			commitment := make([]byte, 32)
+			nodeId := make([]byte, 32)
+			commitmentAtxId := make([]byte, 32)
 			ch := make(Challenge, 32)
 			cfg := config.DefaultConfig()
 			cfg.LabelsPerUnit = 1 << 12
 
 			opts := config.DefaultInitOpts()
 			opts.NumFiles = 2
-			opts.ComputeProviderID = CPUProviderID()
+			opts.ComputeProviderID = int(CPUProviderID())
 			opts.NumUnits = numUnits
 			opts.DataDir = t.TempDir()
 
 			init, err := NewInitializer(
-				initialization.WithCommitment(commitment),
+				initialization.WithNodeId(nodeId),
+				initialization.WithCommitmentAtxId(commitmentAtxId),
 				initialization.WithConfig(cfg),
 				initialization.WithInitOpts(opts),
 				initialization.WithLogger(log),
@@ -72,7 +74,7 @@ func TestProver_GenerateProof(t *testing.T) {
 			r.NoError(err)
 			r.NoError(init.Initialize(context.Background()))
 
-			p, err := NewProver(cfg, opts.DataDir, commitment)
+			p, err := NewProver(cfg, opts.DataDir, nodeId, commitmentAtxId)
 			r.NoError(err)
 			p.SetLogger(log)
 
@@ -82,7 +84,8 @@ func TestProver_GenerateProof(t *testing.T) {
 			r.NotNil(proof)
 			r.NotNil(proofMetaData)
 
-			r.Equal(commitment, proofMetaData.Commitment)
+			r.Equal(nodeId, proofMetaData.NodeId)
+			r.Equal(commitmentAtxId, proofMetaData.CommitmentAtxId)
 			r.Equal(ch, proofMetaData.Challenge)
 			r.Equal(cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
 			r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
@@ -104,11 +107,14 @@ func TestProver_GenerateProof(t *testing.T) {
 func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 	r := require.New(t)
 
-	commitment := make([]byte, 32)
+	nodeId := make([]byte, 32)
+	commitmentAtxId := make([]byte, 32)
+
 	ch := make(Challenge, 32)
 	cfg, opts := getTestConfig(t)
 	init, err := NewInitializer(
-		initialization.WithCommitment(commitment),
+		initialization.WithNodeId(nodeId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
 		initialization.WithConfig(cfg),
 		initialization.WithInitOpts(opts),
 		initialization.WithLogger(testLogger{t: t}),
@@ -116,38 +122,43 @@ func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))
 
-	// Attempt to generate proof with different `ID`.
-	newCommitment := make([]byte, 32)
-	copy(newCommitment, commitment)
-	newCommitment[0] = newCommitment[0] + 1
-	p, err := NewProver(cfg, opts.DataDir, newCommitment)
+	// Attempt to generate proof with different `nodeId`.
+	newNodeId := make([]byte, 32)
+	copy(newNodeId, nodeId)
+	newNodeId[0] = newNodeId[0] + 1
+	p, err := NewProver(cfg, opts.DataDir, newNodeId, commitmentAtxId)
 	r.NoError(err)
 	_, _, err = p.GenerateProof(ch)
-	r.Error(err)
-	errConfigMismatch, ok := err.(initialization.ConfigMismatchError)
-	r.True(ok)
-	r.Equal("Commitment", errConfigMismatch.Param)
+	var errConfigMismatch initialization.ConfigMismatchError
+	r.ErrorAs(err, &errConfigMismatch)
+	r.Equal("NodeId", errConfigMismatch.Param)
+
+	// Attempt to generate proof with different `atxId`.
+	newAtxId := make([]byte, 32)
+	copy(newAtxId, commitmentAtxId)
+	newAtxId[0] = newAtxId[0] + 1
+	p, err = NewProver(cfg, opts.DataDir, nodeId, newAtxId)
+	r.NoError(err)
+	_, _, err = p.GenerateProof(ch)
+	r.ErrorAs(err, &errConfigMismatch)
+	r.Equal("CommitmentAtxId", errConfigMismatch.Param)
 
 	// Attempt to generate proof with different `BitsPerLabel`.
 	newCfg := cfg
 	newCfg.BitsPerLabel++
-	p, err = NewProver(newCfg, opts.DataDir, commitment)
+	p, err = NewProver(newCfg, opts.DataDir, nodeId, commitmentAtxId)
 	r.NoError(err)
 	_, _, err = p.GenerateProof(ch)
-	r.Error(err)
-	errConfigMismatch, ok = err.(initialization.ConfigMismatchError)
-	r.True(ok)
+	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("BitsPerLabel", errConfigMismatch.Param)
 
 	// Attempt to generate proof with different `LabelsPerUnint`.
 	newCfg = cfg
 	newCfg.LabelsPerUnit++
-	p, err = NewProver(newCfg, opts.DataDir, commitment)
+	p, err = NewProver(newCfg, opts.DataDir, nodeId, commitmentAtxId)
 	r.NoError(err)
 	_, _, err = p.GenerateProof(ch)
-	r.Error(err)
-	errConfigMismatch, ok = err.(initialization.ConfigMismatchError)
-	r.True(ok)
+	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("LabelsPerUnit", errConfigMismatch.Param)
 }
 

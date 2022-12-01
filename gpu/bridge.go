@@ -22,11 +22,15 @@ const (
 	ComputeAPIClassCuda        = ComputeAPIClass((C.ComputeApiClass)(C.COMPUTE_API_CLASS_CUDA))
 	ComputeAPIClassVulkan      = ComputeAPIClass((C.ComputeApiClass)(C.COMPUTE_API_CLASS_VULKAN))
 
-	StopResultOk             = StopResult(C.SPACEMESH_API_ERROR_NONE)
-	StopResultError          = StopResult(C.SPACEMESH_API_ERROR)
-	StopResultErrorTimeout   = StopResult(C.SPACEMESH_API_ERROR_TIMEOUT)
-	StopResultErrorAlready   = StopResult(C.SPACEMESH_API_ERROR_ALREADY)
-	StopResultErrorCancelled = StopResult(C.SPACEMESH_API_ERROR_CANCELED)
+	StopResultPowFound              = StopResult(C.SPACEMESH_API_POW_SOLUTION_FOUND)
+	StopResultOk                    = StopResult(C.SPACEMESH_API_ERROR_NONE)
+	StopResultError                 = StopResult(C.SPACEMESH_API_ERROR)
+	StopResultErrorTimeout          = StopResult(C.SPACEMESH_API_ERROR_TIMEOUT)
+	StopResultErrorAlready          = StopResult(C.SPACEMESH_API_ERROR_ALREADY)
+	StopResultErrorCancelled        = StopResult(C.SPACEMESH_API_ERROR_CANCELED)
+	StopResultErrorNoCompoteOptions = StopResult(C.SPACEMESH_API_ERROR_NO_COMPOTE_OPTIONS)
+	StopResultErrorInvalidParameter = StopResult(C.SPACEMESH_API_ERROR_INVALID_PARAMETER)
+	StopResultErrorInvalidProvider  = StopResult(C.SPACEMESH_API_ERROR_INVALID_PROVIDER_ID)
 )
 
 type ComputeAPIClass uint
@@ -65,35 +69,34 @@ func (s StopResult) String() string {
 	}
 }
 
-func cScryptPositions(providerId uint, commitment, salt []byte, startPosition, endPosition uint64, labelSize uint32, options uint32, n, r, p uint32) ([]byte, uint64, int, int) {
+func cScryptPositions(opt *option) ([]byte, uint64, int, int) {
 	mtx.Lock()
 	defer mtx.Unlock()
 
-	outputSize := shared.DataSize(uint64(endPosition-startPosition+1), uint(labelSize))
+	outputSize := shared.DataSize(uint64(opt.endPosition-opt.startPosition+1), uint(opt.bitsPerLabel))
+	cProviderId := C.uint(opt.computeProviderID)
 
-	cProviderId := C.uint(providerId)
-
-	cCommitment := C.CBytes(commitment)
+	cCommitment := C.CBytes(opt.commitment)
 	defer C.free(cCommitment)
 
-	cStartPosition := C.uint64_t(startPosition)
-	cEndPosition := C.uint64_t(endPosition)
-	cHashLenBits := C.uint32_t(labelSize)
+	cStartPosition := C.uint64_t(opt.startPosition)
+	cEndPosition := C.uint64_t(opt.endPosition)
+	cHashLenBits := C.uint32_t(opt.bitsPerLabel)
 
-	cSalt := C.CBytes(salt)
+	cSalt := C.CBytes(opt.salt)
 	defer C.free(cSalt)
 
-	cOptions := C.uint(options)
+	cOptions := C.uint(opt.optionBits())
 	cOutputSize := C.size_t(outputSize)
 
 	cOut := (C.calloc(cOutputSize, 1))
 	defer C.free(cOut)
 
-	cN := C.uint(n)
-	cR := C.uint(r)
-	cP := C.uint(p)
+	cN := C.uint(opt.n)
+	cR := C.uint(opt.r)
+	cP := C.uint(opt.p)
 
-	cD := (C.calloc(32, 1))
+	cD := C.CBytes(opt.d)
 	defer C.free(cD)
 
 	var cIdxSolution C.uint64_t
@@ -119,7 +122,7 @@ func cScryptPositions(providerId uint, commitment, salt []byte, startPosition, e
 	)
 
 	// Output size could be smaller than anticipated if `C.stop` was called while `C.scryptPositions` was blocking.
-	outputSize = shared.DataSize(uint64(cHashesComputed), uint(labelSize))
+	outputSize = shared.DataSize(uint64(cHashesComputed), uint(opt.bitsPerLabel))
 	output := C.GoBytes(cOut, C.int(outputSize))
 
 	return output, uint64(cIdxSolution), int(cHashesPerSec), int(retVal)

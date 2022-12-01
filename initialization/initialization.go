@@ -5,12 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/gpu"
@@ -44,61 +43,94 @@ var (
 	ErrStateMetadataFileMissing     = errors.New("metadata file is missing")
 )
 
+// Providers returns a list of available compute providers.
 func Providers() []ComputeProvider {
 	return gpu.Providers()
 }
 
-func CPUProviderID() int {
+// CPUProviderID returns the ID of the CPU provider or nil if the CPU provider is not available.
+func CPUProviderID() uint {
 	return gpu.CPUProviderID()
 }
 
-type initializeOption struct {
+type option struct {
+	nodeId          []byte
+	commitmentAtxId []byte
+
 	commitment []byte
-	cfg        *Config
-	initOpts   *config.InitOpts
-	logger     Logger
+
+	cfg      *Config
+	initOpts *config.InitOpts
+	logger   Logger
 }
 
-func (opts *initializeOption) verify() error {
-	if opts.cfg == nil {
+func (o *option) validate() error {
+	if o.nodeId == nil {
+		return errors.New("`nodeId` is required")
+	}
+
+	if o.commitmentAtxId == nil {
+		return errors.New("`commitmentAtxId` is required")
+	}
+
+	o.commitment = oracle.CommitmentBytes(o.nodeId, o.commitmentAtxId)
+
+	if o.cfg == nil {
 		return errors.New("no config provided")
 	}
 
-	if opts.initOpts == nil {
+	if o.initOpts == nil {
 		return errors.New("no init options provided")
 	}
 
-	return config.Validate(*opts.cfg, *opts.initOpts)
+	return config.Validate(*o.cfg, *o.initOpts)
 }
 
-type initializeOptionFunc func(*initializeOption) error
+type OptionFunc func(*option) error
 
-func WithCommitment(commitment []byte) initializeOptionFunc {
-	return func(opts *initializeOption) error {
-		if len(commitment) != 32 {
-			return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(commitment))
+// WithNodeId sets the ID of the Node.
+func WithNodeId(nodeId []byte) OptionFunc {
+	return func(opts *option) error {
+		if len(nodeId) != 32 {
+			return fmt.Errorf("invalid `id` length; expected: 32, given: %v", len(nodeId))
 		}
-		opts.commitment = commitment
+
+		opts.nodeId = nodeId
 		return nil
 	}
 }
 
-func WithInitOpts(initOpts config.InitOpts) initializeOptionFunc {
-	return func(opts *initializeOption) error {
+// WithCommitmentAtxId sets the ID of the CommitmentATX.
+func WithCommitmentAtxId(id []byte) OptionFunc {
+	return func(opts *option) error {
+		if len(id) != 32 {
+			return fmt.Errorf("invalid `commitmentAtxId` length; expected: 32, given: %v", len(id))
+		}
+
+		opts.commitmentAtxId = id
+		return nil
+	}
+}
+
+// WithInitOpts sets the init options for the initializer.
+func WithInitOpts(initOpts config.InitOpts) OptionFunc {
+	return func(opts *option) error {
 		opts.initOpts = &initOpts
 		return nil
 	}
 }
 
-func WithConfig(cfg Config) initializeOptionFunc {
-	return func(opts *initializeOption) error {
+// WithConfig sets the config for the initializer.
+func WithConfig(cfg Config) OptionFunc {
+	return func(opts *option) error {
 		opts.cfg = &cfg
 		return nil
 	}
 }
 
-func WithLogger(logger Logger) initializeOptionFunc {
-	return func(opts *initializeOption) error {
+// WithLogger sets the logger for the initializer.
+func WithLogger(logger Logger) OptionFunc {
+	return func(opts *option) error {
 		if logger == nil {
 			return errors.New("logger is nil")
 		}
@@ -107,21 +139,28 @@ func WithLogger(logger Logger) initializeOptionFunc {
 	}
 }
 
+// Initializer is responsible for initializing a new PoST commitment.
 type Initializer struct {
-	numLabelsWritten atomic.Uint64
+	nodeId          []byte
+	commitmentAtxId []byte
 
-	cfg        Config
-	opts       InitOpts
 	commitment []byte
 
-	diskState *DiskState
-	mtx       sync.RWMutex
+	cfg  Config
+	opts InitOpts
+
+	nonce        atomic.Pointer[uint64]
+	lastPosition atomic.Pointer[uint64]
+
+	numLabelsWritten atomic.Uint64
+	diskState        *DiskState
+	mtx              sync.RWMutex
 
 	logger Logger
 }
 
-func NewInitializer(opts ...initializeOptionFunc) (*Initializer, error) {
-	options := &initializeOption{
+func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
+	options := &option{
 		logger: shared.DisabledLogger{},
 	}
 
@@ -131,16 +170,18 @@ func NewInitializer(opts ...initializeOptionFunc) (*Initializer, error) {
 		}
 	}
 
-	if err := options.verify(); err != nil {
+	if err := options.validate(); err != nil {
 		return nil, err
 	}
 
 	return &Initializer{
-		cfg:        *options.cfg,
-		opts:       *options.initOpts,
-		commitment: options.commitment,
-		diskState:  NewDiskState(options.initOpts.DataDir, uint(options.cfg.BitsPerLabel)),
-		logger:     options.logger,
+		cfg:             *options.cfg,
+		opts:            *options.initOpts,
+		nodeId:          options.nodeId,
+		commitmentAtxId: options.commitmentAtxId,
+		commitment:      options.commitment,
+		diskState:       NewDiskState(options.initOpts.DataDir, uint(options.cfg.BitsPerLabel)),
+		logger:          options.logger,
 	}, nil
 }
 
@@ -162,6 +203,8 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		if err := init.verifyMetadata(m); err != nil {
 			return err
 		}
+		init.nonce.Store(m.Nonce)
+		init.lastPosition.Store(m.LastPosition)
 	}
 
 	if err := init.saveMetadata(); err != nil {
@@ -170,21 +213,77 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 
 	numLabels := uint64(init.opts.NumUnits) * uint64(init.cfg.LabelsPerUnit)
 	fileNumLabels := numLabels / uint64(init.opts.NumFiles)
+	difficulty := shared.PowDifficulty(numLabels)
+	batchSize := uint64(config.DefaultComputeBatchSize)
 
 	init.logger.Info("initialization: starting to write %v file(s); number of units: %v, number of labels per unit: %v, number of bits per label: %v, datadir: %v",
 		init.opts.NumFiles, init.opts.NumUnits, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel, init.opts.DataDir)
 
 	for i := 0; i < int(init.opts.NumFiles); i++ {
-		if err := init.initFile(ctx, uint(init.opts.ComputeProviderID), i, numLabels, fileNumLabels); err != nil {
+		if err := init.initFile(ctx, i, batchSize, numLabels, fileNumLabels, difficulty); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	if init.nonce.Load() != nil {
+		return nil
+	}
+
+	init.logger.Info("initialization: no nonce found while computing leaves, continue searching")
+	if init.lastPosition.Load() == nil || *init.lastPosition.Load() < numLabels {
+		lastPos := numLabels
+		init.lastPosition.Store(&lastPos)
+	}
+
+	// continue searching for a nonce
+	// TODO(mafa): PM-195 depending on the difficulty function this can take a VERY long time, with the current difficulty function
+	// ~ 37% of all smeshers won't find a nonce while computing leaves
+	// ~  2% of all smeshers won't find a nonce even after checking 4x numLabels
+	defer init.saveMetadata()
+	for i := *init.lastPosition.Load(); i < math.MaxUint64; i += batchSize {
+		lastPos := i
+		init.lastPosition.Store(&lastPos)
+
+		select {
+		case <-ctx.Done():
+			init.logger.Info("initialization: stopped")
+			if res := gpu.Stop(); res != gpu.StopResultOk {
+				return fmt.Errorf("gpu stop error: %s", res)
+			}
+			return ctx.Err()
+		default:
+			// continue looking for a nonce
+		}
+
+		init.logger.Debug("initialization: continue looking for a nonce: start position: %v, batch size: %v", i, batchSize)
+
+		res, err := oracle.WorkOracle(
+			oracle.WithComputeProviderID(uint(init.opts.ComputeProviderID)),
+			oracle.WithCommitment(init.commitment),
+			oracle.WithStartAndEndPosition(i, i+batchSize-1),
+			oracle.WithComputePow(difficulty),
+			oracle.WithComputeLeaves(false),
+		)
+		if err != nil {
+			return err
+		}
+		if res.Nonce != nil {
+			init.logger.Debug("initialization: found nonce: %d", *res.Nonce)
+
+			init.nonce.Store(res.Nonce)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("no nonce found")
 }
 
-func (init *Initializer) SessionNumLabelsWritten() uint64 {
+func (init *Initializer) NumLabelsWritten() uint64 {
 	return init.numLabelsWritten.Load()
+}
+
+func (init *Initializer) Nonce() *uint64 {
+	return init.nonce.Load()
 }
 
 func (init *Initializer) Reset() error {
@@ -237,10 +336,9 @@ func (init *Initializer) Status() Status {
 	return StatusNotStarted
 }
 
-func (init *Initializer) initFile(ctx context.Context, computeProviderID uint, fileIndex int, numLabels uint64, fileNumLabels uint64) error {
+func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize, numLabels, fileNumLabels uint64, difficulty []byte) error {
 	fileOffset := uint64(fileIndex) * fileNumLabels
 	fileTargetPosition := fileOffset + fileNumLabels
-	batchSize := uint64(config.DefaultComputeBatchSize)
 
 	// Initialize the labels file writer.
 	writer, err := persistence.NewLabelsWriter(init.opts.DataDir, fileIndex, uint(init.cfg.BitsPerLabel))
@@ -254,92 +352,85 @@ func (init *Initializer) initFile(ctx context.Context, computeProviderID uint, f
 		return err
 	}
 
-	if numLabelsWritten > 0 {
-		if numLabelsWritten == fileNumLabels {
-			init.logger.Info("initialization: file #%v already initialized; number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileOffset)
-			init.numLabelsWritten.Store(fileTargetPosition)
-			return nil
-		}
+	switch {
+	case numLabelsWritten == fileNumLabels:
+		init.logger.Info("initialization: file #%v already initialized; number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileOffset)
+		init.numLabelsWritten.Store(fileTargetPosition)
+		return nil
 
-		if numLabelsWritten > fileNumLabels {
-			init.logger.Info("initialization: truncating file #%v; current number of labels: %v, target number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileNumLabels, fileOffset)
-			if err := writer.Truncate(fileNumLabels); err != nil {
-				return err
-			}
-			init.numLabelsWritten.Store(fileTargetPosition)
-			return nil
+	case numLabelsWritten > fileNumLabels:
+		init.logger.Info("initialization: truncating file #%v; current number of labels: %v, target number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileNumLabels, fileOffset)
+		if err := writer.Truncate(fileNumLabels); err != nil {
+			return err
 		}
+		init.numLabelsWritten.Store(fileTargetPosition)
+		return nil
 
+	case numLabelsWritten > 0:
 		init.logger.Info("initialization: continuing to write file #%v; current number of labels: %v, target number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileNumLabels, fileOffset)
-	} else {
+
+	default:
 		init.logger.Info("initialization: starting to write file #%v; target number of labels: %v, start position: %v", fileIndex, fileNumLabels, fileOffset)
 	}
 
-	currentPosition := numLabelsWritten
-	outputChan := make(chan []byte, 1024)
-
-	errGroup, ctx := errgroup.WithContext(ctx)
-
-	// Start compute worker.
-	errGroup.Go(func() error {
-		defer close(outputChan)
-
-		for currentPosition < fileNumLabels {
-			select {
-			case <-ctx.Done():
-				init.logger.Info("initialization: stopped")
-
-				if res := gpu.Stop(); res != gpu.StopResultOk {
-					return fmt.Errorf("gpu stop error: %s", res)
-				}
-
-				return ctx.Err()
-			default:
+	for currentPosition := numLabelsWritten; currentPosition < fileNumLabels; currentPosition += batchSize {
+		select {
+		case <-ctx.Done():
+			init.logger.Info("initialization: stopped")
+			if res := gpu.Stop(); res != gpu.StopResultOk {
+				return fmt.Errorf("gpu stop error: %s", res)
 			}
-
-			// The last batch might need to be smaller.
-			remaining := fileNumLabels - currentPosition
-			if remaining < batchSize {
-				batchSize = remaining
-			}
-
-			init.logger.Debug("initialization: file #%v current position: %v, remaining: %v", fileIndex, currentPosition, remaining)
-
-			// Calculate labels of the batch position range.
-			startPosition := fileOffset + currentPosition
-			endPosition := startPosition + uint64(batchSize) - 1
-			output, err := oracle.WorkOracle(computeProviderID, init.commitment, startPosition, endPosition, uint32(init.cfg.BitsPerLabel))
-			if err != nil {
+			if err := writer.Flush(); err != nil {
 				return err
 			}
-			outputChan <- output
-			currentPosition += uint64(batchSize)
-
-			init.numLabelsWritten.Store(fileOffset + currentPosition)
+			return ctx.Err()
+		default:
+			// continue initialization
 		}
-		return nil
-	})
 
-	// Start IO worker.
-	errGroup.Go(func() error {
-		for {
-			select {
-			case <-ctx.Done():
-				return writer.Flush()
-			case batch, ok := <-outputChan:
-				if !ok {
-					return writer.Flush()
-				}
-
-				// Write labels batch to disk.
-				if err := writer.Write(batch); err != nil {
-					return err
-				}
-			}
+		// The last batch might need to be smaller.
+		remaining := fileNumLabels - currentPosition
+		if remaining < batchSize {
+			batchSize = remaining
 		}
-	})
 
-	if err := errGroup.Wait(); err != nil {
+		init.logger.Debug("initialization: file #%v current position: %v, remaining: %v", fileIndex, currentPosition, remaining)
+
+		// Calculate labels of the batch position range.
+		startPosition := fileOffset + currentPosition
+		endPosition := startPosition + uint64(batchSize) - 1
+		if init.nonce.Load() != nil {
+			// don't look for a nonce, when we already have one
+			difficulty = nil
+		}
+
+		res, err := oracle.WorkOracle(
+			oracle.WithComputeProviderID(uint(init.opts.ComputeProviderID)),
+			oracle.WithCommitment(init.commitment),
+			oracle.WithStartAndEndPosition(startPosition, endPosition),
+			oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
+			oracle.WithComputePow(difficulty),
+		)
+		if err != nil {
+			return err
+		}
+
+		if res.Nonce != nil {
+			init.logger.Info("initialization: file #%v, found nonce: %d", fileIndex, *res.Nonce)
+
+			init.nonce.Store(res.Nonce)
+			init.saveMetadata()
+		}
+
+		// Write labels batch to disk.
+		if err := writer.Write(res.Output); err != nil {
+			return err
+		}
+
+		init.numLabelsWritten.Store(fileOffset + currentPosition + uint64(batchSize))
+	}
+
+	if err := writer.Flush(); err != nil {
 		return err
 	}
 
@@ -352,12 +443,21 @@ func (init *Initializer) initFile(ctx context.Context, computeProviderID uint, f
 	return nil
 }
 
-func (init *Initializer) verifyMetadata(m *Metadata) error {
-	if !bytes.Equal(init.commitment, m.Commitment) {
+func (init *Initializer) verifyMetadata(m *shared.PostMetadata) error {
+	if !bytes.Equal(init.nodeId, m.NodeId) {
 		return ConfigMismatchError{
-			Param:    "Commitment",
-			Expected: fmt.Sprintf("%x", init.commitment),
-			Found:    fmt.Sprintf("%x", m.Commitment),
+			Param:    "NodeId",
+			Expected: fmt.Sprintf("%x", init.nodeId),
+			Found:    fmt.Sprintf("%x", m.NodeId),
+			DataDir:  init.opts.DataDir,
+		}
+	}
+
+	if !bytes.Equal(init.commitmentAtxId, m.CommitmentAtxId) {
+		return ConfigMismatchError{
+			Param:    "CommitmentAtxId",
+			Expected: fmt.Sprintf("%x", init.commitmentAtxId),
+			Found:    fmt.Sprintf("%x", m.CommitmentAtxId),
 			DataDir:  init.opts.DataDir,
 		}
 	}
@@ -403,16 +503,19 @@ func (init *Initializer) verifyMetadata(m *Metadata) error {
 }
 
 func (init *Initializer) saveMetadata() error {
-	v := Metadata{
-		Commitment:    init.commitment,
-		BitsPerLabel:  init.cfg.BitsPerLabel,
-		LabelsPerUnit: init.cfg.LabelsPerUnit,
-		NumUnits:      init.opts.NumUnits,
-		NumFiles:      init.opts.NumFiles,
+	v := shared.PostMetadata{
+		NodeId:          init.nodeId,
+		CommitmentAtxId: init.commitmentAtxId,
+		BitsPerLabel:    init.cfg.BitsPerLabel,
+		LabelsPerUnit:   init.cfg.LabelsPerUnit,
+		NumUnits:        init.opts.NumUnits,
+		NumFiles:        init.opts.NumFiles,
+		Nonce:           init.nonce.Load(),
+		LastPosition:    init.lastPosition.Load(),
 	}
 	return SaveMetadata(init.opts.DataDir, &v)
 }
 
-func (init *Initializer) loadMetadata() (*Metadata, error) {
+func (init *Initializer) loadMetadata() (*shared.PostMetadata, error) {
 	return LoadMetadata(init.opts.DataDir)
 }
