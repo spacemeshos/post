@@ -22,7 +22,7 @@ var (
 
 // VerifyPow ensures the validity of a nonce for a given node.
 // AtxId is the id of the ATX that was selected by the node for its commitment.
-func VerifyPow(nonce, numUnits, bitsPerLabel uint64, nodeId, commitmentAtxId []byte) error {
+func VerifyPow(nonce uint64, numUnits uint32, bitsPerLabel uint8, nodeId, commitmentAtxId []byte) error {
 	if len(nodeId) != 32 {
 		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(nodeId))
 	}
@@ -31,7 +31,7 @@ func VerifyPow(nonce, numUnits, bitsPerLabel uint64, nodeId, commitmentAtxId []b
 		return fmt.Errorf("invalid `commitmentAtxId` length; expected: 32, given: %v", len(commitmentAtxId))
 	}
 
-	numLabels := numUnits * bitsPerLabel
+	numLabels := uint64(numUnits) * uint64(bitsPerLabel)
 	difficulty := shared.PowDifficulty(numLabels)
 	threshold := new(big.Int).SetBytes(difficulty)
 
