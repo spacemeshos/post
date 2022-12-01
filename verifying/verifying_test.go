@@ -75,8 +75,7 @@ func TestVerifyPow(t *testing.T) {
 
 	m, err := initialization.LoadMetadata(opts.DataDir)
 	r.NoError(err)
-
-	r.NoError(VerifyPow(*m.Nonce, opts.NumUnits, cfg.BitsPerLabel, nodeId, commitmentAtxId))
+	r.NoError(VerifyPow(m))
 }
 
 // TestLabelsCorrectness tests, for variation of label sizes, the correctness of

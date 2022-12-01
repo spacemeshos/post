@@ -28,7 +28,7 @@ type (
 	Challenge           = shared.Challenge
 	ConfigMismatchError = shared.ConfigMismatchError
 
-	Metadata  = initialization.Metadata
+	Metadata  = shared.PostMetadata
 	DiskState = initialization.DiskState
 )
 
@@ -149,7 +149,7 @@ func (p *Prover) initCompleted(numUnits uint) (bool, error) {
 	return numLabelsWritten == target, nil
 }
 
-func (p *Prover) loadMetadata() (*initialization.Metadata, error) {
+func (p *Prover) loadMetadata() (*Metadata, error) {
 	return initialization.LoadMetadata(p.datadir)
 }
 

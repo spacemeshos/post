@@ -443,7 +443,7 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 	return nil
 }
 
-func (init *Initializer) verifyMetadata(m *Metadata) error {
+func (init *Initializer) verifyMetadata(m *shared.PostMetadata) error {
 	if !bytes.Equal(init.nodeId, m.NodeId) {
 		return ConfigMismatchError{
 			Param:    "NodeId",
@@ -503,7 +503,7 @@ func (init *Initializer) verifyMetadata(m *Metadata) error {
 }
 
 func (init *Initializer) saveMetadata() error {
-	v := Metadata{
+	v := shared.PostMetadata{
 		NodeId:          init.nodeId,
 		CommitmentAtxId: init.commitmentAtxId,
 		BitsPerLabel:    init.cfg.BitsPerLabel,
@@ -516,6 +516,6 @@ func (init *Initializer) saveMetadata() error {
 	return SaveMetadata(init.opts.DataDir, &v)
 }
 
-func (init *Initializer) loadMetadata() (*Metadata, error) {
+func (init *Initializer) loadMetadata() (*shared.PostMetadata, error) {
 	return LoadMetadata(init.opts.DataDir)
 }

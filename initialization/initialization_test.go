@@ -68,8 +68,7 @@ func TestInitialize(t *testing.T) {
 
 	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
-	r.NotNil(m.Nonce)
-	r.NoError(verifying.VerifyPow(*m.Nonce, opts.NumUnits, cfg.BitsPerLabel, nodeId, commitmentAtxId))
+	r.NoError(verifying.VerifyPow(m))
 }
 
 func TestInitialize_PowOutOfRange(t *testing.T) {
@@ -102,8 +101,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 
 	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
-	r.NotNil(m.Nonce)
-	r.NoError(verifying.VerifyPow(*m.Nonce, opts.NumUnits, cfg.BitsPerLabel, nodeId, commitmentAtxId))
+	r.NoError(verifying.VerifyPow(m))
 
 	// check that the found nonce is outside of the range for calculating labels
 	r.Less(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.Nonce)
@@ -135,8 +133,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 
 	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
-	r.NotNil(m.Nonce)
-	r.NoError(verifying.VerifyPow(*m.Nonce, opts.NumUnits, cfg.BitsPerLabel, nodeId, commitmentAtxId))
+	r.NoError(verifying.VerifyPow(m))
 
 	// trying again returns same nonce
 	origNonce := *m.Nonce
@@ -201,7 +198,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.LessOrEqual(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.LastPosition)
 
 	r.LessOrEqual(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.Nonce)
-	r.NoError(verifying.VerifyPow(*m.Nonce, opts.NumUnits, cfg.BitsPerLabel, nodeId, commitmentAtxId))
+	r.NoError(verifying.VerifyPow(m))
 
 	// lastPos sets lower bound for searching for nonce if none was found
 	lastPos := *m.Nonce + 10
@@ -228,7 +225,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.LessOrEqual(lastPos, *m.LastPosition)
 
 	r.Less(lastPos, *m.Nonce)
-	r.NoError(verifying.VerifyPow(*m.Nonce, opts.NumUnits, cfg.BitsPerLabel, nodeId, commitmentAtxId))
+	r.NoError(verifying.VerifyPow(m))
 }
 
 func TestReset_WhileInitializing(t *testing.T) {
@@ -519,8 +516,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 
 	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
-	r.NotNil(m.Nonce)
-	r.NoError(verifying.VerifyPow(*m.Nonce, opts.NumUnits, cfg.BitsPerLabel, nodeId, commitmentAtxId))
+	r.NoError(verifying.VerifyPow(m))
 	oneFileNonce := *m.Nonce
 
 	for numFiles := uint32(2); numFiles <= 16; numFiles <<= 1 {

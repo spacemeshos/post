@@ -2,6 +2,7 @@ package verifying
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -22,23 +23,27 @@ var (
 
 // VerifyPow ensures the validity of a nonce for a given node.
 // AtxId is the id of the ATX that was selected by the node for its commitment.
-func VerifyPow(nonce uint64, numUnits uint32, bitsPerLabel uint8, nodeId, commitmentAtxId []byte) error {
-	if len(nodeId) != 32 {
-		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(nodeId))
+func VerifyPow(m *shared.PostMetadata) error {
+	if m.Nonce == nil {
+		return errors.New("invalid `nonce` value; expected: non-nil, given: nil")
 	}
 
-	if len(commitmentAtxId) != 32 {
-		return fmt.Errorf("invalid `commitmentAtxId` length; expected: 32, given: %v", len(commitmentAtxId))
+	if len(m.NodeId) != 32 {
+		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(m.NodeId))
 	}
 
-	numLabels := uint64(numUnits) * uint64(bitsPerLabel)
+	if len(m.CommitmentAtxId) != 32 {
+		return fmt.Errorf("invalid `commitmentAtxId` length; expected: 32, given: %v", len(m.CommitmentAtxId))
+	}
+
+	numLabels := uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
 	difficulty := shared.PowDifficulty(numLabels)
 	threshold := new(big.Int).SetBytes(difficulty)
 
 	res, err := WorkOracle(
-		oracle.WithCommitment(oracle.CommitmentBytes(nodeId, commitmentAtxId)),
-		oracle.WithPosition(nonce),
-		oracle.WithBitsPerLabel(uint32(bitsPerLabel)*32),
+		oracle.WithCommitment(oracle.CommitmentBytes(m.NodeId, m.CommitmentAtxId)),
+		oracle.WithPosition(*m.Nonce),
+		oracle.WithBitsPerLabel(uint32(m.BitsPerLabel)*32),
 	)
 	if err != nil {
 		return err
