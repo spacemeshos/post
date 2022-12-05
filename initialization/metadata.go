@@ -11,16 +11,7 @@ import (
 
 const metadataFileName = "postdata_metadata.json"
 
-// metadata is the data associated with the PoST init procedure, persisted in the datadir next to the init files.
-type Metadata struct {
-	Commitment    []byte
-	BitsPerLabel  uint8
-	LabelsPerUnit uint64
-	NumUnits      uint32
-	NumFiles      uint32
-}
-
-func SaveMetadata(dir string, v *Metadata) error {
+func SaveMetadata(dir string, v *shared.PostMetadata) error {
 	err := os.MkdirAll(dir, shared.OwnerReadWriteExec)
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("dir creation failure: %w", err)
@@ -39,7 +30,7 @@ func SaveMetadata(dir string, v *Metadata) error {
 	return nil
 }
 
-func LoadMetadata(dir string) (*Metadata, error) {
+func LoadMetadata(dir string) (*shared.PostMetadata, error) {
 	filename := filepath.Join(dir, metadataFileName)
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -49,7 +40,7 @@ func LoadMetadata(dir string) (*Metadata, error) {
 		return nil, fmt.Errorf("read file failure: %w", err)
 	}
 
-	metadata := Metadata{}
+	metadata := shared.PostMetadata{}
 	if err := json.Unmarshal(data, &metadata); err != nil {
 		return nil, err
 	}

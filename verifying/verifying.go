@@ -2,7 +2,9 @@ package verifying
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/oracle"
@@ -14,16 +16,56 @@ type (
 )
 
 var (
-	WorkOracleOne = oracle.WorkOracleOne
-	FastOracle    = oracle.FastOracle
-	UInt64LE      = shared.UInt64LE
+	WorkOracle = oracle.WorkOracle
+	FastOracle = oracle.FastOracle
+	UInt64LE   = shared.UInt64LE
 )
+
+// VerifyPow ensures the validity of a nonce for a given node.
+// AtxId is the id of the ATX that was selected by the node for its commitment.
+func VerifyPow(m *shared.PostMetadata) error {
+	if m.Nonce == nil {
+		return errors.New("invalid `nonce` value; expected: non-nil, given: nil")
+	}
+
+	if len(m.NodeId) != 32 {
+		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(m.NodeId))
+	}
+
+	if len(m.CommitmentAtxId) != 32 {
+		return fmt.Errorf("invalid `commitmentAtxId` length; expected: 32, given: %v", len(m.CommitmentAtxId))
+	}
+
+	numLabels := uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
+	difficulty := shared.PowDifficulty(numLabels)
+	threshold := new(big.Int).SetBytes(difficulty)
+
+	res, err := WorkOracle(
+		oracle.WithCommitment(oracle.CommitmentBytes(m.NodeId, m.CommitmentAtxId)),
+		oracle.WithPosition(*m.Nonce),
+		oracle.WithBitsPerLabel(uint32(m.BitsPerLabel)*32),
+	)
+	if err != nil {
+		return err
+	}
+
+	label := new(big.Int).SetBytes(res.Output)
+	if label.Cmp(threshold) > 0 {
+		return fmt.Errorf("label is above the threshold; label: %#32x, threshold: %#32x", label, threshold)
+	}
+
+	return nil
+}
 
 // Verify ensures the validity of a proof in respect to its metadata.
 // It returns nil if the proof is valid or an error describing the failure, otherwise.
 func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
-	if len(m.Commitment) != 32 {
-		return fmt.Errorf("invalid `commitment` length; expected: 32, given: %v", len(m.Commitment))
+	if len(m.NodeId) != 32 {
+		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(m.NodeId))
+	}
+
+	if len(m.CommitmentAtxId) != 32 {
+		return fmt.Errorf("invalid `atxId` length; expected: 32, given: %v", len(m.CommitmentAtxId))
 	}
 
 	numLabels := uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
@@ -48,12 +90,19 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 		}
 		indicesSet[index] = true
 
-		label := WorkOracleOne(m.Commitment, index, uint32(m.BitsPerLabel))
-		hash := FastOracle(m.Challenge, p.Nonce, label)
+		res, err := WorkOracle(
+			oracle.WithCommitment(oracle.CommitmentBytes(m.NodeId, m.CommitmentAtxId)),
+			oracle.WithPosition(index),
+			oracle.WithBitsPerLabel(uint32(m.BitsPerLabel)),
+		)
+		if err != nil {
+			return err
+		}
+		hash := FastOracle(m.Challenge, p.Nonce, res.Output)
 		hashNum := UInt64LE(hash[:])
 		if hashNum > difficulty {
 			return fmt.Errorf("fast oracle output is above the threshold; index: %d, label: %x, hash: %x, hashNum: %d, difficulty: %d",
-				index, label, hash, hashNum, difficulty)
+				index, res.Output, hash, hashNum, difficulty)
 		}
 	}
 

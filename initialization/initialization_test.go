@@ -3,6 +3,7 @@ package initialization
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"testing"
@@ -15,6 +16,12 @@ import (
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
+	"github.com/spacemeshos/post/verifying"
+)
+
+var (
+	nodeId          = make([]byte, 32)
+	commitmentAtxId = make([]byte, 32)
 )
 
 type testLogger struct {
@@ -23,8 +30,8 @@ type testLogger struct {
 	t *testing.T
 }
 
-func (l testLogger) Info(msg string, args ...interface{})  { l.t.Logf("\tINFO\t"+msg, args...) }
-func (l testLogger) Debug(msg string, args ...interface{}) { l.t.Logf("\tDEBUG\t"+msg, args...) }
+func (l testLogger) Info(msg string, args ...any)  { l.t.Logf("\tINFO\t"+msg, args...) }
+func (l testLogger) Debug(msg string, args ...any) { l.t.Logf("\tDEBUG\t"+msg, args...) }
 
 func TestInitialize(t *testing.T) {
 	r := require.New(t)
@@ -36,10 +43,11 @@ func TestInitialize(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -55,9 +63,169 @@ func TestInitialize(t *testing.T) {
 		r.NoError(init.Initialize(ctx))
 		cancel()
 		eg.Wait()
-
-		r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.SessionNumLabelsWritten())
 	}
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+
+	m, err := LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.NoError(verifying.VerifyPow(m))
+}
+
+func TestInitialize_PowOutOfRange(t *testing.T) {
+	r := require.New(t)
+
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
+	opts.NumFiles = 2
+	opts.ComputeProviderID = int(CPUProviderID())
+
+	// nodeId where no label in the first uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit satisfies the PoW requirement.
+	nodeId, err := hex.DecodeString("52fdfc072182654f163f5f0f9a621d729566c74d10037c4d7bbb0407d1e2c649")
+	r.NoError(err)
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+
+	r.NoError(init.Initialize(context.Background()))
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+
+	m, err := LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.NoError(verifying.VerifyPow(m))
+
+	// check that the found nonce is outside of the range for calculating labels
+	r.Less(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.Nonce)
+}
+
+func TestInitialize_ContinueWithLastPos(t *testing.T) {
+	r := require.New(t)
+
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
+	opts.NumFiles = 2
+	opts.ComputeProviderID = int(CPUProviderID())
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+
+	r.NoError(init.Initialize(context.Background()))
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+
+	m, err := LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.NoError(verifying.VerifyPow(m))
+
+	// trying again returns same nonce
+	origNonce := *m.Nonce
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+
+	r.NoError(init.Initialize(context.Background()))
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+
+	m, err = LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.Equal(origNonce, *m.Nonce)
+	r.Nil(m.LastPosition)
+
+	// lastPos lower than numLabels is ignored
+	m.LastPosition = new(uint64)
+	*m.LastPosition = uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit - 10
+	r.NoError(SaveMetadata(opts.DataDir, m))
+
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+
+	r.NoError(init.Initialize(context.Background()))
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+
+	m, err = LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.Equal(origNonce, *m.Nonce)
+
+	// no nonce found and lastPos not set finds a higher nonce than numLabels
+	m.Nonce = nil
+	r.NoError(SaveMetadata(opts.DataDir, m))
+
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+
+	r.NoError(init.Initialize(context.Background()))
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+
+	m, err = LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.NotNil(m.Nonce)
+	r.NotNil(m.LastPosition)
+	r.LessOrEqual(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.LastPosition)
+
+	r.LessOrEqual(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.Nonce)
+	r.NoError(verifying.VerifyPow(m))
+
+	// lastPos sets lower bound for searching for nonce if none was found
+	lastPos := *m.Nonce + 10
+	*m.LastPosition = lastPos
+	m.Nonce = nil
+	r.NoError(SaveMetadata(opts.DataDir, m))
+
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+
+	r.NoError(init.Initialize(context.Background()))
+	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+
+	m, err = LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.NotNil(m.Nonce)
+	r.NotNil(m.LastPosition)
+	r.LessOrEqual(lastPos, *m.LastPosition)
+
+	r.Less(lastPos, *m.Nonce)
+	r.NoError(verifying.VerifyPow(m))
 }
 
 func TestReset_WhileInitializing(t *testing.T) {
@@ -70,10 +238,11 @@ func TestReset_WhileInitializing(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -83,7 +252,7 @@ func TestReset_WhileInitializing(t *testing.T) {
 	{
 		var eg errgroup.Group
 		eg.Go(func() error {
-			r.Eventually(func() bool { return init.SessionNumLabelsWritten() > 0 }, 5*time.Second, 50*time.Millisecond)
+			r.Eventually(func() bool { return init.NumLabelsWritten() > 0 }, 5*time.Second, 50*time.Millisecond)
 			r.ErrorIs(init.Reset(), ErrCannotResetWhileInitializing)
 			return nil
 		})
@@ -104,10 +273,11 @@ func TestInitialize_Repeated(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -127,7 +297,8 @@ func TestInitialize_Repeated(t *testing.T) {
 
 	// Initialize again using the same config & opts.
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -156,10 +327,11 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 1
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -180,7 +352,8 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	// Increase `opts.NumUnits`.
 	opts.NumUnits++
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -209,10 +382,11 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits + 1
 	opts.NumFiles = 1
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -233,12 +407,14 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	// Decrease `opts.NumUnits`.
 	opts.NumUnits--
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
 	)
 	r.NoError(err)
+
 	{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -261,10 +437,11 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits + 1
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -287,7 +464,8 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	// Increase `opts.NumUnits` while `opts.NumFiles` > 1.
 	opts.NumUnits = prevNumUnits + 1
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -300,7 +478,8 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 	// Decrease `opts.NumUnits` while `opts.NumFiles` > 1.
 	opts.NumUnits = prevNumUnits - 1
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -320,10 +499,11 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -334,6 +514,11 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	oneFileData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
 	r.NoError(err)
 
+	m, err := LoadMetadata(opts.DataDir)
+	r.NoError(err)
+	r.NoError(verifying.VerifyPow(m))
+	oneFileNonce := *m.Nonce
+
 	for numFiles := uint32(2); numFiles <= 16; numFiles <<= 1 {
 		t.Run(fmt.Sprintf("NumFiles=%d", numFiles), func(t *testing.T) {
 			opts := opts
@@ -341,7 +526,8 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			opts.DataDir = t.TempDir()
 
 			init, err := NewInitializer(
-				WithCommitment(make([]byte, 32)),
+				WithNodeId(nodeId),
+				WithCommitmentAtxId(commitmentAtxId),
 				WithConfig(cfg),
 				WithInitOpts(opts),
 				WithLogger(testLogger{t: t}),
@@ -353,6 +539,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			r.NoError(err)
 
 			r.Equal(multipleFilesData, oneFileData)
+			r.Equal(oneFileNonce, *init.Nonce())
 		})
 	}
 }
@@ -367,10 +554,11 @@ func TestNumLabelsWritten(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -396,7 +584,8 @@ func TestNumLabelsWritten(t *testing.T) {
 
 	// Initialize repeated, using a new instance.
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -421,10 +610,11 @@ func TestValidateMetadata(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.NumFiles = 2
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -440,11 +630,12 @@ func TestValidateMetadata(t *testing.T) {
 	r.NoError(err)
 	r.NoError(init.verifyMetadata(m))
 
-	// Attempt to initialize with different `Commitment`.
-	newCommitment := make([]byte, 32)
-	newCommitment[0] = newCommitment[0] + 1
+	// Attempt to initialize with different `NodeId`.
+	newNodeId := make([]byte, 32)
+	newNodeId[0] = newNodeId[0] + 1
 	init, err = NewInitializer(
-		WithCommitment(newCommitment),
+		WithNodeId(newNodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -452,13 +643,28 @@ func TestValidateMetadata(t *testing.T) {
 	r.NoError(err)
 	var errConfigMismatch ConfigMismatchError
 	r.ErrorAs(init.Initialize(context.Background()), &errConfigMismatch)
-	r.Equal("Commitment", errConfigMismatch.Param)
+	r.Equal("NodeId", errConfigMismatch.Param)
+
+	// Attempt to initialize with different `AtxId`.
+	newAtxId := make([]byte, 32)
+	newAtxId[0] = newAtxId[0] + 1
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(newAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+	r.ErrorAs(init.Initialize(context.Background()), &errConfigMismatch)
+	r.Equal("CommitmentAtxId", errConfigMismatch.Param)
 
 	// Attempt to initialize with different `cfg.BitsPerLabel`.
 	newCfg := cfg
 	newCfg.BitsPerLabel = cfg.BitsPerLabel + 1
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(newCfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -471,7 +677,8 @@ func TestValidateMetadata(t *testing.T) {
 	newOpts := opts
 	newOpts.NumFiles = 4
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(newOpts),
 		WithLogger(testLogger{t: t}),
@@ -484,7 +691,8 @@ func TestValidateMetadata(t *testing.T) {
 	newOpts = opts
 	newOpts.NumUnits++
 	init, err = NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(newOpts),
 		WithLogger(testLogger{t: t}),
@@ -504,10 +712,11 @@ func TestStop(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = 10
 	opts.NumFiles = 5
-	opts.ComputeProviderID = CPUProviderID()
+	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
-		WithCommitment(make([]byte, 32)),
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
@@ -522,7 +731,7 @@ func TestStop(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(func() error {
-			r.Eventually(func() bool { return init.SessionNumLabelsWritten() > 0 }, 5*time.Second, 50*time.Millisecond)
+			r.Eventually(func() bool { return init.NumLabelsWritten() > 0 }, 5*time.Second, 50*time.Millisecond)
 			cancel()
 			return nil
 		})
@@ -562,7 +771,7 @@ func assertNumLabelsWritten(ctx context.Context, t *testing.T, init *Initializer
 			case <-ctx.Done():
 				return nil
 			case <-timer.C:
-				num := init.SessionNumLabelsWritten()
+				num := init.NumLabelsWritten()
 				t.Logf("num labels written: %v\n", num)
 				assert.GreaterOrEqual(t, num, prev)
 				prev = num
