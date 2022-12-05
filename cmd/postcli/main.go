@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/minio/sha256-simd"
 
 	"github.com/spacemeshos/ed25519"
 	"github.com/spacemeshos/post/config"
@@ -104,12 +103,11 @@ func main() {
 		log.Panic("cli: %v", err)
 	}
 
-	commitment := GetCommitmentBytes(id, commitmentAtxId)
-	log.Info("cli: commitment: %x", commitment)
 	init, err := initialization.NewInitializer(
 		initialization.WithConfig(cfg),
 		initialization.WithInitOpts(opts),
-		initialization.WithCommitment(commitment),
+		initialization.WithNodeId(id),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
 		initialization.WithLogger(log),
 	)
 	if err != nil {
@@ -139,7 +137,7 @@ func main() {
 	}
 
 	log.Info("cli: initialization completed, generating a proof as a sanity test")
-	prover, err := proving.NewProver(cfg, opts.DataDir, commitment)
+	prover, err := proving.NewProver(cfg, opts.DataDir, id, commitmentAtxId)
 	if err != nil {
 		log.Panic(err.Error())
 	}
@@ -153,12 +151,6 @@ func main() {
 	}
 
 	log.Info("cli: proof is valid")
-}
-
-// TODO(mafa): add "WithId" and "WithCommitmentATX" options to the initializer and do this within the initializer.
-func GetCommitmentBytes(id []byte, commitmentAtxId []byte) []byte {
-	h := sha256.Sum256(append(id, commitmentAtxId...))
-	return h[:]
 }
 
 func saveKey(key []byte) error {
