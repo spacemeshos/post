@@ -166,8 +166,8 @@ func saveKey(key []byte) error {
 
 type logger struct{}
 
-func (l logger) Info(msg string, args ...interface{})    { baseLog.Printf("\tINFO\t"+msg, args...) }
-func (l logger) Debug(msg string, args ...interface{})   { baseLog.Printf("\tDEBUG\t"+msg, args...) }
-func (l logger) Warning(msg string, args ...interface{}) { baseLog.Printf("\tWARN\t"+msg, args...) }
-func (l logger) Error(msg string, args ...interface{})   { baseLog.Printf("\tERROR\t"+msg, args...) }
-func (l logger) Panic(msg string, args ...interface{})   { baseLog.Fatalf(msg, args...) }
+func (l logger) Info(msg string, args ...any)    { baseLog.Printf("\tINFO\t"+msg, args...) }
+func (l logger) Debug(msg string, args ...any)   { baseLog.Printf("\tDEBUG\t"+msg, args...) }
+func (l logger) Warning(msg string, args ...any) { baseLog.Printf("\tWARN\t"+msg, args...) }
+func (l logger) Error(msg string, args ...any)   { baseLog.Printf("\tERROR\t"+msg, args...) }
+func (l logger) Panic(msg string, args ...any)   { baseLog.Fatalf(msg, args...) }
