@@ -37,18 +37,20 @@ func ProvingDifficulty(numLabels uint64, k1 uint64) uint64 {
 }
 
 // PowDifficulty returns the target difficulty of finding a nonce in `numLabels` labels.
-// It is calculated such that one computed label is expected to be below the difficulty threshold.
-// The difficulty is calculated as follows:
+// It is calculated such that a high percentage of smeshers find at least one computed label
+// below the difficulty threshold. The difficulty is calculated as follows:
 //
-//	difficulty = 2^256 / numLabels
+//	difficulty = 8 * 2^256 / numLabels
 //
-// TODO(mafa): this difficulty calculation is unfit. There is only a ~ 63% chance to find a nonce
-// in the first `numLabels`	labels and only a ~ 90% chance to find a nonce in the first `2*numLabels` labels.
+// The probability of finding a label below the difficulty threshold within numLabels
+// approaches ~ 99.97% the bigger numLabels gets. Within 1.15 * numLabels the probability
+// approaches 99.99% of finding at least one label below the difficulty threshold.
 func PowDifficulty(numLabels uint64) []byte {
 	difficulty := make([]byte, 33)
 	difficulty[0] = 0x01
 	x := new(big.Int).SetBytes(difficulty)
 	x.Div(x, big.NewInt(int64(numLabels)))
+	x.Mul(x, big.NewInt(8))
 	return x.FillBytes(difficulty[1:])
 }
 
