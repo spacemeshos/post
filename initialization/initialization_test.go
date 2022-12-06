@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"math/big"
 	"testing"
 	"time"
 
@@ -86,6 +87,16 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	// nodeId where no label in the first uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit satisfies the PoW requirement.
 	nodeId, err := hex.DecodeString("52fdfc072182654f163f5f0f9a621d729566c74d10037c4d7bbb0407d1e2c649")
 	r.NoError(err)
+
+	// use a higher difficulty to make sure no Pow is found in the first `numLabels` labels.
+	powDifficultyFunc = func(numLabels uint64) []byte {
+		difficulty := make([]byte, 33)
+		difficulty[0] = 0x01
+		x := new(big.Int).SetBytes(difficulty)
+		x.Div(x, big.NewInt(int64(numLabels)))
+		return x.FillBytes(difficulty[1:])
+	}
+	t.Cleanup(func() { powDifficultyFunc = shared.PowDifficulty })
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -517,10 +528,14 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
 	r.NoError(verifying.VerifyPow(m))
-	oneFileNonce := *m.Nonce
+
+	// TODO(mafa): since we are not looking for the absolute lowest nonce, we can't guarantee that the nonce will be the same.
+	// see also https://github.com/spacemeshos/post/issues/90
+	// oneFileNonce := *m.Nonce
 
 	for numFiles := uint32(2); numFiles <= 16; numFiles <<= 1 {
 		t.Run(fmt.Sprintf("NumFiles=%d", numFiles), func(t *testing.T) {
+			r := require.New(t)
 			opts := opts
 			opts.NumFiles = numFiles
 			opts.DataDir = t.TempDir()
@@ -539,7 +554,13 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			r.NoError(err)
 
 			r.Equal(multipleFilesData, oneFileData)
-			r.Equal(oneFileNonce, *init.Nonce())
+
+			m, err := LoadMetadata(opts.DataDir)
+			r.NoError(err)
+			r.NoError(verifying.VerifyPow(m))
+
+			// TODO(mafa): see above
+			// r.Equal(oneFileNonce, *init.Nonce())
 		})
 	}
 }

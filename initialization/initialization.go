@@ -41,6 +41,8 @@ var (
 	ErrAlreadyInitializing          = errors.New("already initializing")
 	ErrCannotResetWhileInitializing = errors.New("cannot reset while initializing")
 	ErrStateMetadataFileMissing     = errors.New("metadata file is missing")
+
+	powDifficultyFunc = shared.PowDifficulty
 )
 
 // Providers returns a list of available compute providers.
@@ -213,7 +215,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 
 	numLabels := uint64(init.opts.NumUnits) * uint64(init.cfg.LabelsPerUnit)
 	fileNumLabels := numLabels / uint64(init.opts.NumFiles)
-	difficulty := shared.PowDifficulty(numLabels)
+	difficulty := powDifficultyFunc(numLabels)
 	batchSize := uint64(config.DefaultComputeBatchSize)
 
 	init.logger.Info("initialization: starting to write %v file(s); number of units: %v, number of labels per unit: %v, number of bits per label: %v, datadir: %v",

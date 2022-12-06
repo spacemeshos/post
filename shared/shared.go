@@ -50,7 +50,7 @@ func PowDifficulty(numLabels uint64) []byte {
 	difficulty[0] = 0x01
 	x := new(big.Int).SetBytes(difficulty)
 	x.Div(x, big.NewInt(int64(numLabels)))
-	x.Mul(x, big.NewInt(8))
+	x.Lsh(x, 3) // x << 3 == x * 2^3 == x * 8
 	return x.FillBytes(difficulty[1:])
 }
 
