@@ -46,12 +46,12 @@ func ProvingDifficulty(numLabels uint64, k1 uint64) uint64 {
 // approaches ~ 99.97% the bigger numLabels gets. Within 1.15 * numLabels the probability
 // approaches 99.99% of finding at least one label below the difficulty threshold.
 func PowDifficulty(numLabels uint64) []byte {
-	difficulty := make([]byte, 33)
-	difficulty[0] = 0x01
-	x := new(big.Int).SetBytes(difficulty)
+	x := new(big.Int).Lsh(big.NewInt(1), 256)
 	x.Div(x, big.NewInt(int64(numLabels)))
-	x.Lsh(x, 3) // x << 3 == x * 2^3 == x * 8
-	return x.FillBytes(difficulty[1:])
+	x.Lsh(x, 3) // reduce difficulty by a factor of 8
+
+	difficulty := make([]byte, 32)
+	return x.FillBytes(difficulty)
 }
 
 func Uint64MulOverflow(a, b uint64) bool {
