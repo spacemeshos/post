@@ -88,22 +88,20 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	nodeId, err := hex.DecodeString("52fdfc072182654f163f5f0f9a621d729566c74d10037c4d7bbb0407d1e2c649")
 	r.NoError(err)
 
-	// use a higher difficulty to make sure no Pow is found in the first `numLabels` labels.
-	powDifficultyFunc = func(numLabels uint64) []byte {
-		difficulty := make([]byte, 33)
-		difficulty[0] = 0x01
-		x := new(big.Int).SetBytes(difficulty)
-		x.Div(x, big.NewInt(int64(numLabels)))
-		return x.FillBytes(difficulty[1:])
-	}
-	t.Cleanup(func() { powDifficultyFunc = shared.PowDifficulty })
-
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
+		// use a higher difficulty to make sure no Pow is found in the first `numLabels` labels.
+		withDifficultyFunc(func(numLabels uint64) []byte {
+			x := new(big.Int).Lsh(big.NewInt(1), 256)
+			x.Div(x, big.NewInt(int64(numLabels)))
+
+			difficulty := make([]byte, 32)
+			return x.FillBytes(difficulty)
+		}),
 	)
 	r.NoError(err)
 
