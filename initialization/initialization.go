@@ -61,7 +61,9 @@ type option struct {
 
 	cfg      *Config
 	initOpts *config.InitOpts
-	logger   Logger
+
+	logger            Logger
+	powDifficultyFunc func(uint64) []byte
 }
 
 func (o *option) validate() error {
@@ -139,6 +141,18 @@ func WithLogger(logger Logger) OptionFunc {
 	}
 }
 
+// withDifficultyFunc sets the difficulty function for the initializer.
+// NOTE: This is an internal option for tests and should not be used by external packages.
+func withDifficultyFunc(powDifficultyFunc func(uint64) []byte) OptionFunc {
+	return func(opts *option) error {
+		if powDifficultyFunc == nil {
+			return errors.New("difficulty function is nil")
+		}
+		opts.powDifficultyFunc = powDifficultyFunc
+		return nil
+	}
+}
+
 // Initializer is responsible for initializing a new PoST commitment.
 type Initializer struct {
 	nodeId          []byte
@@ -156,12 +170,15 @@ type Initializer struct {
 	diskState        *DiskState
 	mtx              sync.RWMutex
 
-	logger Logger
+	logger            Logger
+	powDifficultyFunc func(uint64) []byte
 }
 
 func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 	options := &option{
 		logger: shared.DisabledLogger{},
+
+		powDifficultyFunc: shared.PowDifficulty,
 	}
 
 	for _, opt := range opts {
@@ -175,13 +192,14 @@ func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 	}
 
 	return &Initializer{
-		cfg:             *options.cfg,
-		opts:            *options.initOpts,
-		nodeId:          options.nodeId,
-		commitmentAtxId: options.commitmentAtxId,
-		commitment:      options.commitment,
-		diskState:       NewDiskState(options.initOpts.DataDir, uint(options.cfg.BitsPerLabel)),
-		logger:          options.logger,
+		cfg:               *options.cfg,
+		opts:              *options.initOpts,
+		nodeId:            options.nodeId,
+		commitmentAtxId:   options.commitmentAtxId,
+		commitment:        options.commitment,
+		diskState:         NewDiskState(options.initOpts.DataDir, uint(options.cfg.BitsPerLabel)),
+		logger:            options.logger,
+		powDifficultyFunc: options.powDifficultyFunc,
 	}, nil
 }
 
@@ -213,7 +231,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 
 	numLabels := uint64(init.opts.NumUnits) * uint64(init.cfg.LabelsPerUnit)
 	fileNumLabels := numLabels / uint64(init.opts.NumFiles)
-	difficulty := shared.PowDifficulty(numLabels)
+	difficulty := init.powDifficultyFunc(numLabels)
 	batchSize := uint64(config.DefaultComputeBatchSize)
 
 	init.logger.Info("initialization: starting to write %v file(s); number of units: %v, number of labels per unit: %v, number of bits per label: %v, datadir: %v",
