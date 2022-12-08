@@ -191,7 +191,7 @@ func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 		return nil, err
 	}
 
-	return &Initializer{
+	init := &Initializer{
 		cfg:               *options.cfg,
 		opts:              *options.initOpts,
 		nodeId:            options.nodeId,
@@ -200,7 +200,30 @@ func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 		diskState:         NewDiskState(options.initOpts.DataDir, uint(options.cfg.BitsPerLabel)),
 		logger:            options.logger,
 		powDifficultyFunc: options.powDifficultyFunc,
-	}, nil
+	}
+
+	numLabelsWritten, err := init.diskState.NumLabelsWritten()
+	if err != nil {
+		return nil, err
+	}
+
+	if numLabelsWritten > 0 {
+		m, err := init.loadMetadata()
+		if err != nil {
+			return nil, err
+		}
+		if err := init.verifyMetadata(m); err != nil {
+			return nil, err
+		}
+		init.nonce.Store(m.Nonce)
+		init.lastPosition.Store(m.LastPosition)
+	}
+
+	if err := init.saveMetadata(); err != nil {
+		return nil, err
+	}
+
+	return init, nil
 }
 
 // Initialize is the process in which the prover commits to store some data, by having its storage filled with
@@ -210,24 +233,6 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		return ErrAlreadyInitializing
 	}
 	defer init.mtx.Unlock()
-
-	if numLabelsWritten, err := init.diskState.NumLabelsWritten(); err != nil {
-		return err
-	} else if numLabelsWritten > 0 {
-		m, err := init.loadMetadata()
-		if err != nil {
-			return err
-		}
-		if err := init.verifyMetadata(m); err != nil {
-			return err
-		}
-		init.nonce.Store(m.Nonce)
-		init.lastPosition.Store(m.LastPosition)
-	}
-
-	if err := init.saveMetadata(); err != nil {
-		return err
-	}
 
 	numLabels := uint64(init.opts.NumUnits) * uint64(init.cfg.LabelsPerUnit)
 	fileNumLabels := numLabels / uint64(init.opts.NumFiles)

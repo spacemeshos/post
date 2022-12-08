@@ -472,29 +472,27 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 
 	// Increase `opts.NumUnits` while `opts.NumFiles` > 1.
 	opts.NumUnits = prevNumUnits + 1
-	init, err = NewInitializer(
+	_, err = NewInitializer(
 		WithNodeId(nodeId),
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
 	)
-	r.NoError(err)
-	cfgMissErr := &shared.ConfigMismatchError{}
-	r.ErrorAs(init.Initialize(context.Background()), cfgMissErr)
+	var cfgMissErr shared.ConfigMismatchError
+	r.ErrorAs(err, &cfgMissErr)
 	r.Equal("NumUnits", cfgMissErr.Param)
 
 	// Decrease `opts.NumUnits` while `opts.NumFiles` > 1.
 	opts.NumUnits = prevNumUnits - 1
-	init, err = NewInitializer(
+	_, err = NewInitializer(
 		WithNodeId(nodeId),
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
 	)
-	r.NoError(err)
-	r.ErrorAs(init.Initialize(context.Background()), cfgMissErr)
+	r.ErrorAs(err, &cfgMissErr)
 	r.Equal("NumUnits", cfgMissErr.Param)
 }
 
@@ -641,8 +639,8 @@ func TestValidateMetadata(t *testing.T) {
 	r.NoError(err)
 
 	m, err := init.loadMetadata()
-	r.Equal(ErrStateMetadataFileMissing, err)
-	r.Nil(m)
+	r.NoError(err)
+	r.NoError(init.verifyMetadata(m))
 
 	r.NoError(init.Initialize(context.Background()))
 	m, err = init.loadMetadata()
@@ -652,72 +650,67 @@ func TestValidateMetadata(t *testing.T) {
 	// Attempt to initialize with different `NodeId`.
 	newNodeId := make([]byte, 32)
 	newNodeId[0] = newNodeId[0] + 1
-	init, err = NewInitializer(
+	_, err = NewInitializer(
 		WithNodeId(newNodeId),
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
 	)
-	r.NoError(err)
 	var errConfigMismatch ConfigMismatchError
-	r.ErrorAs(init.Initialize(context.Background()), &errConfigMismatch)
+	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("NodeId", errConfigMismatch.Param)
 
 	// Attempt to initialize with different `AtxId`.
 	newAtxId := make([]byte, 32)
 	newAtxId[0] = newAtxId[0] + 1
-	init, err = NewInitializer(
+	_, err = NewInitializer(
 		WithNodeId(nodeId),
 		WithCommitmentAtxId(newAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
 	)
-	r.NoError(err)
-	r.ErrorAs(init.Initialize(context.Background()), &errConfigMismatch)
+	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("CommitmentAtxId", errConfigMismatch.Param)
 
 	// Attempt to initialize with different `cfg.BitsPerLabel`.
 	newCfg := cfg
 	newCfg.BitsPerLabel = cfg.BitsPerLabel + 1
-	init, err = NewInitializer(
+	_, err = NewInitializer(
 		WithNodeId(nodeId),
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(newCfg),
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
 	)
-	r.NoError(err)
-	r.ErrorAs(init.Initialize(context.Background()), &errConfigMismatch)
+	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("BitsPerLabel", errConfigMismatch.Param)
 
 	// Attempt to initialize with different `opts.NumFiles`.
 	newOpts := opts
 	newOpts.NumFiles = 4
-	init, err = NewInitializer(
+	_, err = NewInitializer(
 		WithNodeId(nodeId),
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(newOpts),
 		WithLogger(testLogger{t: t}),
 	)
-	r.NoError(err)
-	r.ErrorAs(init.Initialize(context.Background()), &errConfigMismatch)
+	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("NumFiles", errConfigMismatch.Param)
 
 	// Attempt to initialize with different `opts.NumUnits` while `opts.NumFiles` > 1.
 	newOpts = opts
 	newOpts.NumUnits++
-	init, err = NewInitializer(
+	_, err = NewInitializer(
 		WithNodeId(nodeId),
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(newOpts),
 		WithLogger(testLogger{t: t}),
 	)
-	r.NoError(err)
-	r.ErrorAs(init.Initialize(context.Background()), &errConfigMismatch)
+	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("NumUnits", errConfigMismatch.Param)
 }
 
