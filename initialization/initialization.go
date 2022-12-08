@@ -306,6 +306,10 @@ func (init *Initializer) Nonce() *uint64 {
 	return init.nonce.Load()
 }
 
+func (init *Initializer) CommitmentAtxId() []byte {
+	return init.commitmentAtxId
+}
+
 func (init *Initializer) Reset() error {
 	if !init.mtx.TryLock() {
 		return ErrCannotResetWhileInitializing
