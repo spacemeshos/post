@@ -259,9 +259,6 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 
 	// continue searching for a nonce
-	// TODO(mafa): PM-195 depending on the difficulty function this can take a VERY long time, with the current difficulty function
-	// ~ 37% of all smeshers won't find a nonce while computing leaves
-	// ~  2% of all smeshers won't find a nonce even after checking 4x numLabels
 	defer init.saveMetadata()
 	for i := *init.lastPosition.Load(); i < math.MaxUint64; i += batchSize {
 		lastPos := i
