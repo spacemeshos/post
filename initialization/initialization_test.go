@@ -67,9 +67,14 @@ func TestInitialize(t *testing.T) {
 	}
 	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
-	m, err := LoadMetadata(opts.DataDir)
-	r.NoError(err)
-	r.NoError(verifying.VerifyPow(m))
+	m := &shared.VRFNonceMetadata{
+		NodeId:          nodeId,
+		CommitmentAtxId: commitmentAtxId,
+		NumUnits:        opts.NumUnits,
+		BitsPerLabel:    cfg.BitsPerLabel,
+		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+	}
+	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
 }
 
 func TestInitialize_PowOutOfRange(t *testing.T) {
@@ -108,12 +113,17 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	r.NoError(init.Initialize(context.Background()))
 	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
-	m, err := LoadMetadata(opts.DataDir)
-	r.NoError(err)
-	r.NoError(verifying.VerifyPow(m))
+	m := &shared.VRFNonceMetadata{
+		NodeId:          nodeId,
+		CommitmentAtxId: commitmentAtxId,
+		NumUnits:        opts.NumUnits,
+		BitsPerLabel:    cfg.BitsPerLabel,
+		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+	}
+	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
 
 	// check that the found nonce is outside of the range for calculating labels
-	r.Less(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.Nonce)
+	r.Less(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *init.Nonce())
 }
 
 func TestInitialize_ContinueWithLastPos(t *testing.T) {
@@ -140,12 +150,17 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(init.Initialize(context.Background()))
 	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
-	m, err := LoadMetadata(opts.DataDir)
-	r.NoError(err)
-	r.NoError(verifying.VerifyPow(m))
+	meta := &shared.VRFNonceMetadata{
+		NodeId:          nodeId,
+		CommitmentAtxId: commitmentAtxId,
+		NumUnits:        opts.NumUnits,
+		BitsPerLabel:    cfg.BitsPerLabel,
+		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+	}
+	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta))
 
 	// trying again returns same nonce
-	origNonce := *m.Nonce
+	origNonce := *init.Nonce()
 	init, err = NewInitializer(
 		WithNodeId(nodeId),
 		WithCommitmentAtxId(commitmentAtxId),
@@ -158,7 +173,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(init.Initialize(context.Background()))
 	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
-	m, err = LoadMetadata(opts.DataDir)
+	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
 	r.Equal(origNonce, *m.Nonce)
 	r.Nil(m.LastPosition)
@@ -205,9 +220,16 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NotNil(m.Nonce)
 	r.NotNil(m.LastPosition)
 	r.LessOrEqual(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.LastPosition)
-
 	r.LessOrEqual(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.Nonce)
-	r.NoError(verifying.VerifyPow(m))
+
+	meta = &shared.VRFNonceMetadata{
+		NodeId:          nodeId,
+		CommitmentAtxId: commitmentAtxId,
+		NumUnits:        opts.NumUnits,
+		BitsPerLabel:    cfg.BitsPerLabel,
+		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+	}
+	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta))
 
 	// lastPos sets lower bound for searching for nonce if none was found
 	lastPos := *m.Nonce + 10
@@ -234,7 +256,15 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.LessOrEqual(lastPos, *m.LastPosition)
 
 	r.Less(lastPos, *m.Nonce)
-	r.NoError(verifying.VerifyPow(m))
+
+	meta = &shared.VRFNonceMetadata{
+		NodeId:          nodeId,
+		CommitmentAtxId: commitmentAtxId,
+		NumUnits:        opts.NumUnits,
+		BitsPerLabel:    cfg.BitsPerLabel,
+		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+	}
+	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta))
 }
 
 func TestReset_WhileInitializing(t *testing.T) {
@@ -521,9 +551,14 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	oneFileData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
 	r.NoError(err)
 
-	m, err := LoadMetadata(opts.DataDir)
-	r.NoError(err)
-	r.NoError(verifying.VerifyPow(m))
+	m := &shared.VRFNonceMetadata{
+		NodeId:          nodeId,
+		CommitmentAtxId: commitmentAtxId,
+		NumUnits:        opts.NumUnits,
+		BitsPerLabel:    cfg.BitsPerLabel,
+		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+	}
+	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
 
 	// TODO(mafa): since we are not looking for the absolute lowest nonce, we can't guarantee that the nonce will be the same.
 	// see also https://github.com/spacemeshos/post/issues/90
@@ -551,9 +586,14 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 
 			r.Equal(multipleFilesData, oneFileData)
 
-			m, err := LoadMetadata(opts.DataDir)
-			r.NoError(err)
-			r.NoError(verifying.VerifyPow(m))
+			m := &shared.VRFNonceMetadata{
+				NodeId:          nodeId,
+				CommitmentAtxId: commitmentAtxId,
+				NumUnits:        opts.NumUnits,
+				BitsPerLabel:    cfg.BitsPerLabel,
+				LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+			}
+			r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
 
 			// TODO(mafa): see above
 			// r.Equal(oneFileNonce, *init.Nonce())

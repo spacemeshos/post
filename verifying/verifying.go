@@ -21,10 +21,10 @@ var (
 	UInt64LE   = shared.UInt64LE
 )
 
-// VerifyPow ensures the validity of a nonce for a given node.
+// VerifyVRFNonce ensures the validity of a nonce for a given node.
 // AtxId is the id of the ATX that was selected by the node for its commitment.
-func VerifyPow(m *shared.PostMetadata) error {
-	if m.Nonce == nil {
+func VerifyVRFNonce(nonce *uint64, m *shared.VRFNonceMetadata) error {
+	if nonce == nil {
 		return errors.New("invalid `nonce` value; expected: non-nil, given: nil")
 	}
 
@@ -42,7 +42,7 @@ func VerifyPow(m *shared.PostMetadata) error {
 
 	res, err := WorkOracle(
 		oracle.WithCommitment(oracle.CommitmentBytes(m.NodeId, m.CommitmentAtxId)),
-		oracle.WithPosition(*m.Nonce),
+		oracle.WithPosition(*nonce),
 		oracle.WithBitsPerLabel(uint32(m.BitsPerLabel)*32),
 	)
 	if err != nil {
