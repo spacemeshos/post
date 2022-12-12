@@ -1,12 +1,14 @@
-package config
+package initialization
 
-type FilesLayout struct {
+import "github.com/spacemeshos/post/config"
+
+type filesLayout struct {
 	NumFiles          uint
 	FileNumLabels     uint64
 	LastFileNumLabels uint64
 }
 
-func DeriveFilesLayout(cfg Config, opts InitOpts) FilesLayout {
+func deriveFilesLayout(cfg config.Config, opts config.InitOpts) filesLayout {
 	maxFileSizeBits := opts.MaxFileSize * 8
 	maxFileNumLabels := maxFileSizeBits / uint64(cfg.BitsPerLabel)
 	numLabels := cfg.LabelsPerUnit * uint64(opts.NumUnits)
@@ -19,7 +21,7 @@ func DeriveFilesLayout(cfg Config, opts InitOpts) FilesLayout {
 		lastFileNumLabels = remainder
 	}
 
-	return FilesLayout{
+	return filesLayout{
 		NumFiles:          uint(numFiles),
 		FileNumLabels:     maxFileNumLabels,
 		LastFileNumLabels: lastFileNumLabels,

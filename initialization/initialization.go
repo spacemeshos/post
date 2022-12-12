@@ -237,7 +237,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	init.logger.Info("initialization: datadir: %v, number of units: %v, max file size: %v, number of labels per unit: %v, number of bits per label: %v",
 		init.opts.DataDir, init.opts.NumUnits, init.opts.MaxFileSize, init.cfg.LabelsPerUnit, init.cfg.LabelsPerUnit)
 
-	layout := config.DeriveFilesLayout(init.cfg, init.opts)
+	layout := deriveFilesLayout(init.cfg, init.opts)
 	init.logger.Info("initialization: files layout: number of files: %v, number of labels per file: %v, last file number of labels: %v",
 		layout.NumFiles, layout.FileNumLabels, layout.LastFileNumLabels)
 	if err := init.removeRedundantFiles(layout); err != nil {
@@ -310,16 +310,14 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	return fmt.Errorf("no nonce found")
 }
 
-func (init *Initializer) removeRedundantFiles(layout config.FilesLayout) error {
-	numFiles, err := init.diskState.NumFiles()
+func (init *Initializer) removeRedundantFiles(layout filesLayout) error {
+	numFiles, err := init.diskState.NumFilesWritten()
 	if err != nil {
 		return err
 	}
 
-	diff := numFiles - int(layout.NumFiles)
-	for i := 0; i < diff; i++ {
-		index := numFiles - 1 - i
-		name := shared.InitFileName(index)
+	for i := int(layout.NumFiles); i < numFiles; i++ {
+		name := shared.InitFileName(i)
 		init.logger.Info("initialization: removing redundant file: %v", name)
 		if err := init.RemoveFile(name); err != nil {
 			return err
@@ -353,10 +351,10 @@ func (init *Initializer) Reset() error {
 		if err != nil {
 			continue
 		}
-		if shared.IsInitFile(info) || file.Name() == metadataFileName {
-			path := filepath.Join(init.opts.DataDir, file.Name())
-			if err := os.Remove(path); err != nil {
-				return fmt.Errorf("failed to delete file (%v): %w", path, err)
+		name := file.Name()
+		if shared.IsInitFile(info) || name == metadataFileName {
+			if err := init.RemoveFile(name); err != nil {
+				return err
 			}
 		}
 	}
@@ -367,7 +365,7 @@ func (init *Initializer) Reset() error {
 func (init *Initializer) RemoveFile(name string) error {
 	path := filepath.Join(init.opts.DataDir, name)
 	if err := os.Remove(path); err != nil {
-		return fmt.Errorf("failed to delete file (%v): %v", path, err)
+		return fmt.Errorf("failed to delete file (%v): %w", path, err)
 	}
 
 	return nil

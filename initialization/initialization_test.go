@@ -79,21 +79,23 @@ func TestInitialize(t *testing.T) {
 func TestMaxFileSize(t *testing.T) {
 	r := require.New(t)
 
-	cfg := Config{}
-	cfg.BitsPerLabel = 8
-	cfg.LabelsPerUnit = 2048
-	opts := InitOpts{}
-	opts.NumUnits = 10
-	opts.MaxFileSize = 2048
+	cfg := Config{
+		BitsPerLabel:  8,
+		LabelsPerUnit: 2048,
+	}
+	opts := InitOpts{
+		NumUnits:    10,
+		MaxFileSize: 2048,
+	}
 
-	layout := config.DeriveFilesLayout(cfg, opts)
+	layout := deriveFilesLayout(cfg, opts)
 	r.Equal(10, int(layout.NumFiles))
 	r.Equal(2048, int(layout.FileNumLabels))
 	r.Equal(2048, int(layout.LastFileNumLabels))
 
 	opts.MaxFileSize = 2000
 
-	layout = config.DeriveFilesLayout(cfg, opts)
+	layout = deriveFilesLayout(cfg, opts)
 	r.Equal(11, int(layout.NumFiles))
 	r.Equal(2000, int(layout.FileNumLabels))
 	r.Equal(480, int(layout.LastFileNumLabels))
@@ -518,7 +520,7 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 	// Decrease `opts.NumUnits`.
 	newOpts := opts
 	newOpts.NumUnits = opts.NumUnits - 1
-	init, err = NewInitializer(
+	newInit, err := NewInitializer(
 		WithNodeId(nodeId),
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
@@ -534,14 +536,18 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 		var eg errgroup.Group
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
 
-		numFiles, err := init.diskState.NumFiles()
+		numFiles, err := init.diskState.NumFilesWritten()
 		r.NoError(err)
-		r.Equal(int(opts.NumUnits), numFiles)
-		r.NoError(init.Initialize(ctx))
+		layout := deriveFilesLayout(cfg, opts)
+		r.Equal(int(layout.NumFiles), numFiles)
 
-		numFiles, err = init.diskState.NumFiles()
+		r.NoError(newInit.Initialize(ctx))
+
+		numFiles, err = newInit.diskState.NumFilesWritten()
 		r.NoError(err)
-		r.Equal(int(opts.NumUnits)-1, numFiles)
+		newLayout := deriveFilesLayout(cfg, newOpts)
+		r.Equal(int(newLayout.NumFiles), numFiles)
+		r.Less(newLayout.NumFiles, layout.NumFiles)
 
 		cancel()
 		eg.Wait()
@@ -552,7 +558,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	r := require.New(t)
 
 	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
+	cfg.LabelsPerUnit = 1 << 14
 
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
@@ -560,12 +566,36 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	opts.MaxFileSize = deriveTotalSize(cfg, opts)
 	opts.ComputeProviderID = int(CPUProviderID())
 
-	var data []byte
-	var nonce *uint64
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.NoError(err)
+	r.NoError(init.Initialize(context.Background()))
 
-	for numFiles := uint(1); numFiles <= 16; numFiles <<= 1 {
-		layout := config.DeriveFilesLayout(cfg, opts)
-		r.Equal(numFiles, layout.NumFiles)
+	oneFileData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
+	r.NoError(err)
+
+	m := &shared.VRFNonceMetadata{
+		NodeId:          nodeId,
+		CommitmentAtxId: commitmentAtxId,
+		NumUnits:        opts.NumUnits,
+		BitsPerLabel:    cfg.BitsPerLabel,
+		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+	}
+	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
+
+	// TODO(mafa): since we are not looking for the absolute lowest nonce, we can't guarantee that the nonce will be the same.
+	// see also https://github.com/spacemeshos/post/issues/90
+	// oneFileNonce := *m.Nonce
+
+	for numFiles := 2; numFiles <= 16; numFiles <<= 1 {
+		opts.MaxFileSize = opts.MaxFileSize / 2
+		layout := deriveFilesLayout(cfg, opts)
+		r.Equal(numFiles, int(layout.NumFiles))
 
 		t.Run(fmt.Sprintf("NumFiles=%d", numFiles), func(t *testing.T) {
 			r := require.New(t)
@@ -582,14 +612,10 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			r.NoError(err)
 			r.NoError(init.Initialize(context.Background()))
 
-			lastData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
+			multipleFilesData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
 			r.NoError(err)
 
-			if data == nil {
-				data = lastData
-			} else {
-				r.Equal(data, lastData)
-			}
+			r.Equal(multipleFilesData, oneFileData)
 
 			m := &shared.VRFNonceMetadata{
 				NodeId:          nodeId,
@@ -600,16 +626,9 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			}
 			r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
 
-			if nonce == nil {
-				nonce = init.Nonce()
-			} else {
-				// TODO(mafa): since we are not looking for the absolute lowest nonce, we can't guarantee that the nonce will be the same.
-				// see also https://github.com/spacemeshos/post/issues/90
-				// r.Equal(*nonce, *init.Nonce())
-			}
+			// TODO(mafa): see above
+			// r.Equal(oneFileNonce, *init.Nonce())
 		})
-
-		opts.MaxFileSize = opts.MaxFileSize / 2
 	}
 }
 

@@ -31,6 +31,8 @@ const (
 const (
 	MaxBitsPerLabel = 256
 	MinBitsPerLabel = 1
+
+	MinFileSize = 1024
 )
 
 var DefaultDataDir string
@@ -89,6 +91,10 @@ func Validate(cfg Config, opts InitOpts) error {
 
 	if opts.NumUnits > cfg.MaxNumUnits {
 		return fmt.Errorf("invalid `opts.NumUnits`; expected: <= %d, given: %d", cfg.MaxNumUnits, opts.NumUnits)
+	}
+
+	if opts.MaxFileSize < MinFileSize {
+		return fmt.Errorf("invalid `opts.MaxFileSize`; expected: >= %d, given: %d", MinFileSize, opts.MaxFileSize)
 	}
 
 	if int(cfg.BitsPerLabel) > MaxBitsPerLabel {

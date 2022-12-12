@@ -16,12 +16,8 @@ func IsInitFile(file os.FileInfo) bool {
 		return false
 	}
 
-	return IsInitFileName(file.Name())
-}
-
-func IsInitFileName(name string) bool {
 	re := regexp.MustCompile("postdata_(.*).bin")
-	matches := re.FindStringSubmatch(name)
+	matches := re.FindStringSubmatch(file.Name())
 	if len(matches) != 2 {
 		return false
 	}
