@@ -58,7 +58,6 @@ func TestProver_GenerateProof(t *testing.T) {
 			cfg.LabelsPerUnit = 1 << 12
 
 			opts := config.DefaultInitOpts()
-			//opts.NumFiles = 2
 			opts.ComputeProviderID = int(CPUProviderID())
 			opts.NumUnits = numUnits
 			opts.DataDir = t.TempDir()

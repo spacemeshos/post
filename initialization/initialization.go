@@ -308,8 +308,6 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 
 	return fmt.Errorf("no nonce found")
-
-	return nil
 }
 
 func (init *Initializer) removeRedundantFiles(layout config.FilesLayout) error {

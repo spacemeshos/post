@@ -480,7 +480,6 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 		cancel()
 		eg.Wait()
 	}
-
 }
 
 func TestInitialize_RedundantFiles(t *testing.T) {
@@ -761,7 +760,6 @@ func TestStop(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = 10
-	//opts.NumFiles = 5
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
