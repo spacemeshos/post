@@ -28,7 +28,6 @@ func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.NumFiles = 2
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	return cfg, opts
@@ -59,7 +58,7 @@ func TestProver_GenerateProof(t *testing.T) {
 			cfg.LabelsPerUnit = 1 << 12
 
 			opts := config.DefaultInitOpts()
-			opts.NumFiles = 2
+			//opts.NumFiles = 2
 			opts.ComputeProviderID = int(CPUProviderID())
 			opts.NumUnits = numUnits
 			opts.DataDir = t.TempDir()

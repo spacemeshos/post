@@ -43,7 +43,6 @@ func TestInitialize(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.NumFiles = 2
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
@@ -77,6 +76,29 @@ func TestInitialize(t *testing.T) {
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
 }
 
+func TestMaxFileSize(t *testing.T) {
+	r := require.New(t)
+
+	cfg := Config{}
+	cfg.BitsPerLabel = 8
+	cfg.LabelsPerUnit = 2048
+	opts := InitOpts{}
+	opts.NumUnits = 10
+	opts.MaxFileSize = 2048
+
+	layout := config.DeriveFilesLayout(cfg, opts)
+	r.Equal(10, int(layout.NumFiles))
+	r.Equal(2048, int(layout.FileNumLabels))
+	r.Equal(2048, int(layout.LastFileNumLabels))
+
+	opts.MaxFileSize = 2000
+
+	layout = config.DeriveFilesLayout(cfg, opts)
+	r.Equal(11, int(layout.NumFiles))
+	r.Equal(2000, int(layout.FileNumLabels))
+	r.Equal(480, int(layout.LastFileNumLabels))
+}
+
 func TestInitialize_PowOutOfRange(t *testing.T) {
 	r := require.New(t)
 
@@ -86,7 +108,6 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.NumFiles = 2
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	// nodeId where no label in the first uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit satisfies the PoW requirement.
@@ -135,7 +156,6 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.NumFiles = 2
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
@@ -271,12 +291,11 @@ func TestReset_WhileInitializing(t *testing.T) {
 	r := require.New(t)
 
 	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
+	cfg.LabelsPerUnit = 1 << 15
 
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.NumFiles = 2
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
@@ -311,7 +330,6 @@ func TestInitialize_Repeated(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.NumFiles = 2
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
@@ -365,7 +383,6 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.NumFiles = 1
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
@@ -420,7 +437,6 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits + 1
-	opts.NumFiles = 1
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
@@ -464,18 +480,20 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 		cancel()
 		eg.Wait()
 	}
+
 }
 
-func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
+func TestInitialize_RedundantFiles(t *testing.T) {
 	r := require.New(t)
 
 	cfg := config.DefaultConfig()
 	cfg.LabelsPerUnit = 1 << 12
+	cfg.BitsPerLabel = 8
 
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits + 1
-	opts.NumFiles = 2
+	opts.MaxFileSize = 1 << 12
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
@@ -498,32 +516,37 @@ func TestInitialize_NumUnits_MultipleFiles(t *testing.T) {
 		eg.Wait()
 	}
 
-	prevNumUnits := opts.NumUnits
-
-	// Increase `opts.NumUnits` while `opts.NumFiles` > 1.
-	opts.NumUnits = prevNumUnits + 1
-	_, err = NewInitializer(
+	// Decrease `opts.NumUnits`.
+	newOpts := opts
+	newOpts.NumUnits = opts.NumUnits - 1
+	init, err = NewInitializer(
 		WithNodeId(nodeId),
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
-		WithInitOpts(opts),
+		WithInitOpts(newOpts),
 		WithLogger(testLogger{t: t}),
 	)
-	var cfgMissErr shared.ConfigMismatchError
-	r.ErrorAs(err, &cfgMissErr)
-	r.Equal("NumUnits", cfgMissErr.Param)
+	r.NoError(err)
 
-	// Decrease `opts.NumUnits` while `opts.NumFiles` > 1.
-	opts.NumUnits = prevNumUnits - 1
-	_, err = NewInitializer(
-		WithNodeId(nodeId),
-		WithCommitmentAtxId(commitmentAtxId),
-		WithConfig(cfg),
-		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
-	)
-	r.ErrorAs(err, &cfgMissErr)
-	r.Equal("NumUnits", cfgMissErr.Param)
+	{
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		var eg errgroup.Group
+		eg.Go(assertNumLabelsWritten(ctx, t, init))
+
+		numFiles, err := init.diskState.NumFiles()
+		r.NoError(err)
+		r.Equal(int(opts.NumUnits), numFiles)
+		r.NoError(init.Initialize(ctx))
+
+		numFiles, err = init.diskState.NumFiles()
+		r.NoError(err)
+		r.Equal(int(opts.NumUnits)-1, numFiles)
+
+		cancel()
+		eg.Wait()
+	}
 }
 
 func TestInitialize_MultipleFiles(t *testing.T) {
@@ -535,40 +558,19 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.NumFiles = 2
+	opts.MaxFileSize = deriveTotalSize(cfg, opts)
 	opts.ComputeProviderID = int(CPUProviderID())
 
-	init, err := NewInitializer(
-		WithNodeId(nodeId),
-		WithCommitmentAtxId(commitmentAtxId),
-		WithConfig(cfg),
-		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
-	)
-	r.NoError(err)
-	r.NoError(init.Initialize(context.Background()))
+	var data []byte
+	var nonce *uint64
 
-	oneFileData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
-	r.NoError(err)
+	for numFiles := uint(1); numFiles <= 16; numFiles <<= 1 {
+		layout := config.DeriveFilesLayout(cfg, opts)
+		r.Equal(numFiles, layout.NumFiles)
 
-	m := &shared.VRFNonceMetadata{
-		NodeId:          nodeId,
-		CommitmentAtxId: commitmentAtxId,
-		NumUnits:        opts.NumUnits,
-		BitsPerLabel:    cfg.BitsPerLabel,
-		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
-	}
-	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
-
-	// TODO(mafa): since we are not looking for the absolute lowest nonce, we can't guarantee that the nonce will be the same.
-	// see also https://github.com/spacemeshos/post/issues/90
-	// oneFileNonce := *m.Nonce
-
-	for numFiles := uint32(2); numFiles <= 16; numFiles <<= 1 {
 		t.Run(fmt.Sprintf("NumFiles=%d", numFiles), func(t *testing.T) {
 			r := require.New(t)
 			opts := opts
-			opts.NumFiles = numFiles
 			opts.DataDir = t.TempDir()
 
 			init, err := NewInitializer(
@@ -581,10 +583,14 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			r.NoError(err)
 			r.NoError(init.Initialize(context.Background()))
 
-			multipleFilesData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
+			lastData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
 			r.NoError(err)
 
-			r.Equal(multipleFilesData, oneFileData)
+			if data == nil {
+				data = lastData
+			} else {
+				r.Equal(data, lastData)
+			}
 
 			m := &shared.VRFNonceMetadata{
 				NodeId:          nodeId,
@@ -595,9 +601,16 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			}
 			r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
 
-			// TODO(mafa): see above
-			// r.Equal(oneFileNonce, *init.Nonce())
+			if nonce == nil {
+				nonce = init.Nonce()
+			} else {
+				// TODO(mafa): since we are not looking for the absolute lowest nonce, we can't guarantee that the nonce will be the same.
+				// see also https://github.com/spacemeshos/post/issues/90
+				// r.Equal(*nonce, *init.Nonce())
+			}
 		})
+
+		opts.MaxFileSize = opts.MaxFileSize / 2
 	}
 }
 
@@ -610,7 +623,6 @@ func TestNumLabelsWritten(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.NumFiles = 2
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
@@ -666,7 +678,6 @@ func TestValidateMetadata(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.NumFiles = 2
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
@@ -727,9 +738,9 @@ func TestValidateMetadata(t *testing.T) {
 	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("BitsPerLabel", errConfigMismatch.Param)
 
-	// Attempt to initialize with different `opts.NumFiles`.
+	// Attempt to initialize with different `opts.MaxFileSize`.
 	newOpts := opts
-	newOpts.NumFiles = 4
+	newOpts.MaxFileSize = opts.MaxFileSize + 1
 	_, err = NewInitializer(
 		WithNodeId(nodeId),
 		WithCommitmentAtxId(commitmentAtxId),
@@ -738,20 +749,7 @@ func TestValidateMetadata(t *testing.T) {
 		WithLogger(testLogger{t: t}),
 	)
 	r.ErrorAs(err, &errConfigMismatch)
-	r.Equal("NumFiles", errConfigMismatch.Param)
-
-	// Attempt to initialize with different `opts.NumUnits` while `opts.NumFiles` > 1.
-	newOpts = opts
-	newOpts.NumUnits++
-	_, err = NewInitializer(
-		WithNodeId(nodeId),
-		WithCommitmentAtxId(commitmentAtxId),
-		WithConfig(cfg),
-		WithInitOpts(newOpts),
-		WithLogger(testLogger{t: t}),
-	)
-	r.ErrorAs(err, &errConfigMismatch)
-	r.Equal("NumUnits", errConfigMismatch.Param)
+	r.Equal("MaxFileSize", errConfigMismatch.Param)
 }
 
 func TestStop(t *testing.T) {
@@ -763,7 +761,7 @@ func TestStop(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = 10
-	opts.NumFiles = 5
+	//opts.NumFiles = 5
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
@@ -853,4 +851,13 @@ func initData(datadir string, bitsPerLabel uint) ([]byte, error) {
 	}
 
 	return writer.Bytes(), nil
+}
+
+func deriveTotalSize(cfg Config, opts InitOpts) uint64 {
+	totalSizeBits := uint64(opts.NumUnits) * cfg.LabelsPerUnit * uint64(cfg.BitsPerLabel)
+	totalSize := totalSizeBits / 8
+	if totalSizeBits%8 > 0 {
+		totalSize++
+	}
+	return totalSize
 }

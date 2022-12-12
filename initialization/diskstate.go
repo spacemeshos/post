@@ -15,7 +15,7 @@ func NewDiskState(datadir string, bitsPerLabel uint) *DiskState {
 }
 
 func (d *DiskState) NumLabelsWritten() (uint64, error) {
-	numBytesWritten, err := d.NumBytesWritten()
+	numBytesWritten, _, err := d.NumBytesWritten()
 	if err != nil {
 		return 0, err
 	}
@@ -23,6 +23,11 @@ func (d *DiskState) NumLabelsWritten() (uint64, error) {
 	return shared.NumLabels(numBytesWritten, d.bitsPerLabel), nil
 }
 
-func (d *DiskState) NumBytesWritten() (uint64, error) {
+func (d *DiskState) NumBytesWritten() (uint64, int, error) {
 	return persistence.NumBytesWritten(d.datadir, shared.IsInitFile)
+}
+
+func (d *DiskState) NumFiles() (int, error) {
+	_, numFiles, err := d.NumBytesWritten()
+	return numFiles, err
 }
