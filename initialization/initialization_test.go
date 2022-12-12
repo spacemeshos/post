@@ -71,7 +71,7 @@ func TestInitialize(t *testing.T) {
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
 		BitsPerLabel:    cfg.BitsPerLabel,
-		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
 }
@@ -141,7 +141,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
 		BitsPerLabel:    cfg.BitsPerLabel,
-		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
 
@@ -177,7 +177,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
 		BitsPerLabel:    cfg.BitsPerLabel,
-		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta))
 
@@ -249,7 +249,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
 		BitsPerLabel:    cfg.BitsPerLabel,
-		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta))
 
@@ -284,7 +284,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
 		BitsPerLabel:    cfg.BitsPerLabel,
-		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta))
 }
@@ -584,7 +584,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
 		BitsPerLabel:    cfg.BitsPerLabel,
-		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
 
@@ -622,7 +622,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 				CommitmentAtxId: commitmentAtxId,
 				NumUnits:        opts.NumUnits,
 				BitsPerLabel:    cfg.BitsPerLabel,
-				LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+				LabelsPerUnit:   cfg.LabelsPerUnit,
 			}
 			r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
 
