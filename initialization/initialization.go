@@ -546,6 +546,15 @@ func (init *Initializer) verifyMetadata(m *shared.PostMetadata) error {
 		}
 	}
 
+	if init.opts.NumUnits > m.NumUnits {
+		return ConfigMismatchError{
+			Param:    "NumUnits",
+			Expected: fmt.Sprintf(">= %d", init.opts.NumUnits),
+			Found:    fmt.Sprintf("%d", m.NumUnits),
+			DataDir:  init.opts.DataDir,
+		}
+	}
+
 	return nil
 }
 

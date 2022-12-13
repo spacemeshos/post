@@ -377,6 +377,8 @@ func TestInitialize_Repeated(t *testing.T) {
 }
 
 func TestInitialize_NumUnits_Increase(t *testing.T) {
+	t.Skip("not supported yet, see https://github.com/spacemeshos/go-spacemesh/issues/3759")
+
 	r := require.New(t)
 
 	cfg := config.DefaultConfig()
@@ -768,6 +770,19 @@ func TestValidateMetadata(t *testing.T) {
 	)
 	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("MaxFileSize", errConfigMismatch.Param)
+
+	// Attempt to initialize with a higher `opts.NumUnits`.
+	newOpts = opts
+	newOpts.NumUnits++
+	_, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(newOpts),
+		WithLogger(testLogger{t: t}),
+	)
+	r.ErrorAs(err, &errConfigMismatch)
+	r.Equal("NumUnits", errConfigMismatch.Param)
 }
 
 func TestStop(t *testing.T) {
