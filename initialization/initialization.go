@@ -234,16 +234,28 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 	defer init.mtx.Unlock()
 
-	numLabels := uint64(init.opts.NumUnits) * uint64(init.cfg.LabelsPerUnit)
-	fileNumLabels := numLabels / uint64(init.opts.NumFiles)
+	init.logger.Info("initialization: datadir: %v, number of units: %v, max file size: %v, number of labels per unit: %v, number of bits per label: %v",
+		init.opts.DataDir, init.opts.NumUnits, init.opts.MaxFileSize, init.cfg.LabelsPerUnit, init.cfg.LabelsPerUnit)
+
+	layout := deriveFilesLayout(init.cfg, init.opts)
+	init.logger.Info("initialization: files layout: number of files: %v, number of labels per file: %v, last file number of labels: %v",
+		layout.NumFiles, layout.FileNumLabels, layout.LastFileNumLabels)
+	if err := init.removeRedundantFiles(layout); err != nil {
+		return err
+	}
+
+	numLabels := uint64(init.opts.NumUnits) * init.cfg.LabelsPerUnit
 	difficulty := init.powDifficultyFunc(numLabels)
 	batchSize := uint64(config.DefaultComputeBatchSize)
 
-	init.logger.Info("initialization: starting to write %v file(s); number of units: %v, number of labels per unit: %v, number of bits per label: %v, datadir: %v",
-		init.opts.NumFiles, init.opts.NumUnits, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel, init.opts.DataDir)
+	for i := 0; i < int(layout.NumFiles); i++ {
+		fileOffset := uint64(i) * layout.FileNumLabels
+		fileNumLabels := layout.FileNumLabels
+		if i == int(layout.NumFiles)-1 {
+			fileNumLabels = layout.LastFileNumLabels
+		}
 
-	for i := 0; i < int(init.opts.NumFiles); i++ {
-		if err := init.initFile(ctx, i, batchSize, numLabels, fileNumLabels, difficulty); err != nil {
+		if err := init.initFile(ctx, i, batchSize, fileOffset, fileNumLabels, difficulty); err != nil {
 			return err
 		}
 	}
@@ -298,6 +310,23 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	return fmt.Errorf("no nonce found")
 }
 
+func (init *Initializer) removeRedundantFiles(layout filesLayout) error {
+	numFiles, err := init.diskState.NumFilesWritten()
+	if err != nil {
+		return err
+	}
+
+	for i := int(layout.NumFiles); i < numFiles; i++ {
+		name := shared.InitFileName(i)
+		init.logger.Info("initialization: removing redundant file: %v", name)
+		if err := init.RemoveFile(name); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (init *Initializer) NumLabelsWritten() uint64 {
 	return init.numLabelsWritten.Load()
 }
@@ -322,12 +351,21 @@ func (init *Initializer) Reset() error {
 		if err != nil {
 			continue
 		}
-		if shared.IsInitFile(info) || file.Name() == metadataFileName {
-			path := filepath.Join(init.opts.DataDir, file.Name())
-			if err := os.Remove(path); err != nil {
-				return fmt.Errorf("failed to delete file (%v): %w", path, err)
+		name := file.Name()
+		if shared.IsInitFile(info) || name == metadataFileName {
+			if err := init.RemoveFile(name); err != nil {
+				return err
 			}
 		}
+	}
+
+	return nil
+}
+
+func (init *Initializer) RemoveFile(name string) error {
+	path := filepath.Join(init.opts.DataDir, name)
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("failed to delete file (%v): %w", path, err)
 	}
 
 	return nil
@@ -356,8 +394,7 @@ func (init *Initializer) Status() Status {
 	return StatusNotStarted
 }
 
-func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize, numLabels, fileNumLabels uint64, difficulty []byte) error {
-	fileOffset := uint64(fileIndex) * fileNumLabels
+func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize, fileOffset, fileNumLabels uint64, difficulty []byte) error {
 	fileTargetPosition := fileOffset + fileNumLabels
 
 	// Initialize the labels file writer.
@@ -500,20 +537,19 @@ func (init *Initializer) verifyMetadata(m *shared.PostMetadata) error {
 		}
 	}
 
-	if init.opts.NumFiles != m.NumFiles {
+	if init.opts.MaxFileSize != m.MaxFileSize {
 		return ConfigMismatchError{
-			Param:    "NumFiles",
-			Expected: fmt.Sprintf("%d", init.opts.NumFiles),
-			Found:    fmt.Sprintf("%d", m.NumFiles),
+			Param:    "MaxFileSize",
+			Expected: fmt.Sprintf("%d", init.opts.MaxFileSize),
+			Found:    fmt.Sprintf("%d", m.MaxFileSize),
 			DataDir:  init.opts.DataDir,
 		}
 	}
 
-	// `opts.NumUnits` alternation isn't supported (yet) while `opts.NumFiles` > 1.
-	if init.opts.NumUnits != m.NumUnits && init.opts.NumFiles > 1 {
+	if init.opts.NumUnits > m.NumUnits {
 		return ConfigMismatchError{
 			Param:    "NumUnits",
-			Expected: fmt.Sprintf("%d", init.opts.NumUnits),
+			Expected: fmt.Sprintf(">= %d", init.opts.NumUnits),
 			Found:    fmt.Sprintf("%d", m.NumUnits),
 			DataDir:  init.opts.DataDir,
 		}
@@ -529,7 +565,7 @@ func (init *Initializer) saveMetadata() error {
 		BitsPerLabel:    init.cfg.BitsPerLabel,
 		LabelsPerUnit:   init.cfg.LabelsPerUnit,
 		NumUnits:        init.opts.NumUnits,
-		NumFiles:        init.opts.NumFiles,
+		MaxFileSize:     init.opts.MaxFileSize,
 		Nonce:           init.nonce.Load(),
 		LastPosition:    init.lastPosition.Load(),
 	}
