@@ -28,6 +28,7 @@ var (
 	log                = logger{}
 	printProviders     bool
 	printConfig        bool
+	genProof           bool
 	idHex              string
 	id                 []byte
 	commitmentAtxIdHex string
@@ -38,18 +39,18 @@ var (
 func parseFlags() {
 	flag.BoolVar(&printProviders, "printProviders", false, "print the list of compute providers")
 	flag.BoolVar(&printConfig, "printConfig", false, "print the used config and options")
+	flag.BoolVar(&genProof, "genproof", false, "generate proof as a sanity test, after initialization")
 	flag.StringVar(&opts.DataDir, "datadir", opts.DataDir, "filesystem datadir path")
+	flag.Uint64Var(&opts.MaxFileSize, "maxFileSize", opts.MaxFileSize, "max file size")
 	flag.IntVar(&opts.ComputeProviderID, "provider", opts.ComputeProviderID, "compute provider id (required)")
 	flag.Uint64Var(&cfg.LabelsPerUnit, "labelsPerUnit", cfg.LabelsPerUnit, "the number of labels per unit")
 	flag.BoolVar(&reset, "reset", false, "whether to reset the datadir before starting")
 	flag.StringVar(&idHex, "id", "", "miner's id (public key), in hex (will be auto-generated if not provided)")
 	flag.StringVar(&commitmentAtxIdHex, "commitmentAtxId", "", "commitment atx id, in hex (required)")
-
-	var numUnits uint64
-	flag.Uint64Var(&numUnits, "numUnits", uint64(opts.NumUnits), "number of units") // workaround the missing type support for uint32
-	opts.NumUnits = uint32(numUnits)
-
+	numUnits := flag.Uint64("numUnits", uint64(opts.NumUnits), "number of units")
 	flag.Parse()
+
+	opts.NumUnits = uint32(*numUnits) // workaround the missing type support for uint32
 }
 
 func processFlags() error {
@@ -118,6 +119,8 @@ func main() {
 		if err := init.Reset(); err != nil {
 			log.Panic("reset error: %v", err)
 		}
+		log.Info("cli: reset completed")
+		return
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -136,21 +139,26 @@ func main() {
 		return
 	}
 
-	log.Info("cli: initialization completed, generating a proof as a sanity test")
-	prover, err := proving.NewProver(cfg, opts.DataDir, id, commitmentAtxId)
-	if err != nil {
-		log.Panic(err.Error())
-	}
-	prover.SetLogger(log)
-	proof, proofMetadata, err := prover.GenerateProof(shared.ZeroChallenge)
-	if err != nil {
-		log.Panic("proof generation error: %v", err)
-	}
-	if err := verifying.Verify(proof, proofMetadata); err != nil {
-		log.Panic("failed to verify test proof: %v", err)
-	}
+	log.Info("cli: initialization completed")
 
-	log.Info("cli: proof is valid")
+	if genProof {
+		log.Info("cli: generating proof as a sanity test")
+
+		prover, err := proving.NewProver(cfg, opts.DataDir, id, commitmentAtxId)
+		if err != nil {
+			log.Panic(err.Error())
+		}
+		prover.SetLogger(log)
+		proof, proofMetadata, err := prover.GenerateProof(shared.ZeroChallenge)
+		if err != nil {
+			log.Panic("proof generation error: %v", err)
+		}
+		if err := verifying.Verify(proof, proofMetadata); err != nil {
+			log.Panic("failed to verify test proof: %v", err)
+		}
+
+		log.Info("cli: proof is valid")
+	}
 }
 
 func saveKey(key []byte) error {
