@@ -33,7 +33,6 @@ func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.NumFiles = 2
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	return cfg, opts
@@ -73,9 +72,14 @@ func TestVerifyPow(t *testing.T) {
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))
 
-	m, err := initialization.LoadMetadata(opts.DataDir)
-	r.NoError(err)
-	r.NoError(VerifyPow(m))
+	m := &shared.VRFNonceMetadata{
+		NodeId:          nodeId,
+		CommitmentAtxId: commitmentAtxId,
+		NumUnits:        opts.NumUnits,
+		BitsPerLabel:    cfg.BitsPerLabel,
+		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+	}
+	r.NoError(VerifyVRFNonce(init.Nonce(), m))
 }
 
 // TestLabelsCorrectness tests, for variation of label sizes, the correctness of

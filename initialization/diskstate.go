@@ -1,7 +1,8 @@
 package initialization
 
 import (
-	"github.com/spacemeshos/post/persistence"
+	"os"
+
 	"github.com/spacemeshos/post/shared"
 )
 
@@ -24,5 +25,48 @@ func (d *DiskState) NumLabelsWritten() (uint64, error) {
 }
 
 func (d *DiskState) NumBytesWritten() (uint64, error) {
-	return persistence.NumBytesWritten(d.datadir, shared.IsInitFile)
+	files, err := GetFiles(d.datadir, shared.IsInitFile)
+	if err != nil {
+		return 0, err
+	}
+
+	var numBytesWritten uint64
+	for _, file := range files {
+		numBytesWritten += uint64(file.Size())
+	}
+
+	return numBytesWritten, nil
+}
+
+func (d *DiskState) NumFilesWritten() (int, error) {
+	files, err := GetFiles(d.datadir, shared.IsInitFile)
+	if err != nil {
+		return 0, err
+	}
+
+	return len(files), err
+}
+
+func GetFiles(dir string, predicate func(os.FileInfo) bool) ([]os.FileInfo, error) {
+	allFiles, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	includedFiles := make([]os.FileInfo, 0)
+	for _, file := range allFiles {
+		info, err := file.Info()
+		if err != nil {
+			continue
+		}
+
+		if predicate(info) {
+			includedFiles = append(includedFiles, info)
+		}
+	}
+
+	return includedFiles, nil
 }

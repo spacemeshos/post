@@ -11,7 +11,7 @@ import (
 const (
 	DefaultDataDirName = "data"
 
-	DefaultNumFiles = 1
+	DefaultMaxFileSize = uint64(4294967296) // 4 GB
 
 	// DefaultComputeBatchSize value must be divisible by 8, to guarantee that writing to disk
 	// and file truncating is byte-granular regardless of `BitsPerLabel` value.
@@ -32,8 +32,7 @@ const (
 	MaxBitsPerLabel = 256
 	MinBitsPerLabel = 1
 
-	MaxNumFiles = 32
-	MinNumFiles = 1
+	MinFileSize = 1024
 )
 
 var DefaultDataDir string
@@ -66,7 +65,7 @@ func DefaultConfig() Config {
 type InitOpts struct {
 	DataDir           string
 	NumUnits          uint32
-	NumFiles          uint32
+	MaxFileSize       uint64
 	ComputeProviderID int
 	Throttle          bool
 }
@@ -79,7 +78,7 @@ func DefaultInitOpts() InitOpts {
 	return InitOpts{
 		DataDir:           DefaultDataDir,
 		NumUnits:          DefaultMinNumUnits + 1,
-		NumFiles:          DefaultNumFiles,
+		MaxFileSize:       DefaultMaxFileSize,
 		ComputeProviderID: BestProviderID,
 		Throttle:          false,
 	}
@@ -94,12 +93,8 @@ func Validate(cfg Config, opts InitOpts) error {
 		return fmt.Errorf("invalid `opts.NumUnits`; expected: <= %d, given: %d", cfg.MaxNumUnits, opts.NumUnits)
 	}
 
-	if opts.NumFiles > MaxNumFiles {
-		return fmt.Errorf("invalid `opts.NumFiles`; expected: <= %d, given: %d", MaxNumFiles, opts.NumFiles)
-	}
-
-	if opts.NumFiles < MinNumFiles {
-		return fmt.Errorf("invalid `opts.NumFiles`; expected: >= %d, given: %d", MinNumFiles, opts.NumFiles)
+	if opts.MaxFileSize < MinFileSize {
+		return fmt.Errorf("invalid `opts.MaxFileSize`; expected: >= %d, given: %d", MinFileSize, opts.MaxFileSize)
 	}
 
 	if int(cfg.BitsPerLabel) > MaxBitsPerLabel {
@@ -110,18 +105,13 @@ func Validate(cfg Config, opts InitOpts) error {
 		return fmt.Errorf("invalid `cfg.BitsPerLabel`; expected: >= %d, given: %d", MinBitsPerLabel, cfg.BitsPerLabel)
 	}
 
-	if res := shared.Uint64MulOverflow(uint64(cfg.LabelsPerUnit), uint64(opts.NumUnits)); res {
+	if res := shared.Uint64MulOverflow(cfg.LabelsPerUnit, uint64(opts.NumUnits)); res {
 		return fmt.Errorf("uint64 overflow: `cfg.LabelsPerUnit` (%v) * `opts.NumUnits` (%v) exceeds the range allowed by uint64",
 			cfg.LabelsPerUnit, opts.NumUnits)
 	}
 
 	numLabels := cfg.LabelsPerUnit * uint64(opts.NumUnits)
-
-	if numLabels%uint64(opts.NumFiles) != 0 {
-		return fmt.Errorf("invalid `cfg.LabelsPerUnit` & `opts.NumUnits`; expected: `cfg.LabelsPerUnit` * `opts.NumUnits` to be evenly divisible by `opts.NumFiles` (%v), given: %d", opts.NumFiles, numLabels)
-	}
-
-	if res := shared.Uint64MulOverflow(uint64(numLabels), uint64(cfg.K1)); res {
+	if res := shared.Uint64MulOverflow(numLabels, uint64(cfg.K1)); res {
 		return fmt.Errorf("uint64 overflow: `cfg.LabelsPerUnit` * `opts.NumUnits` (%v) * `cfg.K1` (%v) exceeds the range allowed by uint64",
 			numLabels, cfg.K1)
 	}

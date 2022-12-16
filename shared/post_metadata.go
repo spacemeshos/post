@@ -8,7 +8,7 @@ type PostMetadata struct {
 	BitsPerLabel  uint8
 	LabelsPerUnit uint64
 	NumUnits      uint32
-	NumFiles      uint32
+	MaxFileSize   uint64
 	Nonce         *uint64 `json:",omitempty"`
 	LastPosition  *uint64 `json:",omitempty"`
 }
