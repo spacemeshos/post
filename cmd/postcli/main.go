@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 
 	"github.com/davecgh/go-spew/spew"
-
 	"github.com/spacemeshos/ed25519"
+
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/gpu"
 	"github.com/spacemeshos/post/initialization"
