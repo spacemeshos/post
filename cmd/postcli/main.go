@@ -126,7 +126,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	err := init.Initialize(ctx)
+	err = init.Initialize(ctx)
 	switch {
 	case errors.Is(err, shared.ErrInitCompleted):
 		log.Panic(err.Error())
