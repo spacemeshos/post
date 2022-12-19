@@ -126,15 +126,15 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	if err := init.Initialize(ctx); err != nil {
-		if err == shared.ErrInitCompleted {
-			log.Panic(err.Error())
-			return
-		}
-		if err == context.Canceled {
-			log.Info("cli: initialization interrupted")
-			return
-		}
+	err := init.Initialize(ctx)
+	switch {
+	case errors.Is(err, shared.ErrInitCompleted):
+		log.Panic(err.Error())
+		return
+	case errors.Is(err, context.Canceled):
+		log.Info("cli: initialization interrupted")
+		return
+	case err != nil:
 		log.Error("cli: initialization error: %v", err)
 		return
 	}
