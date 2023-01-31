@@ -48,6 +48,7 @@ func TestProver_GenerateProof(t *testing.T) {
 	log := testLogger{t: t}
 
 	for numUnits := uint32(config.DefaultMinNumUnits); numUnits < 6; numUnits++ {
+		numUnits := numUnits
 		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
 			t.Parallel()
 
