@@ -7,7 +7,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/minio/sha256-simd"
+	"github.com/spacemeshos/sha256-simd"
 	"github.com/stretchr/testify/require"
 
 	"github.com/spacemeshos/post/config"

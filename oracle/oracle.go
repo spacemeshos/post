@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/minio/sha256-simd"
+	"github.com/spacemeshos/sha256-simd"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/gpu"
