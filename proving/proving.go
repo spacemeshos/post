@@ -52,7 +52,7 @@ type Prover struct {
 
 // NewProver creates a new prover instance.
 //
-// Deprecated: NewProver is deprecated. Use the GenerateProof function instead.
+// Deprecated: NewProver is deprecated. Use the proving.Generate function instead.
 func NewProver(cfg Config, datadir string, nodeId, commitmentAtxId []byte) (*Prover, error) {
 	return &Prover{
 		cfg:             cfg,
