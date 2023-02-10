@@ -3,6 +3,7 @@ package proving
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
 	"golang.org/x/sync/errgroup"
@@ -49,10 +50,50 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, datadir string, nod
 		// TODO(mafa): collect indices for proof
 		// and signal stop via
 		cancel()
+
 		return nil
 	})
 
-	return nil, nil, nil
+	if err := eg.Wait(); err != nil && err != context.Canceled {
+		return nil, nil, err
+	}
+
+	select {
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	default:
+	}
+
+	// TODO(mafa): close solution chan here
+
+	// TODO(mafa): use proof collected in proof collector.
+	solutionNonceResult := &struct {
+		nonce   uint32
+		indices []byte
+		err     error
+	}{}
+
+	if solutionNonceResult == nil {
+		return nil, nil, errors.New("no proof found")
+	}
+
+	logger.Info("proving: generated proof")
+
+	proof := &Proof{
+		Nonce:   solutionNonceResult.nonce,
+		Indices: solutionNonceResult.indices,
+	}
+	proofMetadata := &ProofMetadata{
+		NodeId:          nodeId,
+		CommitmentAtxId: commitmentAtxId,
+		Challenge:       ch,
+		BitsPerLabel:    cfg.BitsPerLabel,
+		LabelsPerUnit:   cfg.LabelsPerUnit,
+		NumUnits:        m.NumUnits,
+		K1:              cfg.K1,
+		K2:              cfg.K2,
+	}
+	return proof, proofMetadata, nil
 }
 
 func verifyMetadata(m *Metadata, cfg Config, datadir string, nodeId, commitmentAtxId []byte) error {
