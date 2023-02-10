@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	NumNoncesPerIteration = 10 // TODO(moshababo): update the recommended value
-	MaxNumIterations      = 10 // TODO(moshababo): update the recommended value
+	NumWorkersPerNonce    = 1
+	NumNoncesPerIteration = 1
+	MaxNumIterations      = 10
 )
 
 type (
@@ -49,6 +50,9 @@ type Prover struct {
 	logger Logger
 }
 
+// NewProver creates a new prover instance.
+//
+// Deprecated: NewProver is deprecated. Use the GenerateProof function instead.
 func NewProver(cfg Config, datadir string, nodeId, commitmentAtxId []byte) (*Prover, error) {
 	return &Prover{
 		cfg:             cfg,
