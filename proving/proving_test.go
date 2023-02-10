@@ -21,12 +21,12 @@ var (
 	CPUProviderID  = initialization.CPUProviderID
 )
 
-func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
+func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
 	cfg.LabelsPerUnit = 1 << 12
 
 	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
+	opts.DataDir = tb.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ComputeProviderID = int(CPUProviderID())
 
@@ -36,16 +36,17 @@ func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
 type testLogger struct {
 	shared.Logger
 
-	t *testing.T
+	tb testing.TB
 }
 
-func (l testLogger) Info(msg string, args ...any)  { l.t.Logf("\tINFO\t"+msg, args...) }
-func (l testLogger) Debug(msg string, args ...any) { l.t.Logf("\tDEBUG\t"+msg, args...) }
+func (l testLogger) Info(msg string, args ...any)  { l.tb.Logf("\tINFO\t"+msg, args...) }
+func (l testLogger) Debug(msg string, args ...any) { l.tb.Logf("\tDEBUG\t"+msg, args...) }
+func (l testLogger) Error(msg string, args ...any) { l.tb.Logf("\tERROR\t"+msg, args...) }
 
 func TestProver_GenerateProof(t *testing.T) {
 	// TODO(moshababo): tests should range through `cfg.BitsPerLabel` as well.
 	r := require.New(t)
-	log := testLogger{t: t}
+	log := testLogger{tb: t}
 
 	for numUnits := uint32(config.DefaultMinNumUnits); numUnits < 6; numUnits++ {
 		numUnits := numUnits
@@ -116,7 +117,7 @@ func TestProver_GenerateProof_NotAllowed(t *testing.T) {
 		initialization.WithCommitmentAtxId(commitmentAtxId),
 		initialization.WithConfig(cfg),
 		initialization.WithInitOpts(opts),
-		initialization.WithLogger(testLogger{t: t}),
+		initialization.WithLogger(testLogger{tb: t}),
 	)
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))

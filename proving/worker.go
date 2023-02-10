@@ -103,14 +103,15 @@ func labelWorker(ctx context.Context, batchQueue <-chan *batch, proofChan chan<-
 			for j := uint(0); j < numNonces; j++ {
 				val := le34Faster(out, j*d)
 				if val < difficultyVal {
+					s := &solution{
+						Index: index,
+						Nonce: j,
+					}
 					select {
+					case proofChan <- s:
 					case <-ctx.Done():
 						batchDataPool.Put(batch.Data[:batchSize])
 						return ctx.Err()
-					case proofChan <- &solution{
-						Index: index,
-						Nonce: j,
-					}:
 					}
 				}
 			}
