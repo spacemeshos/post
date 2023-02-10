@@ -9,8 +9,6 @@ import (
 	"io"
 	"math"
 	"sync"
-
-	"github.com/spacemeshos/go-spacemesh/log"
 )
 
 const (
@@ -65,7 +63,6 @@ func ioWorker(ctx context.Context, batchQueue chan<- *batch, datadir string) err
 			}
 		default:
 			batchDataPool.Put(data)
-			log.Error("error reading labels from disk: %s", err)
 			return err
 		}
 		index += uint64(n)
