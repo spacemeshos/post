@@ -152,3 +152,14 @@ func le34(data []byte, i uint) uint64 {
 	// Return the 34 bits from the data slice
 	return z & 0x3FFFFFFFFFFFF
 }
+
+// Get an uint64 that consists of 34 bits from the data slice starting from bit i.
+// SAFETY: Assumes len(data) >= (i/8)+8.
+func le34Faster(data []byte, i uint) uint64 {
+	b := data[i/8 : (i/8)+8]
+	z := binary.LittleEndian.Uint64(b)
+	// Shift the result to the right by the remaining bits
+	z = z >> (i % 8)
+	// Return the 34 bits from the data slice
+	return z & 0x3FFFFFFFFFFFF
+}
