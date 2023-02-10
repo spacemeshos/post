@@ -3,8 +3,10 @@ package proving
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 
 	"golang.org/x/sync/errgroup"
 
@@ -33,21 +35,31 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, datadir string, nod
 		return nil, nil, shared.ErrInitNotCompleted
 	}
 
+	var reader io.Reader
+	batchQueue := make(chan *batch)
+	solutionQueue := make(chan *solution)
+
+	difficulty := make([]byte, 8)
+	binary.BigEndian.PutUint64(
+		difficulty,
+		shared.ProvingDifficulty(uint64(m.NumUnits), uint64(cfg.K1)),
+	)
+
 	workerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	eg, egCtx := errgroup.WithContext(workerCtx)
 	eg.Go(func() error {
-		return ioWorker(egCtx)
+		return ioWorker(egCtx, batchQueue, reader)
 	})
 
 	for i := 0; i < numProvingWorkers; i++ {
 		eg.Go(func() error {
-			return labelWorker(egCtx)
+			return labelWorker(egCtx, batchQueue, solutionQueue, ch, difficulty)
 		})
 	}
 
 	eg.Go(func() error {
-		// TODO(mafa): collect indices for proof
+		// TODO(mafa): collect indices for proof from solution queue.
 		// and signal stop via
 		cancel()
 
@@ -58,13 +70,13 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, datadir string, nod
 		return nil, nil, err
 	}
 
+	// TODO(mafa): close solution queue here.
+
 	select {
 	case <-ctx.Done():
 		return nil, nil, ctx.Err()
 	default:
 	}
-
-	// TODO(mafa): close solution chan here
 
 	// TODO(mafa): use proof collected in proof collector.
 	solutionNonceResult := &struct {

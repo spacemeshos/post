@@ -23,7 +23,10 @@ const (
 )
 
 var batchDataPool = sync.Pool{
-	New: func() any { return make([]byte, batchSize) },
+	New: func() any {
+		buf := make([]byte, batchSize)
+		return buf
+	},
 }
 
 type batch struct {
@@ -40,7 +43,7 @@ type solution struct {
 // labelWorkers.
 //
 // TODO(mafa): use this as base to replace GranSpecificReader / GranSpecificWriter and the persistence package.
-func ioWorker(ctx context.Context, batchQueue chan<- *batch, datadir string) error {
+func ioWorker(ctx context.Context, batchQueue chan<- *batch, reader io.Reader) error {
 	defer close(batchQueue)
 	index := uint64(0)
 
@@ -62,13 +65,11 @@ func ioWorker(ctx context.Context, batchQueue chan<- *batch, datadir string) err
 				return ctx.Err()
 			}
 		default:
-			batchDataPool.Put(data)
+			batchDataPool.Put(&data)
 			return err
 		}
 		index += uint64(n)
 	}
-
-	return nil
 }
 
 // labelWorker is a worker that receives batches from ioWorker and looks for indices to be included in the proof.
@@ -107,14 +108,14 @@ func labelWorker(ctx context.Context, batchQueue <-chan *batch, proofChan chan<-
 					select {
 					case proofChan <- s:
 					case <-ctx.Done():
-						batchDataPool.Put(batch.Data[:batchSize])
+						batchDataPool.Put(&batch.Data)
 						return ctx.Err()
 					}
 				}
 			}
 			index++
 		}
-		batchDataPool.Put(batch.Data[:batchSize])
+		batchDataPool.Put(&batch.Data)
 	}
 
 	return nil
