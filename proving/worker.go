@@ -3,7 +3,9 @@ package proving
 import (
 	"context"
 	"crypto/aes"
+	"crypto/cipher"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"math"
 	"sync"
@@ -74,7 +76,10 @@ func labelWorker(ctx context.Context, batchQueue <-chan *batch, proofChan chan<-
 	numOuts := uint8(math.Ceil(float64(numNonces*d) / m))
 	difficultyVal := le34(difficulty, 0)
 
-	ciphers := createAesCiphers(ch, numOuts)
+	ciphers, err := createAesCiphers(ch, numOuts)
+	if err != nil {
+		return fmt.Errorf("failed to create aes ciphers: %v", err)
+	}
 	out := make([]byte, numOuts*blockSize)
 
 	for batch := range batchQueue {
@@ -109,6 +114,31 @@ func labelWorker(ctx context.Context, batchQueue <-chan *batch, proofChan chan<-
 	}
 
 	return nil
+}
+
+// Create a set of AES block ciphers.
+// A cipher is created using an idx encrypted with challenge:
+// cipher[i] = AES(ch).Encrypt(i).
+func createAesCiphers(ch Challenge, count uint8) (ciphers []cipher.Block, err error) {
+	// a temporary cipher used only to create keys.
+	keyCipher, err := aes.NewCipher(ch)
+	if err != nil {
+		return nil, err
+	}
+
+	keyBuffer := make([]byte, aes.BlockSize)
+	key := make([]byte, aes.BlockSize)
+
+	for i := byte(0); i < count; i++ {
+		keyBuffer[0] = i
+		keyCipher.Encrypt(key, keyBuffer)
+		c, err := aes.NewCipher(key)
+		if err != nil {
+			return nil, err
+		}
+		ciphers = append(ciphers, c)
+	}
+	return ciphers, nil
 }
 
 // Get an uint64 that consists of 34 bits from the data slice starting from bit i.
