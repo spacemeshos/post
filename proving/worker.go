@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	blockSize       = aes.BlockSize
+	blockSize       = aes.BlockSize // TODO(mafa): this is confusing, just use aes.BlockSize instead
 	blocksPerWorker = 2 << 20
 	batchSize       = blocksPerWorker * blockSize
 
@@ -57,6 +57,9 @@ func ioWorker(ctx context.Context, batchQueue chan<- *batch, datadir string) err
 			}
 			select {
 			case batchQueue <- b:
+				if err == io.EOF {
+					return nil
+				}
 			case <-ctx.Done():
 				return ctx.Err()
 			}
@@ -86,9 +89,12 @@ func labelWorker(ctx context.Context, batchQueue <-chan *batch, proofChan chan<-
 		index := batch.Index
 		labels := batch.Data
 
+		// TODO(mafa): this doesn't handle batches correctly that are not a multiple of 16 bytes.
+		// this can happen when e.g. the end of a file is missing and would pad the missing bytes with zeros.
+		// consider that ioWorker only sends batches that are a multiple of blockSize in size.
 		for len(labels) > 0 {
-			block := labels[:aes.BlockSize]
-			labels = labels[aes.BlockSize:]
+			block := labels[:blockSize]
+			labels = labels[blockSize:]
 
 			for i := uint8(0); i < numOuts; i++ {
 				ciphers[i].Encrypt(out[i*blockSize:(i+1)*blockSize], block)
@@ -126,8 +132,8 @@ func createAesCiphers(ch Challenge, count uint8) (ciphers []cipher.Block, err er
 		return nil, err
 	}
 
-	keyBuffer := make([]byte, aes.BlockSize)
-	key := make([]byte, aes.BlockSize)
+	keyBuffer := make([]byte, blockSize)
+	key := make([]byte, blockSize)
 
 	for i := byte(0); i < count; i++ {
 		keyBuffer[0] = i
