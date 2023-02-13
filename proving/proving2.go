@@ -15,7 +15,7 @@ import (
 )
 
 // TODO (mafa): make this configurable.
-const numProvingWorkers = 1
+const NumWorkers = 1 // Number of workers creating a POST in parallel. Each one will max out one CPU core.
 
 // TODO (mafa): use functional options.
 // TODO (mafa): replace Logger with zap.
@@ -52,7 +52,7 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, datadir string, nod
 		return ioWorker(egCtx, batchQueue, reader)
 	})
 
-	for i := 0; i < numProvingWorkers; i++ {
+	for i := 0; i < NumWorkers; i++ {
 		eg.Go(func() error {
 			return labelWorker(egCtx, batchQueue, solutionQueue, ch, difficulty)
 		})
