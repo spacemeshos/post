@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/aes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,6 +27,9 @@ const (
 
 	DefaultK1 = 2000
 	DefaultK2 = 1800
+
+	DefaultAESBatchSize   = aes.BlockSize // one label per byte of AES block.
+	DefaultNonceBatchSize = 20
 )
 
 const (
@@ -50,7 +54,7 @@ type Config struct {
 
 	K1 uint32 // K1 specifies the difficulty for a label to be a candidate for a proof.
 	K2 uint32 // K2 is the number of labels below the required difficulty required for a proof.
-	B  uint32 // B is the number of labels in a proof.
+	B  uint32 // B is the number of labels used per AES invocation ven generating a proof.
 	N  uint32 // N is the number of nonces tried at the same time when generating a proof.
 }
 
@@ -62,6 +66,8 @@ func DefaultConfig() Config {
 		MinNumUnits:   DefaultMinNumUnits,
 		K1:            DefaultK1,
 		K2:            DefaultK2,
+		B:             DefaultAESBatchSize,
+		N:             DefaultNonceBatchSize,
 	}
 }
 

@@ -3,22 +3,31 @@ package proving
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
+	"crypto/aes"
 	"errors"
 	"fmt"
-	"io"
+	"math"
 
 	"golang.org/x/sync/errgroup"
 
 	"github.com/spacemeshos/post/initialization"
+	"github.com/spacemeshos/post/oracle"
+	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
 )
 
-// TODO (mafa): make this configurable.
-const NumWorkers = 1 // Number of workers creating a POST in parallel. Each one will max out one CPU core.
+// TODO (mafa): first two could be configuration options.
+const (
+	NumWorkers = 1 // Number of workers creating a proof in parallel. Each one will max out one CPU core.
+
+	BlocksPerWorker = 1 << 24 // How many AES blocks are contained per batch sent to a worker. Larger values will increase memory usage, but speed up the proof generation.
+	batchSize       = BlocksPerWorker * aes.BlockSize
+)
 
 // TODO (mafa): use functional options.
 // TODO (mafa): replace Logger with zap.
+// TODO (mafa): replace datadir with functional option for data provider. `verifyMetadata` and `initCompleted` should be part of the `WithDataDir` option.
+// -> In tests we can also just provide a mock data provider (as io.Reader).
 func Generate(ctx context.Context, ch Challenge, cfg Config, datadir string, nodeId, commitmentAtxId []byte, logger Logger) (*Proof, *ProofMetadata, error) {
 	m, err := initialization.LoadMetadata(datadir)
 	if err != nil {
@@ -35,42 +44,47 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, datadir string, nod
 		return nil, nil, shared.ErrInitNotCompleted
 	}
 
-	var reader io.Reader
-	batchQueue := make(chan *batch)
-	solutionQueue := make(chan *solution)
+	// TODO (mafa): replace with io.MultiReader and allow to pass in directly for tests.
+	reader, err := persistence.NewLabelsReader(datadir, uint(cfg.BitsPerLabel))
+	if err != nil {
+		return nil, nil, err
+	}
+	batchChan := make(chan *batch)
+	solutionChan := make(chan *solution)
 
-	difficulty := make([]byte, 8)
-	binary.BigEndian.PutUint64(
-		difficulty,
-		shared.ProvingDifficulty(uint64(m.NumUnits), uint64(cfg.K1)),
-	)
+	numLabels := uint64(m.NumUnits) * uint64(cfg.LabelsPerUnit)
 
 	workerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	eg, egCtx := errgroup.WithContext(workerCtx)
 	eg.Go(func() error {
-		return ioWorker(egCtx, batchQueue, reader)
+		return ioWorker(egCtx, batchChan, reader)
 	})
 
 	for i := 0; i < NumWorkers; i++ {
 		eg.Go(func() error {
-			return labelWorker(egCtx, batchQueue, solutionQueue, ch, difficulty)
+			difficulty := shared.ProvingDifficulty(numLabels, uint64(cfg.K1))
+			d := oracle.CalcD(numLabels, cfg.B)
+
+			const numBits = float64(aes.BlockSize * 8)
+			numOuts := uint8(math.Ceil(float64(cfg.N) * float64(d) / numBits))
+
+			return labelWorker(egCtx, batchChan, solutionChan, ch, numOuts, d, difficulty)
 		})
 	}
 
+	result := &nonceResult{}
 	eg.Go(func() error {
-		// TODO(mafa): collect indices for proof from solution queue.
-		// and signal stop via
+		var err error
+		result, err = solutionWorker(egCtx, solutionChan, numLabels, cfg.K2, logger)
 		cancel()
-
-		return nil
+		return err
 	})
 
 	if err := eg.Wait(); err != nil && err != context.Canceled {
 		return nil, nil, err
 	}
-
-	// TODO(mafa): close solution queue here.
+	close(solutionChan)
 
 	select {
 	case <-ctx.Done():
@@ -78,22 +92,15 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, datadir string, nod
 	default:
 	}
 
-	// TODO(mafa): use proof collected in proof collector.
-	solutionNonceResult := &struct {
-		nonce   uint32
-		indices []byte
-		err     error
-	}{}
-
-	if solutionNonceResult == nil {
+	if result == nil {
 		return nil, nil, errors.New("no proof found")
 	}
 
 	logger.Info("proving: generated proof")
 
 	proof := &Proof{
-		Nonce:   solutionNonceResult.nonce,
-		Indices: solutionNonceResult.indices,
+		Nonce:   result.nonce,
+		Indices: result.indices,
 	}
 	proofMetadata := &ProofMetadata{
 		NodeId:          nodeId,
@@ -104,6 +111,8 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, datadir string, nod
 		NumUnits:        m.NumUnits,
 		K1:              cfg.K1,
 		K2:              cfg.K2,
+		N:               cfg.N,
+		B:               cfg.B,
 	}
 	return proof, proofMetadata, nil
 }

@@ -1,9 +1,12 @@
 package oracle
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/spacemeshos/sha256-simd"
 
@@ -179,4 +182,30 @@ func FastOracle(ch Challenge, nonce uint32, label []byte) [32]byte {
 	copy(input[36:], label[:])
 
 	return sha256.Sum256(input)
+}
+
+// CalcD calculates the number of bits to use for the difficulty check.
+// numLabels is the number of labels contained in the PoST data.
+// B is a network parameter that defines the number of labels used in one AES Block.
+func CalcD(numLabels uint64, B uint32) uint {
+	return uint(math.Ceil(math.Log2(float64(numLabels)) - math.Log2(float64(B))))
+}
+
+// CreateBlockCipher creates an AES cipher for given fast oracle block.
+// A cipher is created using an idx encrypted with challenge:
+//
+//	cipher = AES(AES(ch).Encrypt(i))
+func CreateBlockCipher(ch Challenge, nonce uint8) (cipher.Block, error) {
+	// A temporary cipher used only to create key.
+	// The key is a block encrypted with AES which key is the challenge.
+	keyCipher, err := aes.NewCipher(ch)
+	if err != nil {
+		return nil, err
+	}
+
+	keyBuffer := make([]byte, aes.BlockSize)
+	keyBuffer[0] = nonce
+	key := make([]byte, aes.BlockSize)
+	keyCipher.Encrypt(key, keyBuffer)
+	return aes.NewCipher(key)
 }

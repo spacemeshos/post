@@ -1,31 +1,24 @@
 package proving
 
 import (
+	"bytes"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
-	"encoding/binary"
 	"fmt"
 	"io"
-	"math"
+	"sort"
 	"sync"
-)
+	"unsafe"
 
-const (
-	blockSize       = aes.BlockSize // TODO(mafa): this is confusing, just use aes.BlockSize instead
-	blocksPerWorker = 2 << 20
-	batchSize       = blocksPerWorker * blockSize
-
-	m = blockSize * 8
-	d = 34
-
-	numNonces = 20
+	"github.com/spacemeshos/post/oracle"
+	"github.com/spacemeshos/post/shared"
 )
 
 var batchDataPool = sync.Pool{
 	New: func() any {
 		buf := make([]byte, batchSize)
-		return buf
+		return &buf
 	},
 }
 
@@ -48,10 +41,11 @@ func ioWorker(ctx context.Context, batchQueue chan<- *batch, reader io.Reader) e
 	index := uint64(0)
 
 	for {
-		data := batchDataPool.Get().([]byte)
+		data := *batchDataPool.Get().(*[]byte)
 		n, err := reader.Read(data)
 		switch {
 		case err == io.EOF || err == nil:
+			n -= n % aes.BlockSize // make sure we don't send partial blocks to the label workers.
 			b := &batch{
 				Data:  data[:n],
 				Index: index,
@@ -65,6 +59,7 @@ func ioWorker(ctx context.Context, batchQueue chan<- *batch, reader io.Reader) e
 				return ctx.Err()
 			}
 		default:
+			data = data[:n]
 			batchDataPool.Put(&data)
 			return err
 		}
@@ -73,98 +68,129 @@ func ioWorker(ctx context.Context, batchQueue chan<- *batch, reader io.Reader) e
 }
 
 // labelWorker is a worker that receives batches from ioWorker and looks for indices to be included in the proof.
-func labelWorker(ctx context.Context, batchQueue <-chan *batch, proofChan chan<- *solution, ch Challenge, difficulty []byte) error {
-	numOuts := uint8(math.Ceil(float64(numNonces*d) / m))
-	difficultyVal := le34(difficulty, 0)
+func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan<- *solution, ch Challenge, numOuts uint8, d uint, difficulty uint64) error {
+	// use two slices with different types that point to the same memory location.
+	// this is done to speed up the conversation from bytes to uint64.
+	u64s := make([]uint64, numOuts*aes.BlockSize/8)
+	out := unsafe.Slice((*byte)(unsafe.Pointer(&u64s[0])), len(u64s)*8)
+	mask := ((uint64(1) << d) - 1)
 
 	ciphers, err := createAesCiphers(ch, numOuts)
 	if err != nil {
 		return fmt.Errorf("failed to create aes ciphers: %v", err)
 	}
-	out := make([]byte, numOuts*blockSize)
 
-	for batch := range batchQueue {
-		index := batch.Index
-		labels := batch.Data
-
-		// TODO(mafa): this doesn't handle batches correctly that are not a multiple of 16 bytes.
-		// this can happen when e.g. the end of a file is missing and would pad the missing bytes with zeros.
-		// consider that ioWorker only sends batches that are a multiple of blockSize in size.
-		for len(labels) > 0 {
-			block := labels[:blockSize]
-			labels = labels[blockSize:]
-
-			for i := uint8(0); i < numOuts; i++ {
-				ciphers[i].Encrypt(out[i*blockSize:(i+1)*blockSize], block)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case batch, ok := <-batchChan:
+			if !ok {
+				return nil
 			}
+			index := batch.Index
+			labels := batch.Data
 
-			for j := uint(0); j < numNonces; j++ {
-				val := le34Faster(out, j*d)
-				if val < difficultyVal {
-					s := &solution{
-						Index: index,
-						Nonce: j,
+			for len(labels) > 0 {
+				block := labels[:aes.BlockSize]
+				labels = labels[aes.BlockSize:]
+
+				select {
+				case <-ctx.Done():
+					batchDataPool.Put(&batch.Data)
+					return ctx.Err()
+				default:
+				}
+
+				for i, cipher := range ciphers {
+					cipher.Encrypt(out[i*aes.BlockSize:(i+1)*aes.BlockSize], block)
+				}
+
+				for nonce := uint(0); nonce < uint(numOuts); nonce++ {
+					// Extract the hash output for this nonce
+					offset := nonce * d
+					low_idx := offset / 64
+					high_idx := (offset + d - 1) / 64
+
+					val := u64s[low_idx]
+					val >>= offset % 64
+					if low_idx != high_idx {
+						high := u64s[high_idx]
+						val |= (high << (64 - offset%64))
 					}
-					select {
-					case proofChan <- s:
-					case <-ctx.Done():
-						batchDataPool.Put(&batch.Data)
-						return ctx.Err()
+
+					val &= mask
+
+					// check against difficulty threshold
+					if val < difficulty {
+						s := &solution{
+							Index: index,
+							Nonce: nonce,
+						}
+						select {
+						case solutionChan <- s: // send solution to proof generator
+						case <-ctx.Done():
+							batchDataPool.Put(&batch.Data)
+							return ctx.Err()
+						}
 					}
 				}
+				index++
 			}
-			index++
+			batchDataPool.Put(&batch.Data)
 		}
-		batchDataPool.Put(&batch.Data)
 	}
-
-	return nil
 }
 
-// Create a set of AES block ciphers.
-// A cipher is created using an idx encrypted with challenge:
-// cipher[i] = AES(ch).Encrypt(i).
-func createAesCiphers(ch Challenge, count uint8) (ciphers []cipher.Block, err error) {
-	// a temporary cipher used only to create keys.
-	keyCipher, err := aes.NewCipher(ch)
-	if err != nil {
-		return nil, err
+func solutionWorker(ctx context.Context, solutionChan <-chan *solution, numLabels uint64, K2 uint32, logger Logger) (*nonceResult, error) {
+	passed := make(map[uint][]uint64)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case solution, ok := <-solutionChan:
+			if !ok {
+				return nil, fmt.Errorf("no solution found")
+			}
+
+			passed[solution.Nonce] = append(passed[solution.Nonce], solution.Index)
+
+			if len(passed[solution.Nonce]) < int(K2) {
+				continue
+			}
+
+			logger.Debug("Found enough label indices for proof with nonce %d", solution.Nonce)
+			sort.Slice(passed[solution.Nonce], func(i, j int) bool { return i < j })
+			logger.Debug("indices are %v", passed[solution.Nonce])
+
+			bitsPerIndex := uint(shared.BinaryRepresentationMinBits(numLabels))
+			buf := bytes.NewBuffer(make([]byte, 0, shared.Size(bitsPerIndex, uint(K2))))
+			gsWriter := shared.NewGranSpecificWriter(buf, bitsPerIndex)
+			for _, p := range passed[solution.Nonce] {
+				if err := gsWriter.WriteUintBE(p); err != nil {
+					return nil, err
+				}
+			}
+
+			if err := gsWriter.Flush(); err != nil {
+				return nil, err
+			}
+
+			return &nonceResult{
+				nonce:   uint32(solution.Nonce),
+				indices: buf.Bytes(),
+			}, nil
+		}
 	}
+}
 
-	keyBuffer := make([]byte, blockSize)
-	key := make([]byte, blockSize)
-
-	for i := byte(0); i < count; i++ {
-		keyBuffer[0] = i
-		keyCipher.Encrypt(key, keyBuffer)
-		c, err := aes.NewCipher(key)
+func createAesCiphers(ch Challenge, count uint8) (ciphers []cipher.Block, err error) {
+	for i := uint8(0); i < count; i++ {
+		c, err := oracle.CreateBlockCipher(ch, i)
 		if err != nil {
 			return nil, err
 		}
 		ciphers = append(ciphers, c)
 	}
 	return ciphers, nil
-}
-
-// Get an uint64 that consists of 34 bits from the data slice starting from bit i.
-func le34(data []byte, i uint) uint64 {
-	b := data[i/8 : (i/8)+5]
-	x := binary.LittleEndian.Uint32(b)
-	// Combine the two values into an uint64
-	z := uint64(x) | uint64(b[4])<<32
-	// Shift the result to the right by the remaining bits
-	z = z >> (i % 8)
-	// Return the 34 bits from the data slice
-	return z & 0x3FFFFFFFFFFFF
-}
-
-// Get an uint64 that consists of 34 bits from the data slice starting from bit i.
-// SAFETY: Assumes len(data) >= (i/8)+8.
-func le34Faster(data []byte, i uint) uint64 {
-	b := data[i/8 : (i/8)+8]
-	z := binary.LittleEndian.Uint64(b)
-	// Shift the result to the right by the remaining bits
-	z = z >> (i % 8)
-	// Return the 34 bits from the data slice
-	return z & 0x3FFFFFFFFFFFF
 }
