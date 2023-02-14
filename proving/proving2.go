@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 
 	"golang.org/x/sync/errgroup"
 
@@ -48,8 +49,12 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, logger Logger, opts
 		return ioWorker(egCtx, batchChan, options.reader)
 	})
 
+	var wg sync.WaitGroup
 	for i := 0; i < NumWorkers; i++ {
+		wg.Add(1)
 		eg.Go(func() error {
+			defer wg.Done()
+
 			difficulty := shared.ProvingDifficulty(numLabels, uint64(cfg.K1))
 			d := oracle.CalcD(numLabels, cfg.B)
 
@@ -68,10 +73,11 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, logger Logger, opts
 		return err
 	})
 
+	wg.Wait()
+	close(solutionChan)
 	if err := eg.Wait(); err != nil && err != context.Canceled {
 		return nil, nil, err
 	}
-	close(solutionChan)
 
 	select {
 	case <-ctx.Done():

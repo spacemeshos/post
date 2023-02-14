@@ -36,8 +36,8 @@ type solution struct {
 // labelWorkers.
 //
 // TODO(mafa): use this as base to replace GranSpecificReader / GranSpecificWriter and the persistence package.
-func ioWorker(ctx context.Context, batchQueue chan<- *batch, reader io.Reader) error {
-	defer close(batchQueue)
+func ioWorker(ctx context.Context, batchChan chan<- *batch, reader io.Reader) error {
+	defer close(batchChan)
 	index := uint64(0)
 
 	for {
@@ -51,7 +51,7 @@ func ioWorker(ctx context.Context, batchQueue chan<- *batch, reader io.Reader) e
 				Index: index,
 			}
 			select {
-			case batchQueue <- b:
+			case batchChan <- b:
 				if err == io.EOF {
 					return nil
 				}
@@ -86,7 +86,6 @@ func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan
 			return ctx.Err()
 		case batch, ok := <-batchChan:
 			if !ok {
-				close(solutionChan)
 				return nil
 			}
 			index := batch.Index
@@ -155,7 +154,6 @@ func solutionWorker(ctx context.Context, solutionChan <-chan *solution, numLabel
 			}
 
 			passed[solution.Nonce] = append(passed[solution.Nonce], solution.Index)
-
 			if len(passed[solution.Nonce]) < int(K2) {
 				continue
 			}
