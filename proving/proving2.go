@@ -12,7 +12,6 @@ import (
 
 	"github.com/spacemeshos/post/initialization"
 	"github.com/spacemeshos/post/oracle"
-	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
 )
 
@@ -28,37 +27,25 @@ const (
 // TODO (mafa): replace Logger with zap.
 // TODO (mafa): replace datadir with functional option for data provider. `verifyMetadata` and `initCompleted` should be part of the `WithDataDir` option.
 // -> In tests we can also just provide a mock data provider (as io.Reader).
-func Generate(ctx context.Context, ch Challenge, cfg Config, datadir string, nodeId, commitmentAtxId []byte, logger Logger) (*Proof, *ProofMetadata, error) {
-	m, err := initialization.LoadMetadata(datadir)
-	if err != nil {
+func Generate(ctx context.Context, ch Challenge, cfg Config, logger Logger, opts ...OptionFunc) (*Proof, *ProofMetadata, error) {
+	options := &option{}
+	for _, opt := range opts {
+		opt(options)
+	}
+	if err := options.validate(); err != nil {
 		return nil, nil, err
 	}
 
-	if err := verifyMetadata(m, cfg, datadir, nodeId, commitmentAtxId); err != nil {
-		return nil, nil, err
-	}
-
-	if ok, err := initCompleted(datadir, m.NumUnits, cfg.BitsPerLabel, cfg.LabelsPerUnit); err != nil {
-		return nil, nil, err
-	} else if !ok {
-		return nil, nil, shared.ErrInitNotCompleted
-	}
-
-	// TODO (mafa): replace with io.MultiReader and allow to pass in directly for tests.
-	reader, err := persistence.NewLabelsReader(datadir, uint(cfg.BitsPerLabel))
-	if err != nil {
-		return nil, nil, err
-	}
 	batchChan := make(chan *batch)
 	solutionChan := make(chan *solution)
 
-	numLabels := uint64(m.NumUnits) * uint64(cfg.LabelsPerUnit)
+	numLabels := uint64(options.numUnits) * uint64(cfg.LabelsPerUnit)
 
 	workerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	eg, egCtx := errgroup.WithContext(workerCtx)
 	eg.Go(func() error {
-		return ioWorker(egCtx, batchChan, reader)
+		return ioWorker(egCtx, batchChan, options.reader)
 	})
 
 	for i := 0; i < NumWorkers; i++ {
@@ -103,12 +90,12 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, datadir string, nod
 		Indices: result.indices,
 	}
 	proofMetadata := &ProofMetadata{
-		NodeId:          nodeId,
-		CommitmentAtxId: commitmentAtxId,
+		NodeId:          options.nodeId,
+		CommitmentAtxId: options.commitmentAtxId,
 		Challenge:       ch,
 		BitsPerLabel:    cfg.BitsPerLabel,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
-		NumUnits:        m.NumUnits,
+		NumUnits:        options.numUnits,
 		K1:              cfg.K1,
 		K2:              cfg.K2,
 		N:               cfg.N,

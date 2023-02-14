@@ -86,6 +86,7 @@ func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan
 			return ctx.Err()
 		case batch, ok := <-batchChan:
 			if !ok {
+				close(solutionChan)
 				return nil
 			}
 			index := batch.Index
@@ -161,7 +162,7 @@ func solutionWorker(ctx context.Context, solutionChan <-chan *solution, numLabel
 
 			logger.Debug("Found enough label indices for proof with nonce %d", solution.Nonce)
 			sort.Slice(passed[solution.Nonce], func(i, j int) bool { return i < j })
-			logger.Debug("indices are %v", passed[solution.Nonce])
+			logger.Debug("highest index is %d", passed[solution.Nonce][len(passed[solution.Nonce])-1])
 
 			bitsPerIndex := uint(shared.BinaryRepresentationMinBits(numLabels))
 			buf := bytes.NewBuffer(make([]byte, 0, shared.Size(bitsPerIndex, uint(K2))))
