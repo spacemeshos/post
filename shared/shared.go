@@ -36,13 +36,6 @@ func ProvingDifficulty(numLabels uint64, k1 uint64) uint64 {
 	return x*k1 + (y*k1)/numLabels
 }
 
-func ProvingDifficulty2(numLabels, d, k1 uint64) uint64 {
-	maxTarget := uint64(1<<d) - 1
-	x := maxTarget / numLabels
-	y := maxTarget % numLabels
-	return x*k1 + (y*k1)/numLabels
-}
-
 // PowDifficulty returns the target difficulty of finding a nonce in `numLabels` labels.
 // It is calculated such that a high percentage of smeshers find at least one computed label
 // below the difficulty threshold. The difficulty is calculated as follows:

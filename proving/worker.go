@@ -68,12 +68,11 @@ func ioWorker(ctx context.Context, batchChan chan<- *batch, reader io.Reader) er
 }
 
 // labelWorker is a worker that receives batches from ioWorker and looks for indices to be included in the proof.
-func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan<- *solution, ch Challenge, numOuts uint8, numNonces uint32, d uint, difficulty uint64) error {
+func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan<- *solution, ch Challenge, numOuts uint8, numNonces uint32, difficulty uint64) error {
 	// use two slices with different types that point to the same memory location.
 	// this is done to speed up the conversation from bytes to uint64.
 	u64s := make([]uint64, numOuts*aes.BlockSize/8)
 	out := unsafe.Slice((*byte)(unsafe.Pointer(&u64s[0])), len(u64s)*8)
-	mask := ((uint64(1) << d) - 1)
 
 	ciphers, err := createAesCiphers(ch, numOuts)
 	if err != nil {
@@ -107,22 +106,8 @@ func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan
 				}
 
 				for nonce := uint(0); nonce < uint(numNonces); nonce++ {
-					// Extract the hash output for this nonce
-					offset := nonce * d
-					low_idx := offset / 64
-					high_idx := (offset + d - 1) / 64
-
-					val := u64s[low_idx]
-					val >>= offset % 64
-					if low_idx != high_idx {
-						high := u64s[high_idx]
-						val |= (high << (64 - offset%64))
-					}
-
-					val &= mask
-
 					// check against difficulty threshold
-					if val < difficulty {
+					if u64s[nonce] < difficulty {
 						s := &solution{
 							Index: index,
 							Nonce: nonce,

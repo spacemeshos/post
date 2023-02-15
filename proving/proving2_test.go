@@ -11,9 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
-	"github.com/spacemeshos/post/oracle"
 )
 
 func Benchmark_Proof(b *testing.B) {
@@ -51,18 +49,19 @@ func BenchmarkProving(b *testing.B) {
 	startPos := 256 * MiB
 	endPos := PiB
 
-	for numLabels := startPos; numLabels <= endPos; numLabels *= 2 {
-		d := oracle.CalcD(numLabels, config.DefaultAESBatchSize)
-		testName := fmt.Sprintf("%.02fGiB/d=%d", float64(numLabels)/float64(GiB), d)
+	for _, numNonces := range []uint32{2, 6, 10, 20} {
+		for numLabels := startPos; numLabels <= endPos; numLabels *= 2 {
+			testName := fmt.Sprintf("%.02fGiB/Nonces=%d", float64(numLabels)/float64(GiB), numNonces)
 
-		b.Run(testName, func(b *testing.B) {
-			benchedDataSize := uint64(math.Min(float64(numLabels), float64(2*GiB)))
-			benchmarkProving(b, numLabels, benchedDataSize)
-		})
+			b.Run(testName, func(b *testing.B) {
+				benchedDataSize := uint64(math.Min(float64(numLabels), float64(2*GiB)))
+				benchmarkProving(b, numLabels, numNonces, benchedDataSize)
+			})
+		}
 	}
 }
 
-func benchmarkProving(b *testing.B, numLabels, benchedDataSize uint64) {
+func benchmarkProving(b *testing.B, numLabels uint64, numNonces uint32, benchedDataSize uint64) {
 	challenge := []byte("hello world, challenge me!!!!!!!")
 
 	// file := rand.New(rand.NewSource(0))
@@ -75,6 +74,7 @@ func benchmarkProving(b *testing.B, numLabels, benchedDataSize uint64) {
 
 	cfg, _ := getTestConfig(b)
 	cfg.LabelsPerUnit = numLabels
+	cfg.N = numNonces
 
 	b.SetBytes(int64(benchedDataSize))
 	b.ResetTimer()
