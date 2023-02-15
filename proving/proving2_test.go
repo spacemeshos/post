@@ -46,10 +46,9 @@ func BenchmarkProving(b *testing.B) {
 	const MiB = uint64(1024 * 1024)
 	const GiB = MiB * 1024
 	const TiB = GiB * 1024
-	const PiB = TiB * 1024
 
-	startPos := 256 * MiB
-	endPos := PiB
+	startPos := 256 * GiB
+	endPos := 256 * TiB
 
 	for _, numNonces := range []uint32{2, 6, 10, 20} {
 		for numLabels := startPos; numLabels <= endPos; numLabels *= 2 {
