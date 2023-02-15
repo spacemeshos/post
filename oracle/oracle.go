@@ -184,11 +184,11 @@ func FastOracle(ch Challenge, nonce uint32, label []byte) [32]byte {
 	return sha256.Sum256(input)
 }
 
-// CalcD calculates the number of bits to use for the difficulty check.
+// CalcD calculates the number of bytes to use for the difficulty check.
 // numLabels is the number of labels contained in the PoST data.
 // B is a network parameter that defines the number of labels used in one AES Block.
 func CalcD(numLabels uint64, B uint32) uint {
-	return uint(math.Ceil(math.Log2(float64(numLabels)) - math.Log2(float64(B))))
+	return uint(math.Ceil((math.Log2(float64(numLabels)) - math.Log2(float64(B))) / 8))
 }
 
 // CreateBlockCipher creates an AES cipher for given fast oracle block.

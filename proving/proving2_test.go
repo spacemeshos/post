@@ -11,7 +11,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
+	"github.com/spacemeshos/post/oracle"
 )
 
 func Benchmark_Proof(b *testing.B) {
@@ -51,7 +53,8 @@ func BenchmarkProving(b *testing.B) {
 
 	for _, numNonces := range []uint32{2, 6, 10, 20} {
 		for numLabels := startPos; numLabels <= endPos; numLabels *= 2 {
-			testName := fmt.Sprintf("%.02fGiB/Nonces=%d", float64(numLabels)/float64(GiB), numNonces)
+			d := oracle.CalcD(numLabels, config.DefaultAESBatchSize)
+			testName := fmt.Sprintf("%.02fGiB/d=%d/Nonces=%d", float64(numLabels)/float64(GiB), d, numNonces)
 
 			b.Run(testName, func(b *testing.B) {
 				benchedDataSize := uint64(math.Min(float64(numLabels), float64(2*GiB)))
