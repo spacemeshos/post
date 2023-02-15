@@ -30,7 +30,14 @@ func NumLabels(dataSize uint64, labelSize uint) uint64 {
 }
 
 func ProvingDifficulty(numLabels uint64, k1 uint64) uint64 {
-	const maxTarget = 0 // TODO(mafa): this should be 1 << d, where d is the number of bits per nonce ?
+	const maxTarget = math.MaxUint64
+	x := maxTarget / numLabels
+	y := maxTarget % numLabels
+	return x*k1 + (y*k1)/numLabels
+}
+
+func ProvingDifficulty2(numLabels, d, k1 uint64) uint64 {
+	maxTarget := uint64(1<<d) - 1
 	x := maxTarget / numLabels
 	y := maxTarget % numLabels
 	return x*k1 + (y*k1)/numLabels

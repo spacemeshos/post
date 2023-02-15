@@ -20,7 +20,7 @@ import (
 const (
 	NumWorkers = 1 // Number of workers creating a proof in parallel. Each one will max out one CPU core.
 
-	BlocksPerWorker = 1 << 24 // How many AES blocks are contained per batch sent to a worker. Larger values will increase memory usage, but speed up the proof generation.
+	BlocksPerWorker = 1 << 26 // How many AES blocks are contained per batch sent to a worker. Larger values will increase memory usage, but speed up the proof generation.
 	batchSize       = BlocksPerWorker * aes.BlockSize
 )
 
@@ -55,13 +55,13 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, logger Logger, opts
 		eg.Go(func() error {
 			defer wg.Done()
 
-			difficulty := shared.ProvingDifficulty(numLabels, uint64(cfg.K1))
 			d := oracle.CalcD(numLabels, cfg.B)
+			difficulty := shared.ProvingDifficulty2(numLabels, uint64(d), uint64(cfg.K1))
 
 			const numBits = float64(aes.BlockSize * 8)
 			numOuts := uint8(math.Ceil(float64(cfg.N) * float64(d) / numBits))
 
-			return labelWorker(egCtx, batchChan, solutionChan, ch, numOuts, d, difficulty)
+			return labelWorker(egCtx, batchChan, solutionChan, ch, numOuts, cfg.N, d, difficulty)
 		})
 	}
 

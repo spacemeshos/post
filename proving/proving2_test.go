@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"testing"
 
@@ -55,7 +56,8 @@ func BenchmarkProving(b *testing.B) {
 		testName := fmt.Sprintf("%.02fGiB/d=%d", float64(numLabels)/float64(GiB), d)
 
 		b.Run(testName, func(b *testing.B) {
-			benchmarkProving(b, numLabels, 2*GiB)
+			benchedDataSize := uint64(math.Min(float64(numLabels), float64(2*GiB)))
+			benchmarkProving(b, numLabels, benchedDataSize)
 		})
 	}
 }
@@ -63,6 +65,7 @@ func BenchmarkProving(b *testing.B) {
 func benchmarkProving(b *testing.B, numLabels, benchedDataSize uint64) {
 	challenge := []byte("hello world, challenge me!!!!!!!")
 
+	// file := rand.New(rand.NewSource(0))
 	file, err := os.Open("/dev/zero")
 	require.NoError(b, err)
 	defer file.Close()

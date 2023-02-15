@@ -26,10 +26,10 @@ const (
 	DefaultMinNumUnits = 1
 
 	DefaultK1 = 2000
-	DefaultK2 = 1800
+	DefaultK2 = 750
 
 	DefaultAESBatchSize   = aes.BlockSize // one label per byte of AES block.
-	DefaultNonceBatchSize = 20
+	DefaultNonceBatchSize = 6
 )
 
 const (
