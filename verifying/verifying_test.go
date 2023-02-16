@@ -26,12 +26,12 @@ var (
 	CPUProviderID  = initialization.CPUProviderID
 )
 
-func getTestConfig(t *testing.T) (config.Config, config.InitOpts) {
+func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
 	cfg.LabelsPerUnit = 1 << 12
 
 	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
+	opts.DataDir = tb.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ComputeProviderID = int(CPUProviderID())
 

@@ -4,8 +4,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"math"
-
-	"github.com/spacemeshos/post/gpu"
 )
 
 // CalcD calculates the number of bytes to use for the difficulty check.
@@ -32,42 +30,4 @@ func CreateBlockCipher(ch Challenge, nonce uint8) (cipher.Block, error) {
 	key := make([]byte, aes.BlockSize)
 	keyCipher.Encrypt(key, keyBuffer)
 	return aes.NewCipher(key)
-}
-
-// WorkOracle computes labels for a given challenge for a Node with the provided CommitmentATX ID.
-// The labels are computed using the specified compute provider (default: CPU).
-func WorkOracle2(opts ...OptionFunc) (WorkOracleResult, error) {
-	options := &option{
-		computeProviderID: gpu.CPUProviderID(),
-		salt:              make([]byte, 32), // TODO(moshababo): apply salt
-		computeLeaves:     true,
-	}
-
-	for _, opt := range opts {
-		if err := opt(options); err != nil {
-			return WorkOracleResult{}, err
-		}
-	}
-
-	if err := options.validate(); err != nil {
-		return WorkOracleResult{}, err
-	}
-
-	res, err := gpu.ScryptPositions(
-		gpu.WithComputeProviderID(options.computeProviderID),
-		gpu.WithCommitment(options.commitment),
-		gpu.WithSalt(options.salt),
-		gpu.WithStartAndEndPosition(options.startPosition, options.endPosition),
-		gpu.WithBitsPerLabel(options.bitsPerLabel),
-		gpu.WithComputeLeaves(options.computeLeaves),
-		gpu.WithComputePow(options.difficulty),
-	)
-	if err != nil {
-		return WorkOracleResult{}, err
-	}
-
-	return WorkOracleResult{
-		Output: res.Output,
-		Nonce:  res.IdxSolution,
-	}, nil
 }
