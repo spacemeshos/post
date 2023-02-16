@@ -48,10 +48,10 @@ func BenchmarkProving(b *testing.B) {
 	const TiB = GiB * 1024
 
 	startPos := 256 * GiB
-	endPos := 256 * TiB
+	endPos := 4 * TiB
 
 	for _, numNonces := range []uint32{2, 6, 10, 20} {
-		for numLabels := startPos; numLabels <= endPos; numLabels *= 2 {
+		for numLabels := startPos; numLabels <= endPos; numLabels *= 4 {
 			d := oracle.CalcD(numLabels, config.DefaultAESBatchSize)
 			testName := fmt.Sprintf("%.02fGiB/d=%d/Nonces=%d", float64(numLabels)/float64(GiB), d, numNonces)
 
