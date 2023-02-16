@@ -18,7 +18,7 @@ import (
 
 // TODO (mafa): first two could be configuration options.
 const (
-	NumWorkers = 2 // Number of workers creating a proof in parallel. Each one will max out one CPU core.
+	NumWorkers = 1 // Number of workers creating a proof in parallel. Each one will max out one CPU core.
 
 	BlocksPerWorker = 1 << 24 // How many AES blocks are contained per batch sent to a worker. Larger values will increase memory usage, but speed up the proof generation.
 	batchSize       = BlocksPerWorker * aes.BlockSize
