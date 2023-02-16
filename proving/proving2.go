@@ -55,12 +55,12 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, logger Logger, opts
 		eg.Go(func() error {
 			defer wg.Done()
 
-			d := oracle.CalcD(numLabels, cfg.B)
+			d := oracle.CalcD(numLabels, cfg.B) // TODO (mafa): check if this is the correct value for D, after B has been halved.
 			difficulty := shared.ProvingDifficulty2(numLabels, uint64(d), uint64(cfg.K1))
 
 			numOuts := uint8(math.Ceil(float64(cfg.N) * float64(d) / aes.BlockSize))
 
-			return labelWorker(egCtx, batchChan, solutionChan, ch, numOuts, cfg.N, d, difficulty)
+			return labelWorker(egCtx, batchChan, solutionChan, ch, numOuts, cfg.N, cfg.B, d, difficulty)
 		})
 	}
 

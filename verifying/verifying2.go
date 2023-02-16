@@ -48,6 +48,7 @@ func VerifyNew(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) err
 	gsReader := shared.NewGranSpecificReader(buf, bitsPerIndex)
 	indicesSet := make(map[uint64]struct{}, m.K2)
 
+	aesBlock := make([]byte, aes.BlockSize)
 	for i := uint(0); i < uint(m.K2); i++ {
 		index, err := gsReader.ReadNextUintBE()
 		if err != nil {
@@ -69,6 +70,7 @@ func VerifyNew(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) err
 		if err != nil {
 			return err
 		}
+		copy(aesBlock, res.Output)
 
 		// cipher with the keys needed to extract the relevant nonce
 		d := uint32(oracle.CalcD(numLabels, m.B))
@@ -87,8 +89,8 @@ func VerifyNew(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) err
 		out := make([]byte, aes.BlockSize*2)
 		u64 := unsafe.Slice((*uint64)(unsafe.Pointer(&out[offset%aes.BlockSize])), 1)
 		mask := (uint64(1) << (d * 8)) - 1
-		ciphers[0].Encrypt(out[:aes.BlockSize], res.Output)
-		ciphers[1].Encrypt(out[aes.BlockSize:], res.Output)
+		ciphers[0].Encrypt(out[:aes.BlockSize], aesBlock)
+		ciphers[1].Encrypt(out[aes.BlockSize:], aesBlock)
 
 		val := u64[0] & mask
 		if !options.verifyFunc(val) {

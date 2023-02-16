@@ -13,7 +13,7 @@ import (
 )
 
 func BenchmarkVerifying(b *testing.B) {
-	for _, k2 := range []uint32{300, 500, 800, 1800} {
+	for _, k2 := range []uint32{170, 300, 500, 800} {
 		testName := fmt.Sprintf("256GiB/k2=%d", k2)
 
 		b.Run(testName, func(b *testing.B) {

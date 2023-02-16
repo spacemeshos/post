@@ -25,12 +25,11 @@ const (
 	DefaultMaxNumUnits = 10
 	DefaultMinNumUnits = 1
 
-	// TODO(mafa): tune these values.
-	DefaultK1 = 600
-	DefaultK2 = 550
-
-	DefaultAESBatchSize   = aes.BlockSize // one label per byte of AES block.
-	DefaultNonceBatchSize = 6             // TODO(mafa): define reasonable default value.
+	// These values have been derived from https://colab.research.google.com/github/spacemeshos/notebooks/blob/main/post-proof-params.ipynb
+	DefaultK1             = 150
+	DefaultK2             = 170
+	DefaultNonceBatchSize = 24
+	DefaultAESBatchSize   = aes.BlockSize / 2 // 8 labels per AES call, remaining bytes zeroes.
 )
 
 const (
