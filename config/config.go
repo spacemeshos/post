@@ -25,11 +25,12 @@ const (
 	DefaultMaxNumUnits = 10
 	DefaultMinNumUnits = 1
 
-	DefaultK1 = 2000
-	DefaultK2 = 750
+	// TODO(mafa): tune these values.
+	DefaultK1 = 600
+	DefaultK2 = 550
 
 	DefaultAESBatchSize   = aes.BlockSize // one label per byte of AES block.
-	DefaultNonceBatchSize = 6
+	DefaultNonceBatchSize = 6             // TODO(mafa): define reasonable default value.
 )
 
 const (
