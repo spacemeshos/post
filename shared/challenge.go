@@ -2,4 +2,4 @@ package shared
 
 type Challenge []byte
 
-var ZeroChallenge = make(Challenge, 0)
+var ZeroChallenge = make(Challenge, 32)
