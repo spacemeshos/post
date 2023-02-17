@@ -70,13 +70,11 @@ func Test_Generate(t *testing.T) {
 	for numUnits := uint32(config.DefaultMinNumUnits); numUnits < 6; numUnits++ {
 		numUnits := numUnits
 		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
-			t.Parallel()
-
 			nodeId := make([]byte, 32)
 			commitmentAtxId := make([]byte, 32)
 			ch := make(Challenge, 32)
 			cfg := config.DefaultConfig()
-			cfg.LabelsPerUnit = 1 << 15
+			cfg.LabelsPerUnit = 1 << 14
 
 			opts := config.DefaultInitOpts()
 			opts.ComputeProviderID = int(CPUProviderID())

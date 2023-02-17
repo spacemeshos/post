@@ -63,7 +63,7 @@ func ioWorker(ctx context.Context, batchChan chan<- *batch, reader io.Reader) er
 			batchDataPool.Put(&data)
 			return err
 		}
-		index += uint64(n)
+		index += uint64(n) / aes.BlockSize
 	}
 }
 
@@ -153,7 +153,10 @@ func solutionWorker(ctx context.Context, solutionChan <-chan *solution, numLabel
 
 			logger.Debug("found enough label indices for proof with nonce %d", solution.Nonce)
 			sort.Slice(passed[solution.Nonce], func(i, j int) bool { return i < j })
-			logger.Debug("highest index found is %d", passed[solution.Nonce][len(passed[solution.Nonce])-1])
+			for _, p := range passed[solution.Nonce] {
+				logger.Debug("\tlabel index %d", p)
+			}
+			// logger.Debug("highest index found is %d", passed[solution.Nonce][len(passed[solution.Nonce])-1])
 
 			bitsPerIndex := uint(shared.BinaryRepresentationMinBits(numLabels))
 			buf := bytes.NewBuffer(make([]byte, 0, shared.Size(bitsPerIndex, uint(K2))))
