@@ -68,7 +68,7 @@ func ioWorker(ctx context.Context, batchChan chan<- *batch, reader io.Reader) er
 }
 
 // labelWorker is a worker that receives batches from ioWorker and looks for indices to be included in the proof.
-func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan<- *solution, ch Challenge, numOuts uint8, numNonces, b uint32, d uint, difficulty uint64) error {
+func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan<- *solution, ch Challenge, numOuts uint8, numNonces uint32, d uint, difficulty uint64) error {
 	// use two slices with different types that point to the same memory location.
 	// this is done to speed up the conversation from bytes to uint64.
 	out := make([]byte, numOuts*aes.BlockSize+8)
@@ -94,11 +94,10 @@ func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan
 			}
 			index := batch.Index
 			labels := batch.Data
-			block := make([]byte, aes.BlockSize)
 
 			for len(labels) > 0 {
-				copy(block, labels[:b])
-				labels = labels[b:]
+				block := labels[:aes.BlockSize]
+				labels = labels[aes.BlockSize:]
 
 				select {
 				case <-ctx.Done():

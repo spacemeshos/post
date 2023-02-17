@@ -142,6 +142,7 @@ func main() {
 	log.Info("cli: initialization completed")
 
 	if genProof {
+		// TODO(mafa): update this section
 		log.Info("cli: generating proof as a sanity test")
 
 		prover, err := proving.NewProver(cfg, opts.DataDir, id, commitmentAtxId)

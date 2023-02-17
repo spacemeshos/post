@@ -16,6 +16,8 @@ import (
 	"github.com/spacemeshos/post/verifying"
 )
 
+//lint:file-ignore SA1019 These are the tests for the deprecated functions and should still be executed as long as the deprecated functions haven't been removed.
+
 var (
 	NewInitializer = initialization.NewInitializer
 	CPUProviderID  = initialization.CPUProviderID

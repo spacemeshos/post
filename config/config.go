@@ -29,7 +29,7 @@ const (
 	DefaultK1             = 150
 	DefaultK2             = 170
 	DefaultNonceBatchSize = 24
-	DefaultAESBatchSize   = aes.BlockSize / 2 // 8 labels per AES call, remaining bytes zeroes.
+	DefaultAESBatchSize   = aes.BlockSize
 )
 
 const (

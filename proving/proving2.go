@@ -27,7 +27,6 @@ const (
 // TODO (mafa): use functional options.
 // TODO (mafa): replace Logger with zap.
 // TODO (mafa): replace datadir with functional option for data provider. `verifyMetadata` and `initCompleted` should be part of the `WithDataDir` option.
-// -> In tests we can also just provide a mock data provider (as io.Reader).
 func Generate(ctx context.Context, ch Challenge, cfg Config, logger Logger, opts ...OptionFunc) (*Proof, *ProofMetadata, error) {
 	options := &option{}
 	for _, opt := range opts {
@@ -55,12 +54,10 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, logger Logger, opts
 		eg.Go(func() error {
 			defer wg.Done()
 
-			d := oracle.CalcD(numLabels, cfg.B) // TODO (mafa): check if this is the correct value for D, after B has been halved.
+			d := oracle.CalcD(numLabels, cfg.B)
 			difficulty := shared.ProvingDifficulty2(numLabels, uint64(d), uint64(cfg.K1))
-
 			numOuts := uint8(math.Ceil(float64(cfg.N) * float64(d) / aes.BlockSize))
-
-			return labelWorker(egCtx, batchChan, solutionChan, ch, numOuts, cfg.N, cfg.B, d, difficulty)
+			return labelWorker(egCtx, batchChan, solutionChan, ch, numOuts, cfg.N, d, difficulty)
 		})
 	}
 

@@ -59,6 +59,8 @@ func VerifyVRFNonce(nonce *uint64, m *shared.VRFNonceMetadata) error {
 
 // Verify ensures the validity of a proof in respect to its metadata.
 // It returns nil if the proof is valid or an error describing the failure, otherwise.
+//
+// Deprecated: Verify is deprecated. Use the verifying.VerifyNew function instead.
 func Verify(p *shared.Proof, m *shared.ProofMetadata) error {
 	if len(m.NodeId) != 32 {
 		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(m.NodeId))
