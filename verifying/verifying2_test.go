@@ -26,7 +26,7 @@ func (l testLogger) Debug(msg string, args ...any) { l.tb.Logf("\tDEBUG\t"+msg, 
 func (l testLogger) Error(msg string, args ...any) { l.tb.Logf("\tERROR\t"+msg, args...) }
 
 func BenchmarkVerifying(b *testing.B) {
-	for _, k2 := range []uint32{170, 300, 500, 800} {
+	for _, k2 := range []uint32{170, 288, 500, 800} {
 		testName := fmt.Sprintf("256GiB/k2=%d", k2)
 
 		b.Run(testName, func(b *testing.B) {

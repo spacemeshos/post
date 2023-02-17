@@ -39,6 +39,15 @@ func BenchmarkProving(b *testing.B) {
 	}
 }
 
+type dataSource struct {
+	io.Reader
+	close func() error
+}
+
+func (ds *dataSource) Close() error {
+	return ds.close()
+}
+
 func benchmarkProving(b *testing.B, numLabels uint64, numNonces uint32, benchedDataSize uint64) {
 	challenge := []byte("hello world, challenge me!!!!!!!")
 
@@ -57,9 +66,12 @@ func benchmarkProving(b *testing.B, numLabels uint64, numNonces uint32, benchedD
 	b.SetBytes(int64(benchedDataSize))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		reader := io.LimitReader(bufio.NewReader(file), int64(benchedDataSize))
+		r := &dataSource{
+			Reader: io.LimitReader(bufio.NewReader(file), int64(benchedDataSize)),
+			close:  func() error { return file.Close() },
+		}
 
-		Generate(context.Background(), challenge, cfg, testLogger{tb: b}, withLabelsReader(reader, nodeId, commitmentAtxId, 1))
+		Generate(context.Background(), challenge, cfg, testLogger{tb: b}, withLabelsReader(r, nodeId, commitmentAtxId, 1))
 	}
 }
 

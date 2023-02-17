@@ -46,7 +46,7 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, logger Logger, opts
 	defer cancel()
 	eg, egCtx := errgroup.WithContext(workerCtx)
 	eg.Go(func() error {
-		return ioWorker(egCtx, batchChan, options.reader)
+		return ioWorker(egCtx, batchChan, options.dataSource)
 	})
 
 	var wg sync.WaitGroup

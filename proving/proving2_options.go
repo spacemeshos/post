@@ -10,8 +10,8 @@ import (
 )
 
 type option struct {
-	// reader is the source of labels to be used for generating a proof.
-	reader io.Reader
+	// dataSource is the source of labels to be used for generating a proof.
+	dataSource io.ReadCloser
 
 	nodeId          []byte
 	commitmentAtxId []byte
@@ -20,7 +20,7 @@ type option struct {
 }
 
 func (o *option) validate() error {
-	if o.reader == nil {
+	if o.dataSource == nil {
 		return errors.New("`reader` is required")
 	}
 	return nil
@@ -51,7 +51,7 @@ func WithDataSource(cfg Config, nodeId, commitmentAtxId []byte, datadir string) 
 			return err
 		}
 
-		o.reader = reader
+		o.dataSource = reader
 		o.nodeId = nodeId
 		o.commitmentAtxId = commitmentAtxId
 		o.numUnits = m.NumUnits
@@ -61,9 +61,9 @@ func WithDataSource(cfg Config, nodeId, commitmentAtxId []byte, datadir string) 
 
 // withLabelsReader is an option that allows the caller to provide a reader for labels.
 // TODO(mafa): at the moment this is intended for testing purposes only, but will eventually replace `WithDataSource`.
-func withLabelsReader(reader io.Reader, nodeId, commitmentAtxId []byte, numUnits uint32) OptionFunc {
+func withLabelsReader(source io.ReadCloser, nodeId, commitmentAtxId []byte, numUnits uint32) OptionFunc {
 	return func(o *option) error {
-		o.reader = reader
+		o.dataSource = source
 		o.nodeId = nodeId
 		o.commitmentAtxId = commitmentAtxId
 		o.numUnits = numUnits

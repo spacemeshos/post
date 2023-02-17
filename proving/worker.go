@@ -36,13 +36,14 @@ type solution struct {
 // labelWorkers.
 //
 // TODO(mafa): use this as base to replace GranSpecificReader / GranSpecificWriter and the persistence package.
-func ioWorker(ctx context.Context, batchChan chan<- *batch, reader io.Reader) error {
+func ioWorker(ctx context.Context, batchChan chan<- *batch, source io.ReadCloser) error {
 	defer close(batchChan)
+	defer source.Close()
 	index := uint64(0)
 
 	for {
 		data := *batchDataPool.Get().(*[]byte)
-		n, err := reader.Read(data)
+		n, err := source.Read(data)
 		switch {
 		case err == io.EOF || err == nil:
 			n -= n % aes.BlockSize // make sure we don't send partial blocks to the label workers.
