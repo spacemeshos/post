@@ -26,7 +26,7 @@ func BenchmarkProving(b *testing.B) {
 	startPos := 256 * GiB
 	endPos := 4 * TiB
 
-	for _, numNonces := range []uint32{6, 12, 24} {
+	for _, numNonces := range []uint32{6, 12, 20} {
 		for numLabels := startPos; numLabels <= endPos; numLabels *= 4 {
 			d := shared.CalcD(numLabels, config.DefaultAESBatchSize)
 			testName := fmt.Sprintf("%.02fGiB/d=%d/Nonces=%d", float64(numLabels)/float64(GiB), d, numNonces)
