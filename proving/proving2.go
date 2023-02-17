@@ -29,7 +29,9 @@ const (
 func Generate(ctx context.Context, ch Challenge, cfg Config, logger Logger, opts ...OptionFunc) (*Proof, *ProofMetadata, error) {
 	options := &option{}
 	for _, opt := range opts {
-		opt(options)
+		if err := opt(options); err != nil {
+			return nil, nil, err
+		}
 	}
 	if err := options.validate(); err != nil {
 		return nil, nil, err

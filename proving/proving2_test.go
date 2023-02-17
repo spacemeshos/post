@@ -64,17 +64,15 @@ func benchmarkProving(b *testing.B, numLabels uint64, numNonces uint32, benchedD
 }
 
 func Test_Generate(t *testing.T) {
-	r := require.New(t)
-	log := testLogger{tb: t}
-
 	for numUnits := uint32(config.DefaultMinNumUnits); numUnits < 6; numUnits++ {
 		numUnits := numUnits
 		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
+			log := testLogger{tb: t}
+
 			nodeId := make([]byte, 32)
 			commitmentAtxId := make([]byte, 32)
 			ch := make(Challenge, 32)
 			cfg := config.DefaultConfig()
-			cfg.LabelsPerUnit = 1 << 14
 
 			opts := config.DefaultInitOpts()
 			opts.ComputeProviderID = int(CPUProviderID())
@@ -88,33 +86,100 @@ func Test_Generate(t *testing.T) {
 				initialization.WithInitOpts(opts),
 				initialization.WithLogger(log),
 			)
-			r.NoError(err)
-			r.NoError(init.Initialize(context.Background()))
+			require.NoError(t, err)
+			require.NoError(t, init.Initialize(context.Background()))
 
 			n, err := rand.Read(ch)
-			r.NoError(err)
-			r.Equal(len(ch), n)
+			require.NoError(t, err)
+			require.Equal(t, len(ch), n)
 
 			proof, proofMetaData, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
-			r.NoError(err, "numUnits: %d", opts.NumUnits)
-			r.NotNil(proof)
-			r.NotNil(proofMetaData)
+			require.NoError(t, err, "numUnits: %d", opts.NumUnits)
+			require.NotNil(t, proof)
+			require.NotNil(t, proofMetaData)
 
-			r.Equal(nodeId, proofMetaData.NodeId)
-			r.Equal(commitmentAtxId, proofMetaData.CommitmentAtxId)
-			r.Equal(ch, proofMetaData.Challenge)
-			r.Equal(cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
-			r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
-			r.Equal(opts.NumUnits, proofMetaData.NumUnits)
-			r.Equal(cfg.K1, proofMetaData.K1)
-			r.Equal(cfg.K2, proofMetaData.K2)
+			require.Equal(t, nodeId, proofMetaData.NodeId)
+			require.Equal(t, commitmentAtxId, proofMetaData.CommitmentAtxId)
+			require.Equal(t, ch, proofMetaData.Challenge)
+			require.Equal(t, cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
+			require.Equal(t, cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
+			require.Equal(t, opts.NumUnits, proofMetaData.NumUnits)
+			require.Equal(t, cfg.K1, proofMetaData.K1)
+			require.Equal(t, cfg.K2, proofMetaData.K2)
 
 			numLabels := cfg.LabelsPerUnit * uint64(numUnits)
 			indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
-			r.Equal(shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
+			require.Equal(t, shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
 
 			log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
-			r.NoError(verifying.VerifyNew(proof, proofMetaData, verifying.WithLogger(log)))
+			require.NoError(t, verifying.VerifyNew(proof, proofMetaData, verifying.WithLogger(log)))
 		})
 	}
+}
+
+func Test_Generate_DetectInvalidParameters(t *testing.T) {
+	nodeId := make([]byte, 32)
+	commitmentAtxId := make([]byte, 32)
+
+	ch := make(Challenge, 32)
+	cfg, opts := getTestConfig(t)
+	init, err := NewInitializer(
+		initialization.WithNodeId(nodeId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
+		initialization.WithConfig(cfg),
+		initialization.WithInitOpts(opts),
+		initialization.WithLogger(testLogger{tb: t}),
+	)
+	require.NoError(t, err)
+	require.NoError(t, init.Initialize(context.Background()))
+
+	t.Run("invalid nodeId", func(t *testing.T) {
+		log := testLogger{tb: t}
+
+		newNodeId := make([]byte, 32)
+		copy(newNodeId, nodeId)
+		newNodeId[0] = newNodeId[0] + 1
+
+		_, _, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, newNodeId, commitmentAtxId, opts.DataDir))
+		var errConfigMismatch initialization.ConfigMismatchError
+		require.ErrorAs(t, err, &errConfigMismatch)
+		require.Equal(t, "NodeId", errConfigMismatch.Param)
+	})
+
+	t.Run("invalid atxId", func(t *testing.T) {
+		log := testLogger{tb: t}
+
+		newAtxId := make([]byte, 32)
+		copy(newAtxId, commitmentAtxId)
+		newAtxId[0] = newAtxId[0] + 1
+
+		_, _, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, nodeId, newAtxId, opts.DataDir))
+		var errConfigMismatch initialization.ConfigMismatchError
+		require.ErrorAs(t, err, &errConfigMismatch)
+		require.Equal(t, "CommitmentAtxId", errConfigMismatch.Param)
+	})
+
+	t.Run("invalid BitsPerLabel", func(t *testing.T) {
+		log := testLogger{tb: t}
+
+		newCfg := cfg
+		newCfg.BitsPerLabel++
+
+		_, _, err := Generate(context.Background(), ch, newCfg, log, WithDataSource(newCfg, nodeId, commitmentAtxId, opts.DataDir))
+		var errConfigMismatch initialization.ConfigMismatchError
+		require.ErrorAs(t, err, &errConfigMismatch)
+		require.Equal(t, "BitsPerLabel", errConfigMismatch.Param)
+	})
+
+	t.Run("invalid LabelsPerUnit", func(t *testing.T) {
+		log := testLogger{tb: t}
+
+		newCfg := cfg
+		newCfg.LabelsPerUnit++
+
+		_, _, err := Generate(context.Background(), ch, newCfg, log, WithDataSource(newCfg, nodeId, commitmentAtxId, opts.DataDir))
+		var errConfigMismatch initialization.ConfigMismatchError
+		require.ErrorAs(t, err, &errConfigMismatch)
+		require.Equal(t, "LabelsPerUnit", errConfigMismatch.Param)
+	})
 }

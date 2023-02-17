@@ -2,6 +2,7 @@ package verifying
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -9,8 +10,20 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/spacemeshos/post/initialization"
+	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
 )
+
+type testLogger struct {
+	shared.Logger
+
+	tb testing.TB
+}
+
+func (l testLogger) Info(msg string, args ...any)  { l.tb.Logf("\tINFO\t"+msg, args...) }
+func (l testLogger) Debug(msg string, args ...any) { l.tb.Logf("\tDEBUG\t"+msg, args...) }
+func (l testLogger) Error(msg string, args ...any) { l.tb.Logf("\tERROR\t"+msg, args...) }
 
 func BenchmarkVerifying(b *testing.B) {
 	for _, k2 := range []uint32{170, 300, 500, 800} {
@@ -59,4 +72,24 @@ func benchmarkVerifying(b *testing.B, k2 uint32) {
 		require.NoError(b, err)
 		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
 	}
+}
+
+func Test_VerifyNew(t *testing.T) {
+	r := require.New(t)
+	log := testLogger{tb: t}
+
+	cfg, opts := getTestConfig(t)
+	init, err := NewInitializer(
+		initialization.WithNodeId(nodeId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
+		initialization.WithConfig(cfg),
+		initialization.WithInitOpts(opts),
+	)
+	r.NoError(err)
+	r.NoError(init.Initialize(context.Background()))
+
+	proof, proofMetadata, err := proving.Generate(context.Background(), ch, cfg, log, proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+	r.NoError(err)
+
+	r.NoError(VerifyNew(proof, proofMetadata))
 }

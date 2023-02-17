@@ -30,7 +30,6 @@ var (
 
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
 
 	opts := config.DefaultInitOpts()
 	opts.DataDir = tb.TempDir()

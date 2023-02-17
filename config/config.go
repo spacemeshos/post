@@ -19,7 +19,7 @@ const (
 	DefaultComputeBatchSize = 1 << 14
 
 	DefaultBitsPerLabel  = 8
-	DefaultLabelsPerUnit = 2048 // 2KB per unit. Placeholder value, primarily for tests.
+	DefaultLabelsPerUnit = 1 << 14 // 16KB per unit. Placeholder value, primarily for tests.
 
 	DefaultMaxNumUnits = 10
 	DefaultMinNumUnits = 1
