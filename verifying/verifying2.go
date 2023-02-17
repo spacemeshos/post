@@ -41,7 +41,7 @@ func VerifyNew(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) err
 
 	if options.verifyFunc == nil {
 		difficulty := shared.ProvingDifficulty2(numLabels, m.B, m.K1)
-		options.logger.Debug("verifying difficulty", difficulty)
+		options.logger.Debug("verifying difficulty %d", difficulty)
 		options.verifyFunc = func(val uint64) bool {
 			return val < difficulty
 		}
