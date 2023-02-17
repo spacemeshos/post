@@ -18,17 +18,16 @@ const (
 	// and file truncating is byte-granular regardless of `BitsPerLabel` value.
 	DefaultComputeBatchSize = 1 << 14
 
-	// 2KB per unit. Temporary value.
 	DefaultBitsPerLabel  = 8
-	DefaultLabelsPerUnit = 2048
+	DefaultLabelsPerUnit = 2048 // 2KB per unit. Placeholder value, primarily for tests.
 
 	DefaultMaxNumUnits = 10
 	DefaultMinNumUnits = 1
 
 	// These values have been derived from https://colab.research.google.com/github/spacemeshos/notebooks/blob/main/post-proof-params.ipynb
-	DefaultK1             = 150
-	DefaultK2             = 170
-	DefaultNonceBatchSize = 24
+	DefaultK1             = 280
+	DefaultK2             = 290
+	DefaultNonceBatchSize = 20
 	DefaultAESBatchSize   = aes.BlockSize
 )
 

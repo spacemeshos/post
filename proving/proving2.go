@@ -12,7 +12,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/spacemeshos/post/initialization"
-	"github.com/spacemeshos/post/oracle"
 	"github.com/spacemeshos/post/shared"
 )
 
@@ -54,8 +53,9 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, logger Logger, opts
 		eg.Go(func() error {
 			defer wg.Done()
 
-			d := oracle.CalcD(numLabels, cfg.B)
-			difficulty := shared.ProvingDifficulty2(numLabels, uint64(d), uint64(cfg.K1))
+			difficulty := shared.ProvingDifficulty2(numLabels, cfg.B, cfg.K1)
+			logger.Debug("proving difficulty: %d", difficulty)
+			d := shared.CalcD(numLabels, cfg.B)
 			numOuts := uint8(math.Ceil(float64(cfg.N) * float64(d) / aes.BlockSize))
 			return labelWorker(egCtx, batchChan, solutionChan, ch, numOuts, cfg.N, d, difficulty)
 		})

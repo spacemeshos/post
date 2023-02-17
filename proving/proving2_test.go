@@ -3,6 +3,7 @@ package proving
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"math"
@@ -13,34 +14,9 @@ import (
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
-	"github.com/spacemeshos/post/oracle"
+	"github.com/spacemeshos/post/shared"
+	"github.com/spacemeshos/post/verifying"
 )
-
-func Benchmark_Proof(b *testing.B) {
-	challenge := []byte("hello world, challenge me!!!!!!!")
-
-	nodeId := make([]byte, 32)
-	commitmentAtxId := make([]byte, 32)
-
-	cfg, opts := getTestConfig(b)
-	init, err := NewInitializer(
-		initialization.WithNodeId(nodeId),
-		initialization.WithCommitmentAtxId(commitmentAtxId),
-		initialization.WithConfig(cfg),
-		initialization.WithInitOpts(opts),
-	)
-	require.NoError(b, err)
-	require.NoError(b, init.Initialize(context.Background()))
-
-	b.ResetTimer()
-	b.SetBytes(int64(cfg.LabelsPerUnit) * int64(opts.NumUnits))
-	for i := 0; i < b.N; i++ {
-		proof, meta, err := Generate(context.Background(), challenge, cfg, testLogger{tb: b}, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
-		require.NoError(b, err)
-		require.NotNil(b, proof)
-		require.NotNil(b, meta)
-	}
-}
 
 func BenchmarkProving(b *testing.B) {
 	const MiB = uint64(1024 * 1024)
@@ -52,7 +28,7 @@ func BenchmarkProving(b *testing.B) {
 
 	for _, numNonces := range []uint32{6, 12, 24} {
 		for numLabels := startPos; numLabels <= endPos; numLabels *= 4 {
-			d := oracle.CalcD(numLabels, config.DefaultAESBatchSize)
+			d := shared.CalcD(numLabels, config.DefaultAESBatchSize)
 			testName := fmt.Sprintf("%.02fGiB/d=%d/Nonces=%d", float64(numLabels)/float64(GiB), d, numNonces)
 
 			b.Run(testName, func(b *testing.B) {
@@ -84,5 +60,63 @@ func benchmarkProving(b *testing.B, numLabels uint64, numNonces uint32, benchedD
 		reader := io.LimitReader(bufio.NewReader(file), int64(benchedDataSize))
 
 		Generate(context.Background(), challenge, cfg, testLogger{tb: b}, withLabelsReader(reader, nodeId, commitmentAtxId, 1))
+	}
+}
+
+func Test_Generate(t *testing.T) {
+	r := require.New(t)
+	log := testLogger{tb: t}
+
+	for numUnits := uint32(config.DefaultMinNumUnits); numUnits < 6; numUnits++ {
+		numUnits := numUnits
+		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
+			t.Parallel()
+
+			nodeId := make([]byte, 32)
+			commitmentAtxId := make([]byte, 32)
+			ch := make(Challenge, 32)
+			cfg := config.DefaultConfig()
+			cfg.LabelsPerUnit = 1 << 15
+
+			opts := config.DefaultInitOpts()
+			opts.ComputeProviderID = int(CPUProviderID())
+			opts.NumUnits = numUnits
+			opts.DataDir = t.TempDir()
+
+			init, err := NewInitializer(
+				initialization.WithNodeId(nodeId),
+				initialization.WithCommitmentAtxId(commitmentAtxId),
+				initialization.WithConfig(cfg),
+				initialization.WithInitOpts(opts),
+				initialization.WithLogger(log),
+			)
+			r.NoError(err)
+			r.NoError(init.Initialize(context.Background()))
+
+			n, err := rand.Read(ch)
+			r.NoError(err)
+			r.Equal(len(ch), n)
+
+			proof, proofMetaData, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+			r.NoError(err, "numUnits: %d", opts.NumUnits)
+			r.NotNil(proof)
+			r.NotNil(proofMetaData)
+
+			r.Equal(nodeId, proofMetaData.NodeId)
+			r.Equal(commitmentAtxId, proofMetaData.CommitmentAtxId)
+			r.Equal(ch, proofMetaData.Challenge)
+			r.Equal(cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
+			r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
+			r.Equal(opts.NumUnits, proofMetaData.NumUnits)
+			r.Equal(cfg.K1, proofMetaData.K1)
+			r.Equal(cfg.K2, proofMetaData.K2)
+
+			numLabels := cfg.LabelsPerUnit * uint64(numUnits)
+			indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
+			r.Equal(shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
+
+			log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
+			r.NoError(verifying.VerifyNew(proof, proofMetaData, verifying.WithLogger(log)))
+		})
 	}
 }

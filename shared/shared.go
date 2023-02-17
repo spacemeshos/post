@@ -38,11 +38,22 @@ func ProvingDifficulty(numLabels uint64, k1 uint64) uint64 {
 
 // ProvingDifficulty2 returns the target difficulty of finding a nonce in `numLabels` labels.
 // d is the number of bytes in the AES output that count for one nonce.
-func ProvingDifficulty2(numLabels, d, k1 uint64) uint64 {
-	maxTarget := uint64(1<<d*8) - 1
-	x := maxTarget / numLabels
-	y := maxTarget % numLabels
-	return x*k1 + (y*k1)/numLabels
+func ProvingDifficulty2(numLabels uint64, B, k1 uint32) uint64 {
+	// calculate the maximum value that a nonce can have based on the number of labels and B
+	d := CalcD(numLabels, B)
+	maxTarget := uint64(1<<(d*8)) - 1
+
+	numIn := numLabels / uint64(B)
+	x := maxTarget / numIn
+	y := maxTarget % numIn
+	return x*uint64(k1) + y*uint64(k1)/numIn
+}
+
+// CalcD calculates the number of bytes to use for the difficulty check.
+// numLabels is the number of labels contained in the PoST data.
+// B is a network parameter that defines the number of labels used in one AES Block.
+func CalcD(numLabels uint64, B uint32) uint {
+	return uint(math.Ceil((math.Log2(float64(numLabels)) - math.Log2(float64(B))) / 8))
 }
 
 // PowDifficulty returns the target difficulty of finding a nonce in `numLabels` labels.

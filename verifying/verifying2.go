@@ -12,7 +12,9 @@ import (
 )
 
 func VerifyNew(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) error {
-	options := &option{}
+	options := &option{
+		logger: &shared.DisabledLogger{},
+	}
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -38,7 +40,8 @@ func VerifyNew(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) err
 	}
 
 	if options.verifyFunc == nil {
-		difficulty := shared.ProvingDifficulty(numLabels, uint64(m.K1))
+		difficulty := shared.ProvingDifficulty2(numLabels, m.B, m.K1)
+		options.logger.Debug("verifying difficulty", difficulty)
 		options.verifyFunc = func(val uint64) bool {
 			return val < difficulty
 		}
@@ -47,6 +50,25 @@ func VerifyNew(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) err
 	buf := bytes.NewBuffer(p.Indices)
 	gsReader := shared.NewGranSpecificReader(buf, bitsPerIndex)
 	indicesSet := make(map[uint64]struct{}, m.K2)
+
+	// create the ciphers for the specific nonce
+	d := shared.CalcD(numLabels, m.B)
+	offset := p.Nonce * uint32(d)
+	nonceBlock := uint8(offset / aes.BlockSize)
+
+	// since the value can be on a boundary between two blocks, we need to create two ciphers
+	ciphers := make([]cipher.Block, 2)
+	for i := uint8(0); i < 2; i++ {
+		c, err := oracle.CreateBlockCipher(m.Challenge, nonceBlock+i)
+		if err != nil {
+			return fmt.Errorf("creating cipher for block %d: %w", nonceBlock, err)
+		}
+		ciphers[i] = c
+	}
+
+	out := make([]byte, aes.BlockSize*2)
+	u64 := unsafe.Slice((*uint64)(unsafe.Pointer(&out[offset%aes.BlockSize])), 1)
+	mask := (uint64(1) << (d * 8)) - 1
 
 	for i := uint(0); i < uint(m.K2); i++ {
 		index, err := gsReader.ReadNextUintBE()
@@ -70,30 +92,13 @@ func VerifyNew(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) err
 			return err
 		}
 
-		// cipher with the keys needed to extract the relevant nonce
-		d := uint32(oracle.CalcD(numLabels, m.B))
-		offset := p.Nonce * d
-		nonceBlock := uint8(offset / aes.BlockSize)
-
-		ciphers := make([]cipher.Block, 2)
-		for i := uint8(0); i < 2; i++ {
-			c, err := oracle.CreateBlockCipher(m.Challenge, nonceBlock+i)
-			if err != nil {
-				return fmt.Errorf("creating cipher for block %d: %w", nonceBlock, err)
-			}
-			ciphers[i] = c
-		}
-
-		out := make([]byte, aes.BlockSize*2)
-		u64 := unsafe.Slice((*uint64)(unsafe.Pointer(&out[offset%aes.BlockSize])), 1)
-		mask := (uint64(1) << (d * 8)) - 1
 		ciphers[0].Encrypt(out[:aes.BlockSize], res.Output)
 		ciphers[1].Encrypt(out[aes.BlockSize:], res.Output)
 
 		val := u64[0] & mask
+		options.logger.Debug("verifying: index %d value %d", index, val)
 		if !options.verifyFunc(val) {
-			return fmt.Errorf(
-				"fast oracle output is doesn't pass difficulty check; index: %d, labels block: %x, value: %d", index, res.Output, val)
+			return fmt.Errorf("fast oracle output is doesn't pass difficulty check; index: %d, labels block: %x, value: %d", index, res.Output, val)
 		}
 	}
 

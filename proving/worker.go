@@ -151,9 +151,9 @@ func solutionWorker(ctx context.Context, solutionChan <-chan *solution, numLabel
 				continue
 			}
 
-			logger.Debug("Found enough label indices for proof with nonce %d", solution.Nonce)
+			logger.Debug("found enough label indices for proof with nonce %d", solution.Nonce)
 			sort.Slice(passed[solution.Nonce], func(i, j int) bool { return i < j })
-			logger.Debug("highest index is %d", passed[solution.Nonce][len(passed[solution.Nonce])-1])
+			logger.Debug("highest index found is %d", passed[solution.Nonce][len(passed[solution.Nonce])-1])
 
 			bitsPerIndex := uint(shared.BinaryRepresentationMinBits(numLabels))
 			buf := bytes.NewBuffer(make([]byte, 0, shared.Size(bitsPerIndex, uint(K2))))
