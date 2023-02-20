@@ -86,12 +86,9 @@ func Test_Generate(t *testing.T) {
 			nodeId := make([]byte, 32)
 			commitmentAtxId := make([]byte, 32)
 			ch := make(Challenge, 32)
-			cfg := config.DefaultConfig()
 
-			opts := config.DefaultInitOpts()
-			opts.ComputeProviderID = int(CPUProviderID())
+			cfg, opts := getTestConfig(t)
 			opts.NumUnits = numUnits
-			opts.DataDir = t.TempDir()
 
 			init, err := NewInitializer(
 				initialization.WithNodeId(nodeId),

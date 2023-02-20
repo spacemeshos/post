@@ -80,6 +80,10 @@ func Test_VerifyNew(t *testing.T) {
 	r := require.New(t)
 	log := testLogger{tb: t}
 
+	nodeId := make([]byte, 32)
+	commitmentAtxId := make([]byte, 32)
+	ch := make(shared.Challenge, 32)
+
 	cfg, opts := getTestConfig(t)
 	init, err := NewInitializer(
 		initialization.WithNodeId(nodeId),
