@@ -2,9 +2,11 @@ package verifying
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -154,5 +156,48 @@ func TestLabelsCorrectness(t *testing.T) {
 
 			position++
 		}
+	}
+}
+
+func Benchmark_Verify_Fastnet(b *testing.B) {
+	r := require.New(b)
+
+	nodeId := make([]byte, 32)
+	commitmentAtxId := make([]byte, 32)
+	ch := make(shared.Challenge, 32)
+
+	cfg, opts := getTestConfig(b)
+	cfg.BitsPerLabel = 8
+	cfg.K1 = 2000
+	cfg.K2 = 4
+	cfg.LabelsPerUnit = 32
+	cfg.MaxNumUnits = 4
+	cfg.MinNumUnits = 2
+
+	opts.NumUnits = cfg.MinNumUnits
+
+	init, err := NewInitializer(
+		initialization.WithNodeId(nodeId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
+		initialization.WithConfig(cfg),
+		initialization.WithInitOpts(opts),
+	)
+	r.NoError(err)
+	r.NoError(init.Initialize(context.Background()))
+
+	for i := 0; i < b.N; i++ {
+		binary.BigEndian.PutUint64(ch, uint64(opts.NumUnits))
+
+		p, err := NewProver(cfg, opts.DataDir, nodeId, commitmentAtxId)
+		r.NoError(err)
+
+		proof, proofMetadata, err := p.GenerateProof(ch)
+		r.NoError(err)
+
+		b.StartTimer()
+		start := time.Now()
+		require.NoError(b, Verify(proof, proofMetadata))
+		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
+		b.StopTimer()
 	}
 }

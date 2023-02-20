@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -251,4 +252,46 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 
 	log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
 	require.NoError(t, verifying.VerifyNew(proof, proofMetaData, verifying.WithLogger(log)))
+}
+
+func Benchmark_Generate_Fastnet(b *testing.B) {
+	r := require.New(b)
+
+	nodeId := make([]byte, 32)
+	commitmentAtxId := make([]byte, 32)
+	ch := make(shared.Challenge, 32)
+
+	cfg, opts := getTestConfig(b)
+	cfg.BitsPerLabel = 8
+	cfg.K1 = 12
+	cfg.K2 = 4
+	cfg.LabelsPerUnit = 32 // bytes
+	cfg.MaxNumUnits = 4
+	cfg.MinNumUnits = 2
+	cfg.N = 32
+	cfg.B = 2
+
+	opts.NumUnits = cfg.MinNumUnits
+
+	init, err := NewInitializer(
+		initialization.WithNodeId(nodeId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
+		initialization.WithConfig(cfg),
+		initialization.WithInitOpts(opts),
+	)
+	r.NoError(err)
+	r.NoError(init.Initialize(context.Background()))
+
+	for i := 0; i < b.N; i++ {
+		rand.Read(ch)
+
+		b.StartTimer()
+		start := time.Now()
+		proof, proofMetadata, err := Generate(context.Background(), ch, cfg, &shared.DisabledLogger{}, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+		r.NoError(err)
+		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
+		b.StopTimer()
+
+		r.NoError(verifying.VerifyNew(proof, proofMetadata))
+	}
 }

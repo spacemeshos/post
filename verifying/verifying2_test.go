@@ -99,3 +99,44 @@ func Test_VerifyNew(t *testing.T) {
 
 	r.NoError(VerifyNew(proof, proofMetadata))
 }
+
+func Benchmark_VerifyNew_Fastnet(b *testing.B) {
+	r := require.New(b)
+
+	nodeId := make([]byte, 32)
+	commitmentAtxId := make([]byte, 32)
+	ch := make(shared.Challenge, 32)
+
+	cfg, opts := getTestConfig(b)
+	cfg.BitsPerLabel = 8
+	cfg.K1 = 12
+	cfg.K2 = 4
+	cfg.LabelsPerUnit = 32 // bytes
+	cfg.MaxNumUnits = 4
+	cfg.MinNumUnits = 2
+	cfg.N = 32
+	cfg.B = 2
+
+	opts.NumUnits = cfg.MinNumUnits
+
+	init, err := NewInitializer(
+		initialization.WithNodeId(nodeId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
+		initialization.WithConfig(cfg),
+		initialization.WithInitOpts(opts),
+	)
+	r.NoError(err)
+	r.NoError(init.Initialize(context.Background()))
+
+	for i := 0; i < b.N; i++ {
+		rand.Read(ch)
+		proof, proofMetadata, err := proving.Generate(context.Background(), ch, cfg, &shared.DisabledLogger{}, proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+		r.NoError(err)
+
+		b.StartTimer()
+		start := time.Now()
+		r.NoError(VerifyNew(proof, proofMetadata))
+		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
+		b.StopTimer()
+	}
+}
