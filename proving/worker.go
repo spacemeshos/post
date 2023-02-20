@@ -108,8 +108,8 @@ func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan
 				copy(block, labels[:b])
 				labels = labels[b:]
 
-				for i, cipher := range ciphers {
-					cipher.Encrypt(out[i*aes.BlockSize:(i+1)*aes.BlockSize], block)
+				for i := range ciphers {
+					ciphers[i].Encrypt(out[i*aes.BlockSize:(i+1)*aes.BlockSize], block)
 				}
 
 				for nonce := uint(0); nonce < uint(numNonces); nonce++ {
