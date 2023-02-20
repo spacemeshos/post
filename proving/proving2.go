@@ -15,7 +15,7 @@ import (
 	"github.com/spacemeshos/post/shared"
 )
 
-// TODO (mafa): first two could be configuration options.
+// TODO (mafa): these should be configurable by a node.
 const (
 	NumWorkers = 1 // Number of workers creating a proof in parallel. Each one will max out one CPU core.
 

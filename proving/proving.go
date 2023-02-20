@@ -16,9 +16,8 @@ import (
 )
 
 const (
-	NumWorkersPerNonce    = 1
-	NumNoncesPerIteration = 1
-	MaxNumIterations      = 10
+	NumNoncesPerIteration = 10 // TODO(moshababo): update the recommended value
+	MaxNumIterations      = 10 // TODO(moshababo): update the recommended value
 )
 
 type (

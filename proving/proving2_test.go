@@ -120,6 +120,8 @@ func Test_Generate(t *testing.T) {
 			require.Equal(t, opts.NumUnits, proofMetaData.NumUnits)
 			require.Equal(t, cfg.K1, proofMetaData.K1)
 			require.Equal(t, cfg.K2, proofMetaData.K2)
+			require.Equal(t, cfg.B, proofMetaData.B)
+			require.Equal(t, cfg.N, proofMetaData.N)
 
 			numLabels := cfg.LabelsPerUnit * uint64(numUnits)
 			indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
@@ -196,4 +198,60 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 		require.ErrorAs(t, err, &errConfigMismatch)
 		require.Equal(t, "LabelsPerUnit", errConfigMismatch.Param)
 	})
+}
+
+func Test_Generate_TestNetSettings(t *testing.T) {
+	log := testLogger{tb: t}
+
+	nodeId := make([]byte, 32)
+	commitmentAtxId := make([]byte, 32)
+	ch := make(Challenge, 32)
+	cfg := config.DefaultConfig()
+
+	// https://colab.research.google.com/github/spacemeshos/notebooks/blob/main/post-proof-params.ipynb
+	cfg.LabelsPerUnit = 2 << 16
+	cfg.B = 8
+	cfg.K1 = 279
+	cfg.K2 = 287
+	cfg.N = 24
+
+	opts := config.DefaultInitOpts()
+	opts.ComputeProviderID = int(CPUProviderID())
+	opts.NumUnits = 2
+	opts.DataDir = t.TempDir()
+
+	init, err := NewInitializer(
+		initialization.WithNodeId(nodeId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
+		initialization.WithConfig(cfg),
+		initialization.WithInitOpts(opts),
+		initialization.WithLogger(log),
+	)
+	require.NoError(t, err)
+	require.NoError(t, init.Initialize(context.Background()))
+
+	n, err := rand.Read(ch)
+	require.NoError(t, err)
+	require.Equal(t, len(ch), n)
+
+	proof, proofMetaData, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+	require.NoError(t, err, "numUnits: %d", opts.NumUnits)
+	require.NotNil(t, proof)
+	require.NotNil(t, proofMetaData)
+
+	require.Equal(t, nodeId, proofMetaData.NodeId)
+	require.Equal(t, commitmentAtxId, proofMetaData.CommitmentAtxId)
+	require.Equal(t, ch, proofMetaData.Challenge)
+	require.Equal(t, cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
+	require.Equal(t, cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
+	require.Equal(t, opts.NumUnits, proofMetaData.NumUnits)
+	require.Equal(t, cfg.K1, proofMetaData.K1)
+	require.Equal(t, cfg.K2, proofMetaData.K2)
+
+	numLabels := cfg.LabelsPerUnit * uint64(opts.NumUnits)
+	indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
+	require.Equal(t, shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
+
+	log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
+	require.NoError(t, verifying.VerifyNew(proof, proofMetaData, verifying.WithLogger(log)))
 }

@@ -1,7 +1,6 @@
 package config
 
 import (
-	"crypto/aes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,17 +17,19 @@ const (
 	// and file truncating is byte-granular regardless of `BitsPerLabel` value.
 	DefaultComputeBatchSize = 1 << 14
 
-	DefaultBitsPerLabel  = 8
-	DefaultLabelsPerUnit = 1 << 14 // 16KB per unit. Placeholder value, primarily for tests.
-
-	DefaultMaxNumUnits = 10
-	DefaultMinNumUnits = 1
+	DefaultBitsPerLabel = 8
+	DefaultMaxNumUnits  = 10
+	DefaultMinNumUnits  = 1
 
 	// These values have been derived from https://colab.research.google.com/github/spacemeshos/notebooks/blob/main/post-proof-params.ipynb
-	DefaultK1             = 280
-	DefaultK2             = 290
-	DefaultNonceBatchSize = 20
-	DefaultAESBatchSize   = aes.BlockSize
+	// The values here are only intended to be used for tests and are not optimized for performance or security!
+
+	DefaultLabelsPerUnit = 1 << 11 // 2KB per unit.
+
+	DefaultK1             = 200
+	DefaultK2             = 212
+	DefaultNonceBatchSize = 48
+	DefaultAESBatchSize   = 8
 )
 
 const (
@@ -55,6 +56,7 @@ type Config struct {
 	K2 uint32 // K2 is the number of labels below the required difficulty required for a proof.
 	B  uint32 // B is the number of labels used per AES invocation when generating a proof. Lower values speed up verification, higher values proof generation.
 	N  uint32 // N is the number of nonces tried at the same time when generating a proof.
+	// TODO(mafa): N should probably either be derived from the other parameters or be a configuration option of the node.
 }
 
 func DefaultConfig() Config {
