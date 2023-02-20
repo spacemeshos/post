@@ -66,6 +66,7 @@ func VerifyNew(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) err
 		ciphers[i] = c
 	}
 
+	block := make([]byte, aes.BlockSize)
 	out := make([]byte, aes.BlockSize*2)
 	u64 := unsafe.Slice((*uint64)(unsafe.Pointer(&out[offset%aes.BlockSize])), 1)
 	mask := (uint64(1) << (d * 8)) - 1
@@ -91,9 +92,10 @@ func VerifyNew(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) err
 		if err != nil {
 			return err
 		}
+		copy(block, res.Output)
 
-		ciphers[0].Encrypt(out[:aes.BlockSize], res.Output)
-		ciphers[1].Encrypt(out[aes.BlockSize:], res.Output)
+		ciphers[0].Encrypt(out[:aes.BlockSize], block)
+		ciphers[1].Encrypt(out[aes.BlockSize:], block)
 
 		val := u64[0] & mask
 		options.logger.Debug("verifying: index %d value %d", index, val)

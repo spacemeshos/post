@@ -26,16 +26,18 @@ func (l testLogger) Debug(msg string, args ...any) { l.tb.Logf("\tDEBUG\t"+msg, 
 func (l testLogger) Error(msg string, args ...any) { l.tb.Logf("\tERROR\t"+msg, args...) }
 
 func BenchmarkVerifying(b *testing.B) {
-	for _, k2 := range []uint32{170, 288, 500, 800} {
-		testName := fmt.Sprintf("256GiB/k2=%d", k2)
+	for _, mB := range []uint32{8, 16} {
+		for _, k2 := range []uint32{170, 288, 500, 800} {
+			testName := fmt.Sprintf("256GiB/B=%d/k2=%d", mB, k2)
 
-		b.Run(testName, func(b *testing.B) {
-			benchmarkVerifying(b, k2)
-		})
+			b.Run(testName, func(b *testing.B) {
+				benchmarkVerifying(b, mB, k2)
+			})
+		}
 	}
 }
 
-func benchmarkVerifying(b *testing.B, k2 uint32) {
+func benchmarkVerifying(b *testing.B, mB, k2 uint32) {
 	cfg, opts := getTestConfig(b)
 	m := &shared.ProofMetadata{
 		NodeId:          nodeId,
@@ -46,7 +48,7 @@ func benchmarkVerifying(b *testing.B, k2 uint32) {
 		LabelsPerUnit:   256 * 1024 * 1024 * 1024, // 256GiB
 		K1:              cfg.K1,
 		K2:              k2,
-		B:               cfg.B,
+		B:               mB,
 		N:               cfg.N,
 	}
 

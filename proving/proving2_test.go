@@ -26,15 +26,17 @@ func BenchmarkProving(b *testing.B) {
 	startPos := 256 * GiB
 	endPos := 4 * TiB
 
-	for _, numNonces := range []uint32{6, 12, 20} {
-		for numLabels := startPos; numLabels <= endPos; numLabels *= 4 {
-			d := shared.CalcD(numLabels, config.DefaultAESBatchSize)
-			testName := fmt.Sprintf("%.02fGiB/d=%d/Nonces=%d", float64(numLabels)/float64(GiB), d, numNonces)
+	for _, mb := range []uint32{8, 16} {
+		for _, numNonces := range []uint32{6, 12, 20} {
+			for numLabels := startPos; numLabels <= endPos; numLabels *= 4 {
+				d := shared.CalcD(numLabels, config.DefaultAESBatchSize)
+				testName := fmt.Sprintf("%.02fGiB/d=%d/b=%d/Nonces=%d", float64(numLabels)/float64(GiB), d, mb, numNonces)
 
-			b.Run(testName, func(b *testing.B) {
-				benchedDataSize := uint64(math.Min(float64(numLabels), float64(2*GiB)))
-				benchmarkProving(b, numLabels, numNonces, benchedDataSize)
-			})
+				b.Run(testName, func(b *testing.B) {
+					benchedDataSize := uint64(math.Min(float64(numLabels), float64(2*GiB)))
+					benchmarkProving(b, numLabels, numNonces, mb, benchedDataSize)
+				})
+			}
 		}
 	}
 }
@@ -48,10 +50,9 @@ func (ds *dataSource) Close() error {
 	return ds.close()
 }
 
-func benchmarkProving(b *testing.B, numLabels uint64, numNonces uint32, benchedDataSize uint64) {
+func benchmarkProving(b *testing.B, numLabels uint64, numNonces uint32, mb uint32, benchedDataSize uint64) {
 	challenge := []byte("hello world, challenge me!!!!!!!")
 
-	// file := rand.New(rand.NewSource(0))
 	file, err := os.Open("/dev/zero")
 	require.NoError(b, err)
 	defer file.Close()
@@ -62,6 +63,7 @@ func benchmarkProving(b *testing.B, numLabels uint64, numNonces uint32, benchedD
 	cfg, _ := getTestConfig(b)
 	cfg.LabelsPerUnit = numLabels
 	cfg.N = numNonces
+	cfg.B = mb
 
 	b.SetBytes(int64(benchedDataSize))
 	b.ResetTimer()

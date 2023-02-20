@@ -20,7 +20,6 @@ const (
 	NumWorkers = 1 // Number of workers creating a proof in parallel. Each one will max out one CPU core.
 
 	BlocksPerWorker = 1 << 24 // How many AES blocks are contained per batch sent to a worker. Larger values will increase memory usage, but speed up the proof generation.
-	batchSize       = BlocksPerWorker * aes.BlockSize
 )
 
 // TODO (mafa): use functional options.
@@ -46,7 +45,7 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, logger Logger, opts
 	defer cancel()
 	eg, egCtx := errgroup.WithContext(workerCtx)
 	eg.Go(func() error {
-		return ioWorker(egCtx, batchChan, options.dataSource)
+		return ioWorker(egCtx, batchChan, cfg.B, options.dataSource)
 	})
 
 	var wg sync.WaitGroup
@@ -59,7 +58,7 @@ func Generate(ctx context.Context, ch Challenge, cfg Config, logger Logger, opts
 			logger.Debug("proving difficulty: %d", difficulty)
 			d := shared.CalcD(numLabels, cfg.B)
 			numOuts := uint8(math.Ceil(float64(cfg.N) * float64(d) / aes.BlockSize))
-			return labelWorker(egCtx, batchChan, solutionChan, ch, numOuts, cfg.N, d, difficulty)
+			return labelWorker(egCtx, batchChan, solutionChan, ch, numOuts, cfg.N, cfg.B, d, difficulty)
 		})
 	}
 

@@ -15,16 +15,10 @@ import (
 	"github.com/spacemeshos/post/shared"
 )
 
-var batchDataPool = sync.Pool{
-	New: func() any {
-		buf := make([]byte, batchSize)
-		return &buf
-	},
-}
-
 type batch struct {
-	Data  []byte
-	Index uint64
+	Data    []byte
+	Index   uint64
+	Release func()
 }
 
 type solution struct {
@@ -36,23 +30,35 @@ type solution struct {
 // labelWorkers.
 //
 // TODO(mafa): use this as base to replace GranSpecificReader / GranSpecificWriter and the persistence package.
-func ioWorker(ctx context.Context, batchChan chan<- *batch, source io.ReadCloser) error {
+func ioWorker(ctx context.Context, batchChan chan<- *batch, b uint32, source io.ReadCloser) error {
 	defer close(batchChan)
 	defer source.Close()
 	index := uint64(0)
 
+	batchDataPool := sync.Pool{
+		New: func() any {
+			buf := make([]byte, BlocksPerWorker*b)
+			return &buf
+		},
+	}
+
 	for {
-		data := *batchDataPool.Get().(*[]byte)
+		data := *(batchDataPool.Get().(*[]byte))
 		n, err := source.Read(data)
 		switch {
 		case err == io.EOF || err == nil:
-			n -= n % aes.BlockSize // make sure we don't send partial blocks to the label workers.
-			b := &batch{
+			// make sure we don't send partial blocks to the label workers.
+			// TODO(mafa): this silently drops partial blocks and should be handled better.
+			n -= n % int(b)
+			batch := &batch{
 				Data:  data[:n],
 				Index: index,
+				Release: func() {
+					batchDataPool.Put(&data)
+				},
 			}
 			select {
-			case batchChan <- b:
+			case batchChan <- batch:
 				if err == io.EOF {
 					return nil
 				}
@@ -69,7 +75,7 @@ func ioWorker(ctx context.Context, batchChan chan<- *batch, source io.ReadCloser
 }
 
 // labelWorker is a worker that receives batches from ioWorker and looks for indices to be included in the proof.
-func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan<- *solution, ch Challenge, numOuts uint8, numNonces uint32, d uint, difficulty uint64) error {
+func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan<- *solution, ch Challenge, numOuts uint8, numNonces uint32, b uint32, d uint, difficulty uint64) error {
 	// use two slices with different types that point to the same memory location.
 	// this is done to speed up the conversation from bytes to uint64.
 	out := make([]byte, numOuts*aes.BlockSize+8)
@@ -96,13 +102,15 @@ func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan
 			index := batch.Index
 			labels := batch.Data
 
+			block := make([]byte, aes.BlockSize)
+
 			for len(labels) > 0 {
-				block := labels[:aes.BlockSize]
-				labels = labels[aes.BlockSize:]
+				copy(block, labels[:b])
+				labels = labels[b:]
 
 				select {
 				case <-ctx.Done():
-					batchDataPool.Put(&batch.Data)
+					batch.Release()
 					return ctx.Err()
 				default:
 				}
@@ -124,14 +132,14 @@ func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan
 						select {
 						case solutionChan <- s: // send solution to proof generator
 						case <-ctx.Done():
-							batchDataPool.Put(&batch.Data)
+							batch.Release()
 							return ctx.Err()
 						}
 					}
 				}
 				index++
 			}
-			batchDataPool.Put(&batch.Data)
+			batch.Release()
 		}
 	}
 }
