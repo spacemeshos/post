@@ -108,13 +108,6 @@ func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan
 				copy(block, labels[:b])
 				labels = labels[b:]
 
-				select {
-				case <-ctx.Done():
-					batch.Release()
-					return ctx.Err()
-				default:
-				}
-
 				for i, cipher := range ciphers {
 					cipher.Encrypt(out[i*aes.BlockSize:(i+1)*aes.BlockSize], block)
 				}
