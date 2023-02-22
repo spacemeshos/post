@@ -145,7 +145,7 @@ func Test_Generate(t *testing.T) {
 
 			numLabels := cfg.LabelsPerUnit * uint64(numUnits)
 			indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
-			require.Equal(t, shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
+			r.Equal(shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
 
 			log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
 			r.NoError(verifying.Verify(proof, proofMetaData, verifying.WithLogger(log)))
