@@ -148,7 +148,7 @@ func main() {
 		if err != nil {
 			log.Panic("proof generation error: %v", err)
 		}
-		if err := verifying.VerifyNew(proof, proofMetadata); err != nil {
+		if err := verifying.Verify(proof, proofMetadata); err != nil {
 			log.Panic("failed to verify test proof: %v", err)
 		}
 
