@@ -1,14 +1,16 @@
 package proving
 
 import (
+	"bufio"
 	"context"
-	"encoding/binary"
+	"crypto/rand"
 	"fmt"
+	"io"
 	"math"
+	"os"
 	"testing"
 	"time"
 
-	"github.com/spacemeshos/sha256-simd"
 	"github.com/stretchr/testify/require"
 
 	"github.com/spacemeshos/post/config"
@@ -17,20 +19,13 @@ import (
 	"github.com/spacemeshos/post/verifying"
 )
 
-//lint:file-ignore SA1019 These are the tests for the deprecated functions and should still be executed as long as the deprecated functions haven't been removed.
-
-var (
-	NewInitializer = initialization.NewInitializer
-	CPUProviderID  = initialization.CPUProviderID
-)
-
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
 
 	opts := config.DefaultInitOpts()
 	opts.DataDir = tb.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ComputeProviderID = int(initialization.CPUProviderID())
 
 	return cfg, opts
 }
@@ -45,28 +40,80 @@ func (l testLogger) Info(msg string, args ...any)  { l.tb.Logf("\tINFO\t"+msg, a
 func (l testLogger) Debug(msg string, args ...any) { l.tb.Logf("\tDEBUG\t"+msg, args...) }
 func (l testLogger) Error(msg string, args ...any) { l.tb.Logf("\tERROR\t"+msg, args...) }
 
-func TestProver_GenerateProof(t *testing.T) {
-	// TODO(moshababo): tests should range through `cfg.BitsPerLabel` as well.
-	r := require.New(t)
-	log := testLogger{tb: t}
+func BenchmarkProving(b *testing.B) {
+	const MiB = uint64(1024 * 1024)
+	const GiB = MiB * 1024
+	const TiB = GiB * 1024
 
+	startPos := 256 * GiB
+	endPos := 4 * TiB
+
+	for _, mb := range []uint32{8, 16} {
+		for _, numNonces := range []uint32{6, 12, 20} {
+			for numLabels := startPos; numLabels <= endPos; numLabels *= 4 {
+				d := shared.CalcD(numLabels, config.DefaultAESBatchSize)
+				testName := fmt.Sprintf("%.02fGiB/d=%d/b=%d/Nonces=%d", float64(numLabels)/float64(GiB), d, mb, numNonces)
+
+				b.Run(testName, func(b *testing.B) {
+					benchedDataSize := uint64(math.Min(float64(numLabels), float64(2*GiB)))
+					benchmarkProving(b, numLabels, numNonces, mb, benchedDataSize)
+				})
+			}
+		}
+	}
+}
+
+type dataSource struct {
+	io.Reader
+	close func() error
+}
+
+func (ds *dataSource) Close() error {
+	return ds.close()
+}
+
+func benchmarkProving(b *testing.B, numLabels uint64, numNonces uint32, mb uint32, benchedDataSize uint64) {
+	challenge := []byte("hello world, challenge me!!!!!!!")
+
+	file, err := os.Open("/dev/zero")
+	require.NoError(b, err)
+	defer file.Close()
+
+	nodeId := make([]byte, 32)
+	commitmentAtxId := make([]byte, 32)
+
+	cfg, _ := getTestConfig(b)
+	cfg.LabelsPerUnit = numLabels
+	cfg.N = numNonces
+	cfg.B = mb
+
+	b.SetBytes(int64(benchedDataSize))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		r := &dataSource{
+			Reader: io.LimitReader(bufio.NewReader(file), int64(benchedDataSize)),
+			close:  func() error { return file.Close() },
+		}
+
+		Generate(context.Background(), challenge, cfg, testLogger{tb: b}, withLabelsReader(r, nodeId, commitmentAtxId, 1))
+	}
+}
+
+func Test_Generate(t *testing.T) {
 	for numUnits := uint32(config.DefaultMinNumUnits); numUnits < 6; numUnits++ {
 		numUnits := numUnits
 		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
-			t.Parallel()
+			r := require.New(t)
+			log := testLogger{tb: t}
 
 			nodeId := make([]byte, 32)
 			commitmentAtxId := make([]byte, 32)
-			ch := make(Challenge, 32)
-			cfg := config.DefaultConfig()
-			cfg.LabelsPerUnit = 1 << 12
+			ch := make(shared.Challenge, 32)
 
-			opts := config.DefaultInitOpts()
-			opts.ComputeProviderID = int(CPUProviderID())
+			cfg, opts := getTestConfig(t)
 			opts.NumUnits = numUnits
-			opts.DataDir = t.TempDir()
 
-			init, err := NewInitializer(
+			init, err := initialization.NewInitializer(
 				initialization.WithNodeId(nodeId),
 				initialization.WithCommitmentAtxId(commitmentAtxId),
 				initialization.WithConfig(cfg),
@@ -76,12 +123,11 @@ func TestProver_GenerateProof(t *testing.T) {
 			r.NoError(err)
 			r.NoError(init.Initialize(context.Background()))
 
-			p, err := NewProver(cfg, opts.DataDir, nodeId, commitmentAtxId)
+			n, err := rand.Read(ch)
 			r.NoError(err)
-			p.SetLogger(log)
+			r.Equal(len(ch), n)
 
-			binary.BigEndian.PutUint64(ch, uint64(opts.NumUnits))
-			proof, proofMetaData, err := p.GenerateProof(ch)
+			proof, proofMetaData, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
 			r.NoError(err, "numUnits: %d", opts.NumUnits)
 			r.NotNil(proof)
 			r.NotNil(proofMetaData)
@@ -94,129 +140,144 @@ func TestProver_GenerateProof(t *testing.T) {
 			r.Equal(opts.NumUnits, proofMetaData.NumUnits)
 			r.Equal(cfg.K1, proofMetaData.K1)
 			r.Equal(cfg.K2, proofMetaData.K2)
+			r.Equal(cfg.B, proofMetaData.B)
+			r.Equal(cfg.N, proofMetaData.N)
 
 			numLabels := cfg.LabelsPerUnit * uint64(numUnits)
 			indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
-			r.Equal(shared.Size(indexBitSize, uint(p.cfg.K2)), uint(len(proof.Indices)))
+			require.Equal(t, shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
 
 			log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
-
-			r.NoError(verifying.Verify(proof, proofMetaData))
+			r.NoError(verifying.Verify(proof, proofMetaData, verifying.WithLogger(log)))
 		})
 	}
 }
 
-func TestProver_GenerateProof_NotAllowed(t *testing.T) {
-	r := require.New(t)
-
+func Test_Generate_DetectInvalidParameters(t *testing.T) {
 	nodeId := make([]byte, 32)
 	commitmentAtxId := make([]byte, 32)
 
-	ch := make(Challenge, 32)
+	ch := make(shared.Challenge, 32)
 	cfg, opts := getTestConfig(t)
-	init, err := NewInitializer(
+	init, err := initialization.NewInitializer(
 		initialization.WithNodeId(nodeId),
 		initialization.WithCommitmentAtxId(commitmentAtxId),
 		initialization.WithConfig(cfg),
 		initialization.WithInitOpts(opts),
 		initialization.WithLogger(testLogger{tb: t}),
 	)
+	require.NoError(t, err)
+	require.NoError(t, init.Initialize(context.Background()))
+
+	t.Run("invalid nodeId", func(t *testing.T) {
+		log := testLogger{tb: t}
+
+		newNodeId := make([]byte, 32)
+		copy(newNodeId, nodeId)
+		newNodeId[0] = newNodeId[0] + 1
+
+		_, _, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, newNodeId, commitmentAtxId, opts.DataDir))
+		var errConfigMismatch initialization.ConfigMismatchError
+		require.ErrorAs(t, err, &errConfigMismatch)
+		require.Equal(t, "NodeId", errConfigMismatch.Param)
+	})
+
+	t.Run("invalid atxId", func(t *testing.T) {
+		log := testLogger{tb: t}
+
+		newAtxId := make([]byte, 32)
+		copy(newAtxId, commitmentAtxId)
+		newAtxId[0] = newAtxId[0] + 1
+
+		_, _, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, nodeId, newAtxId, opts.DataDir))
+		var errConfigMismatch initialization.ConfigMismatchError
+		require.ErrorAs(t, err, &errConfigMismatch)
+		require.Equal(t, "CommitmentAtxId", errConfigMismatch.Param)
+	})
+
+	t.Run("invalid BitsPerLabel", func(t *testing.T) {
+		log := testLogger{tb: t}
+
+		newCfg := cfg
+		newCfg.BitsPerLabel++
+
+		_, _, err := Generate(context.Background(), ch, newCfg, log, WithDataSource(newCfg, nodeId, commitmentAtxId, opts.DataDir))
+		var errConfigMismatch initialization.ConfigMismatchError
+		require.ErrorAs(t, err, &errConfigMismatch)
+		require.Equal(t, "BitsPerLabel", errConfigMismatch.Param)
+	})
+
+	t.Run("invalid LabelsPerUnit", func(t *testing.T) {
+		log := testLogger{tb: t}
+
+		newCfg := cfg
+		newCfg.LabelsPerUnit++
+
+		_, _, err := Generate(context.Background(), ch, newCfg, log, WithDataSource(newCfg, nodeId, commitmentAtxId, opts.DataDir))
+		var errConfigMismatch initialization.ConfigMismatchError
+		require.ErrorAs(t, err, &errConfigMismatch)
+		require.Equal(t, "LabelsPerUnit", errConfigMismatch.Param)
+	})
+}
+
+func Test_Generate_TestNetSettings(t *testing.T) {
+	r := require.New(t)
+	log := testLogger{tb: t}
+
+	nodeId := make([]byte, 32)
+	commitmentAtxId := make([]byte, 32)
+	ch := make(shared.Challenge, 32)
+	cfg := config.DefaultConfig()
+
+	// https://colab.research.google.com/github/spacemeshos/notebooks/blob/main/post-proof-params.ipynb
+	cfg.LabelsPerUnit = 2 << 16
+	cfg.B = 8
+	cfg.K1 = 279
+	cfg.K2 = 287
+	cfg.N = 24
+
+	opts := config.DefaultInitOpts()
+	opts.ComputeProviderID = int(initialization.CPUProviderID())
+	opts.NumUnits = 2
+	opts.DataDir = t.TempDir()
+
+	init, err := initialization.NewInitializer(
+		initialization.WithNodeId(nodeId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
+		initialization.WithConfig(cfg),
+		initialization.WithInitOpts(opts),
+		initialization.WithLogger(log),
+	)
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))
 
-	// Attempt to generate proof with different `nodeId`.
-	newNodeId := make([]byte, 32)
-	copy(newNodeId, nodeId)
-	newNodeId[0] = newNodeId[0] + 1
-	p, err := NewProver(cfg, opts.DataDir, newNodeId, commitmentAtxId)
+	n, err := rand.Read(ch)
 	r.NoError(err)
-	_, _, err = p.GenerateProof(ch)
-	var errConfigMismatch initialization.ConfigMismatchError
-	r.ErrorAs(err, &errConfigMismatch)
-	r.Equal("NodeId", errConfigMismatch.Param)
+	r.Equal(len(ch), n)
 
-	// Attempt to generate proof with different `atxId`.
-	newAtxId := make([]byte, 32)
-	copy(newAtxId, commitmentAtxId)
-	newAtxId[0] = newAtxId[0] + 1
-	p, err = NewProver(cfg, opts.DataDir, nodeId, newAtxId)
-	r.NoError(err)
-	_, _, err = p.GenerateProof(ch)
-	r.ErrorAs(err, &errConfigMismatch)
-	r.Equal("CommitmentAtxId", errConfigMismatch.Param)
+	proof, proofMetaData, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+	r.NoError(err, "numUnits: %d", opts.NumUnits)
+	r.NotNil(proof)
+	r.NotNil(proofMetaData)
 
-	// Attempt to generate proof with different `BitsPerLabel`.
-	newCfg := cfg
-	newCfg.BitsPerLabel++
-	p, err = NewProver(newCfg, opts.DataDir, nodeId, commitmentAtxId)
-	r.NoError(err)
-	_, _, err = p.GenerateProof(ch)
-	r.ErrorAs(err, &errConfigMismatch)
-	r.Equal("BitsPerLabel", errConfigMismatch.Param)
+	r.Equal(nodeId, proofMetaData.NodeId)
+	r.Equal(commitmentAtxId, proofMetaData.CommitmentAtxId)
+	r.Equal(ch, proofMetaData.Challenge)
+	r.Equal(cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
+	r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
+	r.Equal(opts.NumUnits, proofMetaData.NumUnits)
+	r.Equal(cfg.K1, proofMetaData.K1)
+	r.Equal(cfg.K2, proofMetaData.K2)
 
-	// Attempt to generate proof with different `LabelsPerUnint`.
-	newCfg = cfg
-	newCfg.LabelsPerUnit++
-	p, err = NewProver(newCfg, opts.DataDir, nodeId, commitmentAtxId)
-	r.NoError(err)
-	_, _, err = p.GenerateProof(ch)
-	r.ErrorAs(err, &errConfigMismatch)
-	r.Equal("LabelsPerUnit", errConfigMismatch.Param)
+	numLabels := cfg.LabelsPerUnit * uint64(opts.NumUnits)
+	indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
+	r.Equal(shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
+
+	log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
+	r.NoError(verifying.Verify(proof, proofMetaData, verifying.WithLogger(log)))
 }
 
-func TestCalcProvingDifficulty(t *testing.T) {
-	t.Skip("poc")
-
-	// Implementation of:
-	// SUCCESS = msb64(HASH_OUTPUT) <= MAX_TARGET * (K1/NumLabels)
-
-	NumLabels := uint64(4294967296)
-	K1 := uint64(2000000)
-
-	t.Logf("NumLabels: %v\n", NumLabels)
-	t.Logf("K1: %v\n", K1)
-
-	maxTarget := uint64(math.MaxUint64)
-	t.Logf("\nmax target: %d\n", maxTarget)
-
-	if ok := shared.Uint64MulOverflow(NumLabels, K1); ok {
-		panic("NumLabels*K1 overflow")
-	}
-
-	x := maxTarget / NumLabels
-	y := maxTarget % NumLabels
-	difficulty := x*K1 + (y*K1)/NumLabels
-	t.Logf("difficulty: %v\n", difficulty)
-
-	t.Log("\ncalculating various values...\n")
-	for i := 129540; i < 129545; i++ { // value 129544 pass
-		// Generate a preimage.
-		var b [4]byte
-		binary.BigEndian.PutUint32(b[:], uint32(i))
-		t.Logf("%v: preimage: 0x%x\n", i, b)
-
-		// Derive the hash output.
-		hash := sha256.Sum256(b[:])
-		t.Logf("%v: hash: Ox%x\n", i, hash)
-
-		// Convert the hash output leading 64 bits to an integer
-		// so that it could be used to perform math comparisons.
-		hashNum := binary.BigEndian.Uint64(hash[:])
-		t.Logf("%v: hashNum: %v\n", i, hashNum)
-
-		// Test the difficulty requirement.
-		if hashNum > difficulty {
-			t.Logf("%v: Not passed. hashNum > difficulty\n", i)
-		} else {
-			t.Logf("%v: Great success! hashNum <= difficulty\n", i)
-			break
-		}
-
-		t.Log("\n")
-	}
-}
-
-func Benchmark_GenerateProof_Fastnet(b *testing.B) {
+func Benchmark_Generate_Fastnet(b *testing.B) {
 	r := require.New(b)
 
 	nodeId := make([]byte, 32)
@@ -225,15 +286,17 @@ func Benchmark_GenerateProof_Fastnet(b *testing.B) {
 
 	cfg, opts := getTestConfig(b)
 	cfg.BitsPerLabel = 8
-	cfg.K1 = 2000
+	cfg.K1 = 12
 	cfg.K2 = 4
-	cfg.LabelsPerUnit = 32
+	cfg.LabelsPerUnit = 32 // bytes
 	cfg.MaxNumUnits = 4
 	cfg.MinNumUnits = 2
+	cfg.N = 32
+	cfg.B = 2
 
 	opts.NumUnits = cfg.MinNumUnits
 
-	init, err := NewInitializer(
+	init, err := initialization.NewInitializer(
 		initialization.WithNodeId(nodeId),
 		initialization.WithCommitmentAtxId(commitmentAtxId),
 		initialization.WithConfig(cfg),
@@ -243,18 +306,15 @@ func Benchmark_GenerateProof_Fastnet(b *testing.B) {
 	r.NoError(init.Initialize(context.Background()))
 
 	for i := 0; i < b.N; i++ {
-		binary.BigEndian.PutUint64(ch, uint64(opts.NumUnits))
+		rand.Read(ch)
 
 		b.StartTimer()
 		start := time.Now()
-		p, err := NewProver(cfg, opts.DataDir, nodeId, commitmentAtxId)
-		r.NoError(err)
-
-		proof, proofMetadata, err := p.GenerateProof(ch)
+		proof, proofMetadata, err := Generate(context.Background(), ch, cfg, &shared.DisabledLogger{}, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
 		r.NoError(err)
 		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
 		b.StopTimer()
 
-		require.NoError(b, verifying.Verify(proof, proofMetadata))
+		r.NoError(verifying.Verify(proof, proofMetadata))
 	}
 }

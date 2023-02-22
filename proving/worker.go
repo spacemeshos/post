@@ -75,7 +75,7 @@ func ioWorker(ctx context.Context, batchChan chan<- *batch, b uint32, source io.
 }
 
 // labelWorker is a worker that receives batches from ioWorker and looks for indices to be included in the proof.
-func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan<- *solution, ch Challenge, numOuts uint8, numNonces uint32, b uint32, d uint, difficulty uint64) error {
+func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan<- *solution, ch shared.Challenge, numOuts uint8, numNonces uint32, b uint32, d uint, difficulty uint64) error {
 	// use two slices with different types that point to the same memory location.
 	// this is done to speed up the conversation from bytes to uint64.
 	out := make([]byte, numOuts*aes.BlockSize+8)
@@ -137,7 +137,7 @@ func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan
 	}
 }
 
-func solutionWorker(ctx context.Context, solutionChan <-chan *solution, numLabels uint64, K2 uint32, logger Logger) (*nonceResult, error) {
+func solutionWorker(ctx context.Context, solutionChan <-chan *solution, numLabels uint64, K2 uint32, logger shared.Logger) (*nonceResult, error) {
 	passed := make(map[uint][]uint64)
 	for {
 		select {
@@ -181,7 +181,7 @@ func solutionWorker(ctx context.Context, solutionChan <-chan *solution, numLabel
 	}
 }
 
-func createAesCiphers(ch Challenge, count uint8) (ciphers []cipher.Block, err error) {
+func createAesCiphers(ch shared.Challenge, count uint8) (ciphers []cipher.Block, err error) {
 	for i := uint8(0); i < count; i++ {
 		c, err := oracle.CreateBlockCipher(ch, i)
 		if err != nil {
