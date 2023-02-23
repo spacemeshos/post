@@ -108,7 +108,7 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) error 
 
 	block := make([]byte, aes.BlockSize)
 	out := make([]byte, aes.BlockSize*2)
-	u64 := unsafe.Slice((*uint64)(unsafe.Pointer(&out[offset%aes.BlockSize])), 1)
+	u64 := *(*uint64)(unsafe.Pointer(&out[offset%aes.BlockSize]))
 	mask := (uint64(1) << (d * 8)) - 1
 
 	for i := uint(0); i < uint(m.K2); i++ {
@@ -137,7 +137,7 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) error 
 		ciphers[0].Encrypt(out[:aes.BlockSize], block)
 		ciphers[1].Encrypt(out[aes.BlockSize:], block)
 
-		val := u64[0] & mask
+		val := u64 & mask
 		options.logger.Debug("verifying: index %d value %d", index, val)
 		if !options.verifyFunc(val) {
 			return fmt.Errorf("fast oracle output is doesn't pass difficulty check; index: %d, labels block: %x, value: %d", index, res.Output, val)

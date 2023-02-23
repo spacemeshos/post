@@ -66,7 +66,6 @@ func ioWorker(ctx context.Context, batchChan chan<- *batch, b uint32, source io.
 				return ctx.Err()
 			}
 		default:
-			data = data[:n]
 			batchDataPool.Put(&data)
 			return err
 		}
@@ -77,7 +76,7 @@ func ioWorker(ctx context.Context, batchChan chan<- *batch, b uint32, source io.
 // labelWorker is a worker that receives batches from ioWorker and looks for indices to be included in the proof.
 func labelWorker(ctx context.Context, batchChan <-chan *batch, solutionChan chan<- *solution, ch shared.Challenge, numOuts uint8, numNonces uint32, b uint32, d uint, difficulty uint64) error {
 	// use two slices with different types that point to the same memory location.
-	// this is done to speed up the conversation from bytes to uint64.
+	// this is done to speed up the conversion from bytes to uint64.
 	out := make([]byte, numOuts*aes.BlockSize+8)
 	u64s := make([][]uint64, 8)
 	for i := range u64s {
