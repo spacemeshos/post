@@ -3,326 +3,165 @@ package proving
 import (
 	"bytes"
 	"context"
+	"crypto/aes"
 	"errors"
 	"fmt"
-	"io"
+	"math"
 	"sync"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
-	"github.com/spacemeshos/post/oracle"
-	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
 )
 
+// TODO (mafa): these should be configurable by a node.
 const (
-	NumNoncesPerIteration = 10 // TODO(moshababo): update the recommended value
-	MaxNumIterations      = 10 // TODO(moshababo): update the recommended value
+	NumWorkers = 1 // Number of workers creating a proof in parallel. Each one will max out one CPU core.
+
+	BlocksPerWorker = 1 << 24 // How many AES blocks are contained per batch sent to a worker. Larger values will increase memory usage, but speed up the proof generation.
 )
-
-type (
-	Config              = config.Config
-	Proof               = shared.Proof
-	ProofMetadata       = shared.ProofMetadata
-	Logger              = shared.Logger
-	Challenge           = shared.Challenge
-	ConfigMismatchError = shared.ConfigMismatchError
-
-	Metadata  = shared.PostMetadata
-	DiskState = initialization.DiskState
-)
-
-var (
-	FastOracle = oracle.FastOracle
-	UInt64LE   = shared.UInt64LE
-)
-
-type Prover struct {
-	nodeId          []byte
-	commitmentAtxId []byte
-
-	cfg     Config
-	datadir string
-
-	diskState *DiskState
-
-	logger Logger
-}
-
-func NewProver(cfg Config, datadir string, nodeId, commitmentAtxId []byte) (*Prover, error) {
-	return &Prover{
-		cfg:             cfg,
-		datadir:         datadir,
-		nodeId:          nodeId,
-		commitmentAtxId: commitmentAtxId,
-		diskState:       initialization.NewDiskState(datadir, uint(cfg.BitsPerLabel)),
-		logger:          shared.DisabledLogger{},
-	}, nil
-}
-
-// GenerateProof (analogous to the PoST protocol Execution phase) receives a challenge that cannot be predicted,
-// and reads the entire PoST data to generate a proof in response to the challenge to prove that the prover data exists at the time of invocation.
-// Generating a proof can be repeated arbitrarily many times without repeating the PoST protocol Initialization phase;
-// thus despite the initialization essentially serving as a PoW, the amortized computational complexity can be made arbitrarily small.
-func (p *Prover) GenerateProof(challenge Challenge) (*Proof, *ProofMetadata, error) {
-	m, err := p.loadMetadata()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if err := p.verifyGenerateProofAllowed(m); err != nil {
-		return nil, nil, err
-	}
-
-	numLabels := uint64(m.NumUnits) * p.cfg.LabelsPerUnit
-
-	for i := 0; i < MaxNumIterations; i++ {
-		startNonce := uint32(i) * NumNoncesPerIteration
-		endNonce := startNonce + NumNoncesPerIteration - 1
-
-		p.logger.Debug("proving: starting iteration %d; startNonce: %v, endNonce: %v, challenge: %x", i+1, startNonce, endNonce, challenge)
-
-		solutionNonceResult, err := p.tryNonces(numLabels, challenge, startNonce, endNonce)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if solutionNonceResult != nil {
-			p.logger.Info("proving: generated proof after %d iteration(s)", i+1)
-
-			proof := &Proof{
-				Nonce:   solutionNonceResult.nonce,
-				Indices: solutionNonceResult.indices,
-			}
-			proofMetadata := &ProofMetadata{
-				NodeId:          p.nodeId,
-				CommitmentAtxId: p.commitmentAtxId,
-				Challenge:       challenge,
-				BitsPerLabel:    p.cfg.BitsPerLabel,
-				LabelsPerUnit:   p.cfg.LabelsPerUnit,
-				NumUnits:        m.NumUnits,
-				K1:              p.cfg.K1,
-				K2:              p.cfg.K2,
-			}
-			return proof, proofMetadata, nil
-		}
-	}
-
-	return nil, nil, fmt.Errorf("failed to generate proof; tried %v iterations, %v nonces each", MaxNumIterations, NumNoncesPerIteration)
-}
-
-func (p *Prover) SetLogger(logger Logger) {
-	p.logger = logger
-}
-
-func (p *Prover) verifyGenerateProofAllowed(m *Metadata) error {
-	if err := p.verifyMetadata(m); err != nil {
-		return err
-	}
-
-	if err := p.verifyInitCompleted(uint(m.NumUnits)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (p *Prover) verifyInitCompleted(numUnits uint) error {
-	ok, err := p.initCompleted(numUnits)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return shared.ErrInitNotCompleted
-	}
-
-	return nil
-}
-
-func (p *Prover) initCompleted(numUnits uint) (bool, error) {
-	numLabelsWritten, err := p.diskState.NumLabelsWritten()
-	if err != nil {
-		return false, err
-	}
-
-	target := uint64(numUnits) * uint64(p.cfg.LabelsPerUnit)
-	return numLabelsWritten == target, nil
-}
-
-func (p *Prover) loadMetadata() (*Metadata, error) {
-	return initialization.LoadMetadata(p.datadir)
-}
-
-func (p *Prover) verifyMetadata(m *Metadata) error {
-	if !bytes.Equal(p.nodeId, m.NodeId) {
-		return ConfigMismatchError{
-			Param:    "NodeId",
-			Expected: fmt.Sprintf("%x", p.nodeId),
-			Found:    fmt.Sprintf("%x", m.NodeId),
-			DataDir:  p.datadir,
-		}
-	}
-
-	if !bytes.Equal(p.commitmentAtxId, m.CommitmentAtxId) {
-		return ConfigMismatchError{
-			Param:    "CommitmentAtxId",
-			Expected: fmt.Sprintf("%x", p.commitmentAtxId),
-			Found:    fmt.Sprintf("%x", m.CommitmentAtxId),
-			DataDir:  p.datadir,
-		}
-	}
-
-	if p.cfg.BitsPerLabel != m.BitsPerLabel {
-		return ConfigMismatchError{
-			Param:    "BitsPerLabel",
-			Expected: fmt.Sprintf("%d", p.cfg.BitsPerLabel),
-			Found:    fmt.Sprintf("%d", m.BitsPerLabel),
-			DataDir:  p.datadir,
-		}
-	}
-
-	if p.cfg.LabelsPerUnit != m.LabelsPerUnit {
-		return ConfigMismatchError{
-			Param:    "LabelsPerUnit",
-			Expected: fmt.Sprintf("%d", p.cfg.LabelsPerUnit),
-			Found:    fmt.Sprintf("%d", m.LabelsPerUnit),
-			DataDir:  p.datadir,
-		}
-	}
-
-	return nil
-}
-
-func (p *Prover) tryNonce(ctx context.Context, numLabels uint64, ch Challenge, nonce uint32, readerChan <-chan []byte, difficulty uint64) ([]byte, error) {
-	bitsPerIndex := uint(shared.BinaryRepresentationMinBits(numLabels))
-	buf := bytes.NewBuffer(make([]byte, shared.Size(bitsPerIndex, uint(p.cfg.K2)))[0:0])
-	gsWriter := shared.NewGranSpecificWriter(buf, bitsPerIndex)
-	var index uint64
-	var passed uint
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("%w: tried: %v, passed: %v, needed: %v", ctx.Err(), index, passed, p.cfg.K2)
-		case label, more := <-readerChan:
-			if !more {
-				return nil, fmt.Errorf("exhausted all labels; tried: %v, passed: %v, needed: %v", index, passed, p.cfg.K2)
-			}
-
-			hash := FastOracle(ch, nonce, label)
-
-			// Convert the fast oracle output's leading 64 bits to a number,
-			// so that it could be used to perform math comparisons.
-			hashNum := UInt64LE(hash[:])
-
-			// Check the difficulty requirement.
-			if hashNum <= difficulty {
-				if err := gsWriter.WriteUintBE(index); err != nil {
-					return nil, err
-				}
-				passed++
-
-				if passed >= uint(p.cfg.K2) {
-					if err := gsWriter.Flush(); err != nil {
-						return nil, err
-					}
-					return buf.Bytes(), nil
-				}
-			}
-
-			index++
-		}
-	}
-}
 
 type nonceResult struct {
 	nonce   uint32
 	indices []byte
-	err     error
 }
 
-func (p *Prover) tryNonces(numLabels uint64, challenge Challenge, startNonce, endNonce uint32) (*nonceResult, error) {
-	difficulty := shared.ProvingDifficulty(numLabels, uint64(p.cfg.K1))
-
-	reader, err := persistence.NewLabelsReader(p.datadir, uint(p.cfg.BitsPerLabel))
-	if err != nil {
-		return nil, err
+// TODO (mafa): use functional options.
+// TODO (mafa): replace Logger with zap.
+// TODO (mafa): replace datadir with functional option for data provider. `verifyMetadata` and `initCompleted` should be part of the `WithDataDir` option.
+func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logger shared.Logger, opts ...OptionFunc) (*shared.Proof, *shared.ProofMetadata, error) {
+	options := &option{}
+	for _, opt := range opts {
+		if err := opt(options); err != nil {
+			return nil, nil, err
+		}
 	}
-	defer reader.Close()
-	gsReader := shared.NewGranSpecificReader(reader, uint(p.cfg.BitsPerLabel))
-
-	numWorkers := endNonce - startNonce + 1
-	workersChans := make([]chan []byte, numWorkers)
-	// workersComplete channel will be closed when worker stops listening for appropriate workersChan
-	workersComplete := make([]chan struct{}, numWorkers)
-	for i := range workersChans {
-		workersChans[i] = make(chan []byte, 1)
-		workersComplete[i] = make(chan struct{})
+	if err := options.validate(); err != nil {
+		return nil, nil, err
 	}
-	resultsChan := make(chan *nonceResult, numWorkers)
-	errChan := make(chan error, 1)
+
+	batchChan := make(chan *batch)
+	solutionChan := make(chan *solution)
+
+	numLabels := uint64(options.numUnits) * uint64(cfg.LabelsPerUnit)
+
+	workerCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	eg, egCtx := errgroup.WithContext(workerCtx)
+	eg.Go(func() error {
+		return ioWorker(egCtx, batchChan, cfg.B, options.dataSource)
+	})
 
 	var wg sync.WaitGroup
-	defer wg.Wait()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Start IO worker.
-	// Feed all labels into each worker chan.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			label, err := gsReader.ReadNext()
-			if err != nil {
-				if !errors.Is(err, io.EOF) {
-					errChan <- err
-				}
-				for i := range workersChans {
-					close(workersChans[i])
-				}
-				return
-			}
-
-			for i := range workersChans {
-				select {
-				case workersChans[i] <- label:
-				case <-workersComplete[i]:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}
-	}()
-
-	// Start a worker for each nonce.
-	// TODO(dshulyak) it would be more efficient to start a worker per CPU and distribute work among
-	// them but it is not trivial
-	for i := uint32(0); i < numWorkers; i++ {
-		i := i
+	for i := 0; i < NumWorkers; i++ {
 		wg.Add(1)
-		go func() {
-			nonce := startNonce + i
-			indices, err := p.tryNonce(ctx, numLabels, challenge, nonce, workersChans[i], difficulty)
-			close(workersComplete[i])
-			resultsChan <- &nonceResult{nonce, indices, err}
-			wg.Done()
-		}()
+		eg.Go(func() error {
+			defer wg.Done()
+
+			difficulty := shared.ProvingDifficulty2(numLabels, cfg.B, cfg.K1)
+			logger.Debug("proving difficulty: %d", difficulty)
+			d := shared.CalcD(numLabels, cfg.B)
+			numOuts := uint8(math.Ceil(float64(cfg.N) * float64(d) / aes.BlockSize))
+			return labelWorker(egCtx, batchChan, solutionChan, ch, numOuts, cfg.N, cfg.B, d, difficulty)
+		})
 	}
 
-	// return last observed error if all workers failed, otherwise return first found result
-	for i := uint32(0); i < numWorkers; i++ {
-		select {
-		case result := <-resultsChan:
-			if result.err != nil {
-				p.logger.Debug("proving: nonce %v failed: %v", result.nonce, result.err)
-			} else {
-				p.logger.Debug("proving: nonce %v succeeded", result.nonce)
-				return result, nil
-			}
-		case err := <-errChan:
-			p.logger.Debug("proving: error: %v", err)
-			return nil, err
+	result := &nonceResult{}
+	eg.Go(func() error {
+		var err error
+		result, err = solutionWorker(egCtx, solutionChan, numLabels, cfg.K2, logger)
+		cancel()
+		return err
+	})
+
+	wg.Wait()
+	close(solutionChan)
+	if err := eg.Wait(); err != nil && err != context.Canceled {
+		return nil, nil, err
+	}
+
+	select {
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	default:
+	}
+
+	if result == nil {
+		return nil, nil, errors.New("no proof found")
+	}
+
+	logger.Info("proving: generated proof")
+
+	proof := &shared.Proof{
+		Nonce:   result.nonce,
+		Indices: result.indices,
+	}
+	proofMetadata := &shared.ProofMetadata{
+		NodeId:          options.nodeId,
+		CommitmentAtxId: options.commitmentAtxId,
+		Challenge:       ch,
+		BitsPerLabel:    cfg.BitsPerLabel,
+		LabelsPerUnit:   cfg.LabelsPerUnit,
+		NumUnits:        options.numUnits,
+		K1:              cfg.K1,
+		K2:              cfg.K2,
+		N:               cfg.N,
+		B:               cfg.B,
+	}
+	return proof, proofMetadata, nil
+}
+
+func verifyMetadata(m *shared.PostMetadata, cfg config.Config, datadir string, nodeId, commitmentAtxId []byte) error {
+	if !bytes.Equal(nodeId, m.NodeId) {
+		return shared.ConfigMismatchError{
+			Param:    "NodeId",
+			Expected: fmt.Sprintf("%x", nodeId),
+			Found:    fmt.Sprintf("%x", m.NodeId),
+			DataDir:  datadir,
 		}
 	}
-	return nil, nil
+
+	if !bytes.Equal(commitmentAtxId, m.CommitmentAtxId) {
+		return shared.ConfigMismatchError{
+			Param:    "CommitmentAtxId",
+			Expected: fmt.Sprintf("%x", commitmentAtxId),
+			Found:    fmt.Sprintf("%x", m.CommitmentAtxId),
+			DataDir:  datadir,
+		}
+	}
+
+	if cfg.BitsPerLabel != m.BitsPerLabel {
+		return shared.ConfigMismatchError{
+			Param:    "BitsPerLabel",
+			Expected: fmt.Sprintf("%d", cfg.BitsPerLabel),
+			Found:    fmt.Sprintf("%d", m.BitsPerLabel),
+			DataDir:  datadir,
+		}
+	}
+
+	if cfg.LabelsPerUnit != m.LabelsPerUnit {
+		return shared.ConfigMismatchError{
+			Param:    "LabelsPerUnit",
+			Expected: fmt.Sprintf("%d", cfg.LabelsPerUnit),
+			Found:    fmt.Sprintf("%d", m.LabelsPerUnit),
+			DataDir:  datadir,
+		}
+	}
+
+	return nil
+}
+
+// TODO(mafa): this should be part of the new persistence package
+// missing data should be ignored up to a certain threshold.
+func initCompleted(datadir string, numUnits uint32, bitsPerLabel uint8, labelsPerUnit uint64) (bool, error) {
+	diskState := initialization.NewDiskState(datadir, uint(bitsPerLabel))
+	numLabelsWritten, err := diskState.NumLabelsWritten()
+	if err != nil {
+		return false, err
+	}
+
+	target := uint64(numUnits) * labelsPerUnit
+	return numLabelsWritten == target, nil
 }

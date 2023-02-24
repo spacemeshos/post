@@ -73,7 +73,7 @@ func cScryptPositions(opt *option) ([]byte, uint64, int, int) {
 	mtx.Lock()
 	defer mtx.Unlock()
 
-	outputSize := shared.DataSize(uint64(opt.endPosition-opt.startPosition+1), uint(opt.bitsPerLabel))
+	outputSize := shared.DataSize(opt.endPosition-opt.startPosition+1, uint(opt.bitsPerLabel))
 	cProviderId := C.uint(opt.computeProviderID)
 
 	cCommitment := C.CBytes(opt.commitment)

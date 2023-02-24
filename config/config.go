@@ -17,15 +17,19 @@ const (
 	// and file truncating is byte-granular regardless of `BitsPerLabel` value.
 	DefaultComputeBatchSize = 1 << 14
 
-	// 2KB per unit. Temporary value.
-	DefaultBitsPerLabel  = 8
-	DefaultLabelsPerUnit = 2048
+	DefaultBitsPerLabel = 8
+	DefaultMaxNumUnits  = 10
+	DefaultMinNumUnits  = 1
 
-	DefaultMaxNumUnits = 10
-	DefaultMinNumUnits = 1
+	// These values have been derived from https://colab.research.google.com/github/spacemeshos/notebooks/blob/main/post-proof-params.ipynb
+	// The values here are only intended to be used for tests and are not optimized for performance or security!
 
-	DefaultK1 = 2000
-	DefaultK2 = 1800
+	DefaultLabelsPerUnit = 1 << 11 // 2KB per unit.
+
+	DefaultK1             = 200
+	DefaultK2             = 212
+	DefaultNonceBatchSize = 32
+	DefaultAESBatchSize   = 4
 )
 
 const (
@@ -47,8 +51,12 @@ type Config struct {
 	MaxNumUnits   uint32
 	BitsPerLabel  uint8
 	LabelsPerUnit uint64
-	K1            uint32
-	K2            uint32
+
+	K1 uint32 // K1 specifies the difficulty for a label to be a candidate for a proof.
+	K2 uint32 // K2 is the number of labels below the required difficulty required for a proof.
+	B  uint32 // B is the number of labels used per AES invocation when generating a proof. Lower values speed up verification, higher values proof generation.
+	N  uint32 // N is the number of nonces tried at the same time when generating a proof.
+	// TODO(mafa): N should probably either be derived from the other parameters or be a configuration option of the node.
 }
 
 func DefaultConfig() Config {
@@ -59,6 +67,8 @@ func DefaultConfig() Config {
 		MinNumUnits:   DefaultMinNumUnits,
 		K1:            DefaultK1,
 		K2:            DefaultK2,
+		B:             DefaultAESBatchSize,
+		N:             DefaultNonceBatchSize,
 	}
 }
 

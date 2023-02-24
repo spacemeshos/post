@@ -83,3 +83,7 @@ test-generate:
 postcli: get-gpu-setup
 	go build -o $(BIN_DIR)$@$(EXE) ./cmd/postcli
 .PHONY: postcli
+
+bench:
+	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -benchmem -run='^$$' -bench 'BenchmarkVerifying|BenchmarkProving' github.com/spacemeshos/post/proving github.com/spacemeshos/post/verifying
+.PHONY: bench

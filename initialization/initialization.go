@@ -235,7 +235,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	defer init.mtx.Unlock()
 
 	init.logger.Info("initialization: datadir: %v, number of units: %v, max file size: %v, number of labels per unit: %v, number of bits per label: %v",
-		init.opts.DataDir, init.opts.NumUnits, init.opts.MaxFileSize, init.cfg.LabelsPerUnit, init.cfg.LabelsPerUnit)
+		init.opts.DataDir, init.opts.NumUnits, init.opts.MaxFileSize, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel)
 
 	layout := deriveFilesLayout(init.cfg, init.opts)
 	init.logger.Info("initialization: files layout: number of files: %v, number of labels per file: %v, last file number of labels: %v",

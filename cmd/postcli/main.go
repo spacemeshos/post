@@ -144,12 +144,7 @@ func main() {
 	if genProof {
 		log.Info("cli: generating proof as a sanity test")
 
-		prover, err := proving.NewProver(cfg, opts.DataDir, id, commitmentAtxId)
-		if err != nil {
-			log.Panic(err.Error())
-		}
-		prover.SetLogger(log)
-		proof, proofMetadata, err := prover.GenerateProof(shared.ZeroChallenge)
+		proof, proofMetadata, err := proving.Generate(ctx, shared.ZeroChallenge, cfg, log, proving.WithDataSource(cfg, id, commitmentAtxId, opts.DataDir))
 		if err != nil {
 			log.Panic("proof generation error: %v", err)
 		}
