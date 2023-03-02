@@ -2,27 +2,22 @@ package proving
 
 import (
 	"errors"
-	"io"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
-	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
 )
 
 type option struct {
-	// dataSource is the source of labels to be used for generating a proof.
-	dataSource io.ReadCloser
-
+	datadir         string
 	nodeId          []byte
 	commitmentAtxId []byte
-
-	numUnits uint32
+	numUnits        uint32
 }
 
 func (o *option) validate() error {
-	if o.dataSource == nil {
-		return errors.New("`reader` is required")
+	if o.datadir == "" {
+		return errors.New("`datadir` is required")
 	}
 	return nil
 }
@@ -47,27 +42,10 @@ func WithDataSource(cfg config.Config, nodeId, commitmentAtxId []byte, datadir s
 			return shared.ErrInitNotCompleted
 		}
 
-		reader, err := persistence.NewLabelsReader(datadir, uint(cfg.BitsPerLabel))
-		if err != nil {
-			return err
-		}
-
-		o.dataSource = reader
+		o.datadir = datadir
 		o.nodeId = nodeId
 		o.commitmentAtxId = commitmentAtxId
 		o.numUnits = m.NumUnits
-		return nil
-	}
-}
-
-// withLabelsReader is an option that allows the caller to provide a reader for labels.
-// TODO(mafa): at the moment this is intended for testing purposes only, but will eventually replace `WithDataSource`.
-func withLabelsReader(source io.ReadCloser, nodeId, commitmentAtxId []byte, numUnits uint32) OptionFunc {
-	return func(o *option) error {
-		o.dataSource = source
-		o.nodeId = nodeId
-		o.commitmentAtxId = commitmentAtxId
-		o.numUnits = numUnits
 		return nil
 	}
 }

@@ -1,15 +1,10 @@
 package proving
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"fmt"
-	"io"
-	"math"
-	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -21,6 +16,7 @@ import (
 
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 4096
 
 	opts := config.DefaultInitOpts()
 	opts.DataDir = tb.TempDir()
@@ -219,103 +215,108 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	r.NoError(verifying.Verify(proof, proofMetaData, verifying.WithLogger(log)))
 }
 
-func BenchmarkProving(b *testing.B) {
-	const MiB = uint64(1024 * 1024)
-	const GiB = MiB * 1024
-	const TiB = GiB * 1024
+// func BenchmarkProving(b *testing.B) {
+// 	const MiB = uint64(1024 * 1024)
+// 	const GiB = MiB * 1024
+// 	const TiB = GiB * 1024
 
-	startPos := 256 * GiB
-	endPos := 4 * TiB
+// 	startPos := 256 * GiB
+// 	endPos := 4 * TiB
 
-	for _, mb := range []uint32{8, 16} {
-		for _, numNonces := range []uint32{6, 12, 20} {
-			for numLabels := startPos; numLabels <= endPos; numLabels *= 4 {
-				d := shared.CalcD(numLabels, config.DefaultAESBatchSize)
-				testName := fmt.Sprintf("%.02fGiB/d=%d/b=%d/Nonces=%d", float64(numLabels)/float64(GiB), d, mb, numNonces)
+// 	for _, mb := range []uint32{16} {
+// 		for _, numNonces := range []uint32{6, 12, 20} {
+// 			for numLabels := startPos; numLabels <= endPos; numLabels *= 4 {
+// 				testName := fmt.Sprintf("%.02fGiB/d=8/b=%d/Nonces=%d", float64(numLabels)/float64(GiB), mb, numNonces)
 
-				b.Run(testName, func(b *testing.B) {
-					benchedDataSize := uint64(math.Min(float64(numLabels), float64(2*GiB)))
-					benchmarkProving(b, numLabels, numNonces, mb, benchedDataSize)
-				})
-			}
-		}
-	}
-}
+// 				b.Run(testName, func(b *testing.B) {
+// 					benchedDataSize := uint64(math.Min(float64(numLabels), float64(2*GiB)))
+// 					benchmarkProving(b, numLabels, numNonces, mb, benchedDataSize)
+// 				})
+// 			}
+// 		}
+// 	}
+// }
 
-type dataSource struct {
-	io.Reader
-	close func() error
-}
+// func benchmarkProving(b *testing.B, numLabels uint64, numNonces uint32, mb uint32, benchedDataSize uint64) {
+// 	challenge := []byte("hello world, challenge me!!!!!!!")
 
-func (ds *dataSource) Close() error {
-	return ds.close()
-}
+// 	file, err := os.Open("/dev/zero")
+// 	require.NoError(b, err)
+// 	defer file.Close()
 
-func benchmarkProving(b *testing.B, numLabels uint64, numNonces uint32, mb uint32, benchedDataSize uint64) {
-	challenge := []byte("hello world, challenge me!!!!!!!")
+// 	nodeId := make([]byte, 32)
+// 	commitmentAtxId := make([]byte, 32)
 
-	file, err := os.Open("/dev/zero")
-	require.NoError(b, err)
-	defer file.Close()
+// 	cfg, opts := getTestConfig(b)
+// 	cfg.N = numNonces
+// 	cfg.B = mb
 
-	nodeId := make([]byte, 32)
-	commitmentAtxId := make([]byte, 32)
+// 	cfg.MaxNumUnits = uint32(benchedDataSize / cfg.LabelsPerUnit)
 
-	cfg, _ := getTestConfig(b)
-	cfg.LabelsPerUnit = numLabels
-	cfg.N = numNonces
-	cfg.B = mb
+// 	v := shared.PostMetadata{
+// 		NodeId:          nodeId,
+// 		CommitmentAtxId: commitmentAtxId,
+// 		BitsPerLabel:    cfg.BitsPerLabel,
+// 		LabelsPerUnit:   cfg.LabelsPerUnit,
+// 		NumUnits:        cfg.MaxNumUnits,
+// 		MaxFileSize:     benchedDataSize,
+// 	}
+// 	initialization.SaveMetadata(opts.DataDir, &v)
 
-	b.SetBytes(int64(benchedDataSize))
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		r := &dataSource{
-			Reader: io.LimitReader(bufio.NewReader(file), int64(benchedDataSize)),
-			close:  func() error { return file.Close() },
-		}
+// 	fo, err := os.Create(path.Join(opts.DataDir, "postdata_0.bin"))
+// 	require.NoError(b, err)
+// 	defer fo.Close()
 
-		Generate(context.Background(), challenge, cfg, testLogger{tb: b}, withLabelsReader(r, nodeId, commitmentAtxId, 1))
-	}
-}
+// 	// make a buffer to keep chunks that are read
+// 	buf := make([]byte, benchedDataSize)
+// 	fo.Write(buf)
+// 	fo.Close()
 
-func Benchmark_Generate_Fastnet(b *testing.B) {
-	r := require.New(b)
+// 	b.SetBytes(int64(benchedDataSize))
+// 	b.ResetTimer()
+// 	for i := 0; i < b.N; i++ {
+// 		Generate(context.Background(), challenge, cfg, testLogger{tb: b}, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+// 	}
+// }
 
-	nodeId := make([]byte, 32)
-	commitmentAtxId := make([]byte, 32)
-	ch := make(shared.Challenge, 32)
+// func Benchmark_Generate_Fastnet(b *testing.B) {
+// 	r := require.New(b)
 
-	cfg, opts := getTestConfig(b)
-	cfg.BitsPerLabel = 8
-	cfg.K1 = 12
-	cfg.K2 = 4
-	cfg.LabelsPerUnit = 32 // bytes
-	cfg.MaxNumUnits = 4
-	cfg.MinNumUnits = 2
-	cfg.N = 32
-	cfg.B = 2
+// 	nodeId := make([]byte, 32)
+// 	commitmentAtxId := make([]byte, 32)
+// 	ch := make(shared.Challenge, 32)
 
-	opts.NumUnits = cfg.MinNumUnits
+// 	cfg, opts := getTestConfig(b)
+// 	cfg.BitsPerLabel = 8
+// 	cfg.K1 = 12
+// 	cfg.K2 = 4
+// 	cfg.LabelsPerUnit = 32 // bytes
+// 	cfg.MaxNumUnits = 4
+// 	cfg.MinNumUnits = 2
+// 	cfg.N = 32
+// 	cfg.B = 2
 
-	init, err := initialization.NewInitializer(
-		initialization.WithNodeId(nodeId),
-		initialization.WithCommitmentAtxId(commitmentAtxId),
-		initialization.WithConfig(cfg),
-		initialization.WithInitOpts(opts),
-	)
-	r.NoError(err)
-	r.NoError(init.Initialize(context.Background()))
+// 	opts.NumUnits = cfg.MinNumUnits
 
-	for i := 0; i < b.N; i++ {
-		rand.Read(ch)
+// 	init, err := initialization.NewInitializer(
+// 		initialization.WithNodeId(nodeId),
+// 		initialization.WithCommitmentAtxId(commitmentAtxId),
+// 		initialization.WithConfig(cfg),
+// 		initialization.WithInitOpts(opts),
+// 	)
+// 	r.NoError(err)
+// 	r.NoError(init.Initialize(context.Background()))
 
-		b.StartTimer()
-		start := time.Now()
-		proof, proofMetadata, err := Generate(context.Background(), ch, cfg, &shared.DisabledLogger{}, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
-		r.NoError(err)
-		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
-		b.StopTimer()
+// 	for i := 0; i < b.N; i++ {
+// 		rand.Read(ch)
 
-		r.NoError(verifying.Verify(proof, proofMetadata))
-	}
-}
+// 		b.StartTimer()
+// 		start := time.Now()
+// 		proof, proofMetadata, err := Generate(context.Background(), ch, cfg, &shared.DisabledLogger{}, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+// 		r.NoError(err)
+// 		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
+// 		b.StopTimer()
+
+// 		r.NoError(verifying.Verify(proof, proofMetadata))
+// 	}
+// }

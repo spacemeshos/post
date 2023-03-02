@@ -29,7 +29,7 @@ const (
 	DefaultK1             = 200
 	DefaultK2             = 212
 	DefaultNonceBatchSize = 32
-	DefaultAESBatchSize   = 4
+	DefaultAESBatchSize   = 16
 )
 
 const (
