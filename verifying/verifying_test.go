@@ -61,6 +61,34 @@ func Test_Verify(t *testing.T) {
 	r.NoError(Verify(proof, proofMetadata))
 }
 
+func Test_Verify_Detects_invalid_proof(t *testing.T) {
+	r := require.New(t)
+	log := testLogger{tb: t}
+
+	nodeId := make([]byte, 32)
+	commitmentAtxId := make([]byte, 32)
+	ch := make(shared.Challenge, 32)
+
+	cfg, opts := getTestConfig(t)
+	init, err := initialization.NewInitializer(
+		initialization.WithNodeId(nodeId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
+		initialization.WithConfig(cfg),
+		initialization.WithInitOpts(opts),
+	)
+	r.NoError(err)
+	r.NoError(init.Initialize(context.Background()))
+
+	proof, proofMetadata, err := proving.Generate(context.Background(), ch, cfg, log, proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+	r.NoError(err)
+
+	for i := range proof.Indices {
+		proof.Indices[i] ^= 255 // flip bits in all indices
+	}
+
+	r.ErrorContains(Verify(proof, proofMetadata), "fast oracle output is doesn't pass difficulty check")
+}
+
 func TestVerifyPow(t *testing.T) {
 	r := require.New(t)
 
