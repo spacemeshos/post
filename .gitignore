@@ -1,6 +1,9 @@
 .idea
-libgpu-setup-*
+.vscode
+.ipynb_checkpoints
+
 build
 bin
 
 *.out
+*.zip
