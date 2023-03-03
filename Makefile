@@ -4,11 +4,11 @@ include Makefile.Inc
 build: postcli
 .PHONY: build
 
-test: get-gpu-setup
+test: get-gpu-setup get-postrs-lib
 	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" gotestsum -- -timeout 5m -p 1 -race -short ./...
 .PHONY: test
 
-compile-test: get-gpu-setup
+compile-test: get-gpu-setup get-postrs-lib
 	CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -v -c -o $(BIN_DIR)test$(EXE) ./...
 .PHONY: compile-test
 
@@ -49,28 +49,28 @@ clear-test-cache:
 	go clean -testcache
 .PHONY: clear-test-cache
 
-lint: get-gpu-setup
+lint: get-gpu-setup get-postrs-lib
 	./bin/golangci-lint run --config .golangci.yml
 .PHONY: lint
 
 # Auto-fixes golangci-lint issues where possible.
-lint-fix: get-gpu-setup
+lint-fix: get-gpu-setup get-postrs-lib
 	./bin/golangci-lint run --config .golangci.yml --fix
 .PHONY: lint-fix
 
-lint-github-action: get-gpu-setup
+lint-github-action: get-gpu-setup get-postrs-lib
 	./bin/golangci-lint run --config .golangci.yml --out-format=github-actions
 .PHONY: lint-github-action
 
-cover: get-gpu-setup
+cover: get-gpu-setup get-postrs-lib
 	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -coverprofile=cover.out -timeout 0 -p 1 ./...
 .PHONY: cover
 
-staticcheck: get-gpu-setup
+staticcheck: get-gpu-setup get-postrs-lib
 	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" staticcheck ./...
 .PHONY: staticcheck
 
-generate: get-gpu-setup
+generate: get-gpu-setup get-postrs-lib
 	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go generate ./...
 .PHONY: generate
 
@@ -80,7 +80,7 @@ test-generate:
 	@git diff --name-only --diff-filter=AM --exit-code . || { echo "\nPlease rerun 'make generate' and commit changes.\n"; exit 1; }
 .PHONY: test-generate
 
-postcli: get-gpu-setup
+postcli: get-gpu-setup get-postrs-lib
 	go build -o $(BIN_DIR)$@$(EXE) ./cmd/postcli
 .PHONY: postcli
 
