@@ -9,6 +9,7 @@ export GOARM
 export BIN_DIR
 
 CGO_TEST_LDFLAGS = $(CGO_LDFLAGS) -Wl,-rpath,$(BIN_DIR)
+DYLD_LIBRARY_PATH = $(BIN_DIR)
 
 ifeq ($(OS),Windows_NT)
   HOST_OS := windows

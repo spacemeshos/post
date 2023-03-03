@@ -18,7 +18,6 @@ import (
 
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 4096
 
 	opts := config.DefaultInitOpts()
 	opts.DataDir = tb.TempDir()
