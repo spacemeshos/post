@@ -18,11 +18,6 @@ const (
 	BlocksPerWorker = 1 << 24 // How many AES blocks are contained per batch sent to a worker. Larger values will increase memory usage, but speed up the proof generation.
 )
 
-type nonceResult struct {
-	nonce   uint32
-	indices []byte
-}
-
 func compressIndicies(indicies []uint64, numUnits uint32, cfg config.Config) ([]byte, error) {
 	numLabels := uint64(numUnits) * cfg.LabelsPerUnit
 	bitsPerIndex := uint(shared.BinaryRepresentationMinBits(numLabels))

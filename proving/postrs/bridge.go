@@ -1,7 +1,5 @@
 package postrs
 
-// #cgo LDFLAGS: -L${SRCDIR} -lpost
-
 // #cgo LDFLAGS: -L/home/bartosz/workspace/post-rs/target/release-clib -lpost
 // #include <stdlib.h>
 // #include "prover.h"
