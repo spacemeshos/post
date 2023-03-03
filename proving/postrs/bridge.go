@@ -1,6 +1,6 @@
 package postrs
 
-// #cgo LDFLAGS: -L/home/bartosz/workspace/post-rs/target/release-clib -lpost
+// #cgo LDFLAGS: -lpost
 // #include <stdlib.h>
 // #include "prover.h"
 import "C"
