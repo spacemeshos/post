@@ -18,7 +18,7 @@ compile-windows-test:
 endif
 .PHONY: compile-windows-test
 
-install: get-gpu-setup
+install: get-gpu-setup get-postrs-lib
 	go mod download
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.50.0
 	go install github.com/spacemeshos/go-scale/scalegen@v1.1.1
