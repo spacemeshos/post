@@ -25,7 +25,7 @@ func GenerateProof(datadir string, challenge []byte, cfg config.Config) (*Proof,
 	defer C.free(challengePtr)
 
 	config := C.Config{
-		n:               20,
+		n:               C.uint32_t(cfg.N),
 		b:               C.uint32_t(cfg.B),
 		k1:              C.uint32_t(cfg.K1),
 		k2:              C.uint32_t(cfg.K2),
@@ -44,8 +44,8 @@ func GenerateProof(datadir string, challenge []byte, cfg config.Config) (*Proof,
 	}
 	defer C.free_proof(cProof)
 
-	indicies := unsafe.Slice((*uint64)(unsafe.Pointer(cProof.indicies.ptr)), cProof.indicies.len)
-	indicies = append([]uint64{}, indicies...)
+	indicies := make([]uint64, cProof.indicies.len)
+	copy(indicies, unsafe.Slice((*uint64)(unsafe.Pointer(cProof.indicies.ptr)), cProof.indicies.len))
 
 	return &Proof{
 		Nonce:    uint32(cProof.nonce),
