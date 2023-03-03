@@ -63,9 +63,9 @@ jobs:
   unittests:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
-    needs:
-      - quicktests
-      - lint
+    # needs:
+    #   - quicktests
+    #   - lint
     strategy:
       fail-fast: false
       matrix:
@@ -88,6 +88,7 @@ jobs:
             ${{ runner.os }}-cache-go-${{ env.go-version }}-
       - name: setup env
         run: make install
+        shell: bash
       - name: Clear test cache
         run: make clear-test-cache
       - name: unit tests
