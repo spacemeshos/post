@@ -86,8 +86,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cache-go-${{ env.go-version }}-unittests-
             ${{ runner.os }}-cache-go-${{ env.go-version }}-
-      - run: unzip --version
-      - run: unzip --help
       - name: setup env
         run: make install
         shell: bash
