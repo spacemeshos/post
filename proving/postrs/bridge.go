@@ -12,12 +12,12 @@ import (
 	"github.com/spacemeshos/post/config"
 )
 
-type Proof struct {
+type proof struct {
 	Nonce    uint32
 	Indicies []uint64
 }
 
-func GenerateProof(datadir string, challenge []byte, cfg config.Config) (*Proof, error) {
+func GenerateProof(datadir string, challenge []byte, cfg config.Config) (*proof, error) {
 	datadirPtr := C.CString(datadir)
 	defer C.free(unsafe.Pointer(datadirPtr))
 
@@ -47,7 +47,7 @@ func GenerateProof(datadir string, challenge []byte, cfg config.Config) (*Proof,
 	indicies := make([]uint64, cProof.indicies.len)
 	copy(indicies, unsafe.Slice((*uint64)(unsafe.Pointer(cProof.indicies.ptr)), cProof.indicies.len))
 
-	return &Proof{
+	return &proof{
 		Nonce:    uint32(cProof.nonce),
 		Indicies: indicies,
 	}, nil
