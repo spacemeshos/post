@@ -33,17 +33,17 @@ else
   TEMP := /tmp
   ifeq ($(GOOS),darwin)
     ifeq ($(GOARCH),arm64)
-    	platform := macos-m1
+        platform := macos-m1
     else
-    	platform := macos
+        platform := macos
     endif
     CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,@loader_path
     ULIMIT := ulimit -n 9999;
   else
     ifeq ($(GOARCH),arm64)
-    	platform := linux-arm64
+        platform := linux-arm64
     else
-    	platform := linux
+        platform := linux
     endif
     CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,$$ORIGIN
   endif
@@ -85,21 +85,22 @@ get-gpu-setup: $(PROJ_DIR)$(GPU_SETUP_ZIP) $(BINDIR_GPU_SETUP_LIBS)
 ifeq ($(platform), windows)
 	POSTRS_SETUP_LIBS = prover.h post.dll
 	POSTRS_SETUP_ZIP = libpost-windows-latest.zip
+	POSTRS_DOWNLOAD_ID = 1VJwXQyClXzC6GvrySXXjFMbVO4nJFcGi
 else
   ifeq ($(platform), $(filter $(platform), macos macos-m1))
 	POSTRS_SETUP_LIBS = prover.h libpostc.dylib
 	POSTRS_SETUP_ZIP = libpost-macos-latest.zip
+	POSTRS_DOWNLOAD_ID = 1ImEbQ35Ms2OhDCYrc3rC8vYGs5x3QS2g
   else
 	POSTRS_SETUP_LIBS = prover.h libpost.so
 	POSTRS_SETUP_ZIP = libpost-ubuntu-20.04.zip
+	POSTRS_DOWNLOAD_ID = 1LCmqiFVdcLFQWw4YXjz98cHJxdCTZIqc
   endif
 endif
 
 POSTRS_SETUP_REV = v0.1.0
-POSTRS_SETUP_LIBS = prover.h libpostc.dylib
-POSTRS_SETUP_ZIP = libpost-macos-latest.zip
 # POSTRS_SETUP_URL_ZIP ?= https://github.com/spacemeshos/post-rs/releases/download/$(POSTRS_SETUP_REV)/$(POSTRS_SETUP_ZIP)
-POSTRS_SETUP_URL_ZIP = "https://drive.google.com/uc?export=download&id=1ImEbQ35Ms2OhDCYrc3rC8vYGs5x3QS2g"
+POSTRS_SETUP_URL_ZIP = "https://drive.google.com/uc?export=download&id=$(POSTRS_DOWNLOAD_ID)"
 
 BINDIR_POSTRS_SETUP_LIBS = $(foreach X,$(POSTRS_SETUP_LIBS),$(BIN_DIR)$(X))
 $(BINDIR_POSTRS_SETUP_LIBS): $(PROJ_DIR)$(POSTRS_SETUP_ZIP)
