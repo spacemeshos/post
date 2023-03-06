@@ -95,7 +95,7 @@ endif
 
 POSTRS_SETUP_REV = 0.1.1
 POSTRS_SETUP_ZIP = libpost-$(platform)-v$(POSTRS_SETUP_REV).zip
-POSTRS_SETUP_URL_ZIP ?= https://github.com/spacemeshos/post-rs/releases/download/$(POSTRS_SETUP_REV)/$(POSTRS_SETUP_ZIP)
+POSTRS_SETUP_URL_ZIP ?= https://github.com/spacemeshos/post-rs/releases/download/v$(POSTRS_SETUP_REV)/$(POSTRS_SETUP_ZIP)
 
 BINDIR_POSTRS_SETUP_LIBS = $(foreach X,$(POSTRS_SETUP_LIBS),$(BIN_DIR)$(X))
 $(BINDIR_POSTRS_SETUP_LIBS): $(PROJ_DIR)$(POSTRS_SETUP_ZIP)
