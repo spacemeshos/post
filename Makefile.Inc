@@ -1,4 +1,5 @@
 PROJ_DIR := $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
+PROJ_DIR := $(subst \,/,$(PROJ_DIR))
 BIN_DIR ?= $(PROJ_DIR)build/
 
 export CGO_LDFLAGS := -L$(BIN_DIR)
