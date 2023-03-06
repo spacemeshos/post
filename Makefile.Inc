@@ -88,7 +88,7 @@ ifeq ($(platform), windows)
     POSTRS_DOWNLOAD_ID = 1VJwXQyClXzC6GvrySXXjFMbVO4nJFcGi
 else
   ifeq ($(platform), $(filter $(platform), macos macos-m1))
-    POSTRS_SETUP_LIBS = prover.h libpostc.dylib
+    POSTRS_SETUP_LIBS = prover.h libpost.dylib
     POSTRS_SETUP_ZIP = libpost-macos-latest.zip
     POSTRS_DOWNLOAD_ID = 1ImEbQ35Ms2OhDCYrc3rC8vYGs5x3QS2g
   else
