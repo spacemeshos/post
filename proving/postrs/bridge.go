@@ -1,6 +1,6 @@
 package postrs
 
-// #cgo LDFLAGS: -lpost
+// #cgo LDFLAGS: -lpostc
 // #include <stdlib.h>
 // #include "prover.h"
 import "C"
