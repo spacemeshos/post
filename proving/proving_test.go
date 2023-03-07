@@ -1,15 +1,10 @@
 package proving
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"fmt"
-	"io"
-	"math"
-	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -173,7 +168,7 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 
 	// https://colab.research.google.com/github/spacemeshos/notebooks/blob/main/post-proof-params.ipynb
 	cfg.LabelsPerUnit = 2 << 16
-	cfg.B = 8
+	cfg.B = 16
 	cfg.K1 = 279
 	cfg.K2 = 287
 	cfg.N = 24
@@ -217,105 +212,4 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 
 	log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
 	r.NoError(verifying.Verify(proof, proofMetaData, verifying.WithLogger(log)))
-}
-
-func BenchmarkProving(b *testing.B) {
-	const MiB = uint64(1024 * 1024)
-	const GiB = MiB * 1024
-	const TiB = GiB * 1024
-
-	startPos := 256 * GiB
-	endPos := 4 * TiB
-
-	for _, mb := range []uint32{8, 16} {
-		for _, numNonces := range []uint32{6, 12, 20} {
-			for numLabels := startPos; numLabels <= endPos; numLabels *= 4 {
-				d := shared.CalcD(numLabels, config.DefaultAESBatchSize)
-				testName := fmt.Sprintf("%.02fGiB/d=%d/b=%d/Nonces=%d", float64(numLabels)/float64(GiB), d, mb, numNonces)
-
-				b.Run(testName, func(b *testing.B) {
-					benchedDataSize := uint64(math.Min(float64(numLabels), float64(2*GiB)))
-					benchmarkProving(b, numLabels, numNonces, mb, benchedDataSize)
-				})
-			}
-		}
-	}
-}
-
-type dataSource struct {
-	io.Reader
-	close func() error
-}
-
-func (ds *dataSource) Close() error {
-	return ds.close()
-}
-
-func benchmarkProving(b *testing.B, numLabels uint64, numNonces uint32, mb uint32, benchedDataSize uint64) {
-	challenge := []byte("hello world, challenge me!!!!!!!")
-
-	file, err := os.Open("/dev/zero")
-	require.NoError(b, err)
-	defer file.Close()
-
-	nodeId := make([]byte, 32)
-	commitmentAtxId := make([]byte, 32)
-
-	cfg, _ := getTestConfig(b)
-	cfg.LabelsPerUnit = numLabels
-	cfg.N = numNonces
-	cfg.B = mb
-
-	b.SetBytes(int64(benchedDataSize))
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		r := &dataSource{
-			Reader: io.LimitReader(bufio.NewReader(file), int64(benchedDataSize)),
-			close:  func() error { return file.Close() },
-		}
-
-		Generate(context.Background(), challenge, cfg, testLogger{tb: b}, withLabelsReader(r, nodeId, commitmentAtxId, 1))
-	}
-}
-
-func Benchmark_Generate_Fastnet(b *testing.B) {
-	r := require.New(b)
-
-	nodeId := make([]byte, 32)
-	commitmentAtxId := make([]byte, 32)
-	ch := make(shared.Challenge, 32)
-
-	cfg, opts := getTestConfig(b)
-	cfg.BitsPerLabel = 8
-	cfg.K1 = 12
-	cfg.K2 = 4
-	cfg.LabelsPerUnit = 32 // bytes
-	cfg.MaxNumUnits = 4
-	cfg.MinNumUnits = 2
-	cfg.N = 32
-	cfg.B = 2
-
-	opts.NumUnits = cfg.MinNumUnits
-
-	init, err := initialization.NewInitializer(
-		initialization.WithNodeId(nodeId),
-		initialization.WithCommitmentAtxId(commitmentAtxId),
-		initialization.WithConfig(cfg),
-		initialization.WithInitOpts(opts),
-	)
-	r.NoError(err)
-	r.NoError(init.Initialize(context.Background()))
-
-	for i := 0; i < b.N; i++ {
-		rand.Read(ch)
-
-		b.StartTimer()
-		start := time.Now()
-		proof, proofMetadata, err := Generate(context.Background(), ch, cfg, &shared.DisabledLogger{}, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
-		r.NoError(err)
-		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
-		b.StopTimer()
-
-		r.NoError(verifying.Verify(proof, proofMetadata))
-	}
 }

@@ -3,16 +3,11 @@ package proving
 import (
 	"bytes"
 	"context"
-	"crypto/aes"
-	"errors"
 	"fmt"
-	"math"
-	"sync"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
+	"github.com/spacemeshos/post/proving/postrs"
 	"github.com/spacemeshos/post/shared"
 )
 
@@ -23,9 +18,23 @@ const (
 	BlocksPerWorker = 1 << 24 // How many AES blocks are contained per batch sent to a worker. Larger values will increase memory usage, but speed up the proof generation.
 )
 
-type nonceResult struct {
-	nonce   uint32
-	indices []byte
+func compressIndicies(indicies []uint64, numUnits uint32, cfg config.Config) ([]byte, error) {
+	numLabels := uint64(numUnits) * cfg.LabelsPerUnit
+	bitsPerIndex := uint(shared.BinaryRepresentationMinBits(numLabels))
+	buf := bytes.NewBuffer(make([]byte, 0, shared.Size(bitsPerIndex, uint(cfg.K2))))
+	gsWriter := shared.NewGranSpecificWriter(buf, bitsPerIndex)
+
+	for _, p := range indicies {
+		if err := gsWriter.WriteUintBE(p); err != nil {
+			return nil, fmt.Errorf("writing compressed uint BE: %w", err)
+		}
+	}
+
+	if err := gsWriter.Flush(); err != nil {
+		return nil, fmt.Errorf("flushing index writer: %w", err)
+	}
+
+	return buf.Bytes(), nil
 }
 
 // TODO (mafa): use functional options.
@@ -42,62 +51,18 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		return nil, nil, err
 	}
 
-	batchChan := make(chan *batch)
-	solutionChan := make(chan *solution)
-
-	numLabels := uint64(options.numUnits) * uint64(cfg.LabelsPerUnit)
-
-	workerCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	eg, egCtx := errgroup.WithContext(workerCtx)
-	eg.Go(func() error {
-		return ioWorker(egCtx, batchChan, cfg.B, options.dataSource)
-	})
-
-	var wg sync.WaitGroup
-	for i := 0; i < NumWorkers; i++ {
-		wg.Add(1)
-		eg.Go(func() error {
-			defer wg.Done()
-
-			difficulty := shared.ProvingDifficulty2(numLabels, cfg.B, cfg.K1)
-			logger.Debug("proving difficulty: %d", difficulty)
-			d := shared.CalcD(numLabels, cfg.B)
-			numOuts := uint8(math.Ceil(float64(cfg.N) * float64(d) / aes.BlockSize))
-			return labelWorker(egCtx, batchChan, solutionChan, ch, numOuts, cfg.N, cfg.B, d, difficulty)
-		})
+	result, err := postrs.GenerateProof(options.datadir, ch, cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("generating proof: %w", err)
 	}
-
-	result := &nonceResult{}
-	eg.Go(func() error {
-		var err error
-		result, err = solutionWorker(egCtx, solutionChan, numLabels, cfg.K2, logger)
-		cancel()
-		return err
-	})
-
-	wg.Wait()
-	close(solutionChan)
-	if err := eg.Wait(); err != nil && err != context.Canceled {
-		return nil, nil, err
-	}
-
-	select {
-	case <-ctx.Done():
-		return nil, nil, ctx.Err()
-	default:
-	}
-
-	if result == nil {
-		return nil, nil, errors.New("no proof found")
-	}
-
 	logger.Info("proving: generated proof")
-
-	proof := &shared.Proof{
-		Nonce:   result.nonce,
-		Indices: result.indices,
+	logger.Debug("Nonce: %v, Indicies: %v", result.Nonce, result.Indicies)
+	indicies, err := compressIndicies(result.Indicies, options.numUnits, cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("compressing proof indicies: %w", err)
 	}
+
+	proof := &shared.Proof{Nonce: result.Nonce, Indices: indicies}
 	proofMetadata := &shared.ProofMetadata{
 		NodeId:          options.nodeId,
 		CommitmentAtxId: options.commitmentAtxId,

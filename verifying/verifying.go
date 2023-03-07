@@ -80,7 +80,7 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) error 
 	}
 
 	if options.verifyFunc == nil {
-		difficulty := shared.ProvingDifficulty2(numLabels, m.B, m.K1)
+		difficulty := shared.ProvingDifficulty(numLabels, m.B, m.K1)
 		options.logger.Debug("verifying difficulty %d", difficulty)
 		options.verifyFunc = func(val uint64) bool {
 			return val < difficulty
@@ -92,8 +92,7 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) error 
 	indicesSet := make(map[uint64]struct{}, m.K2)
 
 	// create the ciphers for the specific nonce
-	d := shared.CalcD(numLabels, m.B)
-	offset := p.Nonce * uint32(d)
+	offset := p.Nonce * 8
 	nonceBlock := uint8(offset / aes.BlockSize)
 
 	// since the value can be on a boundary between two blocks, we need to create two ciphers
@@ -109,7 +108,6 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) error 
 	block := make([]byte, aes.BlockSize)
 	out := make([]byte, aes.BlockSize*2)
 	u64 := (*uint64)(unsafe.Pointer(&out[offset%aes.BlockSize]))
-	mask := (uint64(1) << (d * 8)) - 1
 
 	for i := uint(0); i < uint(m.K2); i++ {
 		index, err := gsReader.ReadNextUintBE()
@@ -137,7 +135,7 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) error 
 		ciphers[0].Encrypt(out[:aes.BlockSize], block)
 		ciphers[1].Encrypt(out[aes.BlockSize:], block)
 
-		val := *u64 & mask
+		val := *u64
 		options.logger.Debug("verifying: index %d value %d", index, val)
 		if !options.verifyFunc(val) {
 			return fmt.Errorf("fast oracle output is doesn't pass difficulty check; index: %d, labels block: %x, value: %d", index, res.Output, val)

@@ -24,12 +24,12 @@ const (
 	// These values have been derived from https://colab.research.google.com/github/spacemeshos/notebooks/blob/main/post-proof-params.ipynb
 	// The values here are only intended to be used for tests and are not optimized for performance or security!
 
-	DefaultLabelsPerUnit = 1 << 11 // 2KB per unit.
+	DefaultLabelsPerUnit = 4096
 
 	DefaultK1             = 200
 	DefaultK2             = 212
 	DefaultNonceBatchSize = 32
-	DefaultAESBatchSize   = 4
+	DefaultAESBatchSize   = 16
 )
 
 const (
