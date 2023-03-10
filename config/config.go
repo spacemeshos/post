@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -30,6 +31,9 @@ const (
 	DefaultK2             = 212
 	DefaultNonceBatchSize = 32
 	DefaultAESBatchSize   = 16
+
+	DefaultK2PowDifficulty = math.MaxUint64
+	DefaultK3PowDifficulty = math.MaxUint64
 )
 
 const (
@@ -57,18 +61,23 @@ type Config struct {
 	B  uint32 // B is the number of labels used per AES invocation when generating a proof. Lower values speed up verification, higher values proof generation.
 	N  uint32 // N is the number of nonces tried at the same time when generating a proof.
 	// TODO(mafa): N should probably either be derived from the other parameters or be a configuration option of the node.
+
+	K2PowDifficulty uint64
+	K3PowDifficulty uint64
 }
 
 func DefaultConfig() Config {
 	return Config{
-		BitsPerLabel:  DefaultBitsPerLabel,
-		LabelsPerUnit: DefaultLabelsPerUnit,
-		MaxNumUnits:   DefaultMaxNumUnits,
-		MinNumUnits:   DefaultMinNumUnits,
-		K1:            DefaultK1,
-		K2:            DefaultK2,
-		B:             DefaultAESBatchSize,
-		N:             DefaultNonceBatchSize,
+		BitsPerLabel:    DefaultBitsPerLabel,
+		LabelsPerUnit:   DefaultLabelsPerUnit,
+		MaxNumUnits:     DefaultMaxNumUnits,
+		MinNumUnits:     DefaultMinNumUnits,
+		K1:              DefaultK1,
+		K2:              DefaultK2,
+		B:               DefaultAESBatchSize,
+		N:               DefaultNonceBatchSize,
+		K2PowDifficulty: DefaultK2PowDifficulty,
+		K3PowDifficulty: DefaultK3PowDifficulty,
 	}
 }
 

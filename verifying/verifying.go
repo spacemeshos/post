@@ -3,7 +3,6 @@ package verifying
 import (
 	"bytes"
 	"crypto/aes"
-	"crypto/cipher"
 	"errors"
 	"fmt"
 	"math/big"
@@ -91,23 +90,15 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) error 
 	gsReader := shared.NewGranSpecificReader(buf, bitsPerIndex)
 	indicesSet := make(map[uint64]struct{}, m.K2)
 
-	// create the ciphers for the specific nonce
-	offset := p.Nonce * 8
-	nonceBlock := uint8(offset / aes.BlockSize)
-
-	// since the value can be on a boundary between two blocks, we need to create two ciphers
-	ciphers := make([]cipher.Block, 2)
-	for i := uint8(0); i < 2; i++ {
-		c, err := oracle.CreateBlockCipher(m.Challenge, nonceBlock+i)
-		if err != nil {
-			return fmt.Errorf("creating cipher for block %d: %w", nonceBlock, err)
-		}
-		ciphers[i] = c
+	nonceBlock := p.Nonce / 2
+	cipher, err := oracle.CreateBlockCipher(m.Challenge, nonceBlock, p.K2Pow)
+	if err != nil {
+		return fmt.Errorf("creating cipher for block %d: %w", nonceBlock, err)
 	}
 
 	block := make([]byte, aes.BlockSize)
-	out := make([]byte, aes.BlockSize*2)
-	u64 := (*uint64)(unsafe.Pointer(&out[offset%aes.BlockSize]))
+	out := make([]byte, aes.BlockSize)
+	u64 := (*uint64)(unsafe.Pointer(&out[(p.Nonce%2)*8]))
 
 	for i := uint(0); i < uint(m.K2); i++ {
 		index, err := gsReader.ReadNextUintBE()
@@ -132,8 +123,7 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata, opts ...OptionFunc) error 
 		}
 		copy(block, res.Output)
 
-		ciphers[0].Encrypt(out[:aes.BlockSize], block)
-		ciphers[1].Encrypt(out[aes.BlockSize:], block)
+		cipher.Encrypt(out, block)
 
 		val := *u64
 		options.logger.Debug("verifying: index %d value %d", index, val)

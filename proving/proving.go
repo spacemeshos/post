@@ -56,13 +56,13 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		return nil, nil, fmt.Errorf("generating proof: %w", err)
 	}
 	logger.Info("proving: generated proof")
-	logger.Debug("Nonce: %v, Indicies: %v", result.Nonce, result.Indicies)
+	logger.Debug("Nonce: %v, Indicies: %v, K2PoW: %d, K3PoW: %d", result.Nonce, result.Indicies, result.K2Pow, result.K3Pow)
 	indicies, err := compressIndicies(result.Indicies, options.numUnits, cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("compressing proof indicies: %w", err)
 	}
 
-	proof := &shared.Proof{Nonce: result.Nonce, Indices: indicies}
+	proof := &shared.Proof{Nonce: result.Nonce, Indices: indicies, K2Pow: result.K2Pow, K3Pow: result.K3Pow}
 	proofMetadata := &shared.ProofMetadata{
 		NodeId:          options.nodeId,
 		CommitmentAtxId: options.commitmentAtxId,

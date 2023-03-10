@@ -3,12 +3,14 @@ package oracle
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"encoding/binary"
 	"errors"
 	"fmt"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/gpu"
 	"github.com/spacemeshos/post/shared"
+	"lukechampine.com/blake3"
 )
 
 type option struct {
@@ -169,20 +171,24 @@ func WorkOracle(opts ...OptionFunc) (WorkOracleResult, error) {
 }
 
 // CreateBlockCipher creates an AES cipher for given fast oracle block.
-// A cipher is created using an idx encrypted with challenge:
-//
-//	cipher = AES(AES(ch).Encrypt(i))
-func CreateBlockCipher(ch shared.Challenge, nonce uint8) (cipher.Block, error) {
-	// A temporary cipher used only to create key.
-	// The key is a block encrypted with AES which key is the challenge.
-	keyCipher, err := aes.NewCipher(ch)
+// A cipher is created using an idx encrypted with challenge.
+func CreateBlockCipher(ch shared.Challenge, nonce uint32, k2Pow uint64) (cipher.Block, error) {
+	hasher := blake3.New(16, nil)
+	hasher.Write(ch)
+	nonceBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(nonceBytes, nonce)
+	hasher.Write(nonceBytes)
+	k2PowBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(k2PowBytes, k2Pow)
+	hasher.Write(k2PowBytes)
+
+	key := make([]byte, 16)
+	_, err := hasher.XOF().Read(key)
+
+	fmt.Printf("nonce_group = %d, key = %v\n", nonce, key)
+
 	if err != nil {
 		return nil, err
 	}
-
-	keyBuffer := make([]byte, aes.BlockSize)
-	keyBuffer[0] = nonce
-	key := make([]byte, aes.BlockSize)
-	keyCipher.Encrypt(key, keyBuffer)
 	return aes.NewCipher(key)
 }

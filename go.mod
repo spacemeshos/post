@@ -9,6 +9,7 @@ require (
 	github.com/spacemeshos/sha256-simd v0.1.0
 	github.com/stretchr/testify v1.8.2
 	golang.org/x/sync v0.1.0
+	lukechampine.com/blake3 v1.1.7
 )
 
 require (

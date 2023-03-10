@@ -16,6 +16,8 @@ import (
 
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
+	cfg.K2PowDifficulty = 0x00FFFFFF_FFFFFFFF
+	cfg.K3PowDifficulty = 0x00FFFFFF_FFFFFFFF
 
 	opts := config.DefaultInitOpts()
 	opts.DataDir = tb.TempDir()

@@ -15,6 +15,8 @@ import (
 type proof struct {
 	Nonce    uint32
 	Indicies []uint64
+	K2Pow    uint64
+	K3Pow    uint64
 }
 
 func GenerateProof(datadir string, challenge []byte, cfg config.Config) (*proof, error) {
@@ -25,11 +27,13 @@ func GenerateProof(datadir string, challenge []byte, cfg config.Config) (*proof,
 	defer C.free(challengePtr)
 
 	config := C.Config{
-		n:               C.uint32_t(cfg.N),
-		b:               C.uint32_t(cfg.B),
-		k1:              C.uint32_t(cfg.K1),
-		k2:              C.uint32_t(cfg.K2),
-		labels_per_unit: C.uint64_t(cfg.LabelsPerUnit),
+		n:                 C.uint32_t(cfg.N),
+		b:                 C.uint32_t(cfg.B),
+		k1:                C.uint32_t(cfg.K1),
+		k2:                C.uint32_t(cfg.K2),
+		k2_pow_difficulty: C.uint64_t(cfg.K2PowDifficulty),
+		k3_pow_difficulty: C.uint64_t(cfg.K3PowDifficulty),
+		labels_per_unit:   C.uint64_t(cfg.LabelsPerUnit),
 	}
 
 	cProof := C.generate_proof(
@@ -50,5 +54,7 @@ func GenerateProof(datadir string, challenge []byte, cfg config.Config) (*proof,
 	return &proof{
 		Nonce:    uint32(cProof.nonce),
 		Indicies: indicies,
+		K2Pow:    uint64(cProof.k2_pow),
+		K3Pow:    uint64(cProof.k3_pow),
 	}, nil
 }
