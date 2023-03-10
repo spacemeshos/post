@@ -172,23 +172,21 @@ func WorkOracle(opts ...OptionFunc) (WorkOracleResult, error) {
 
 // CreateBlockCipher creates an AES cipher for given fast oracle block.
 // A cipher is created using an idx encrypted with challenge.
-func CreateBlockCipher(ch shared.Challenge, nonce uint32, k2Pow uint64) (cipher.Block, error) {
+func CreateBlockCipher(ch shared.Challenge, nonceGroup uint32, k2Pow uint64) (cipher.Block, error) {
 	hasher := blake3.New(16, nil)
 	hasher.Write(ch)
+
 	nonceBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(nonceBytes, nonce)
+	binary.LittleEndian.PutUint32(nonceBytes, nonceGroup)
 	hasher.Write(nonceBytes)
+
 	k2PowBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(k2PowBytes, k2Pow)
 	hasher.Write(k2PowBytes)
 
 	key := make([]byte, 16)
-	_, err := hasher.XOF().Read(key)
-
-	fmt.Printf("nonce_group = %d, key = %v\n", nonce, key)
-
-	if err != nil {
-		return nil, err
+	if _, err := hasher.XOF().Read(key); err != nil {
+		return nil, fmt.Errorf("finalizing blake3 hash for AES cipher: %w", err)
 	}
 	return aes.NewCipher(key)
 }
