@@ -174,15 +174,9 @@ func WorkOracle(opts ...OptionFunc) (WorkOracleResult, error) {
 // A cipher is created using an idx encrypted with challenge.
 func CreateBlockCipher(ch shared.Challenge, nonceGroup uint32, k2Pow uint64) (cipher.Block, error) {
 	hasher := blake3.New(16, nil)
-	hasher.Write(ch)
-
-	nonceBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(nonceBytes, nonceGroup)
-	hasher.Write(nonceBytes)
-
-	k2PowBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(k2PowBytes, k2Pow)
-	hasher.Write(k2PowBytes)
+	binary.Write(hasher, binary.LittleEndian, ch)
+	binary.Write(hasher, binary.LittleEndian, nonceGroup)
+	binary.Write(hasher, binary.LittleEndian, k2Pow)
 
 	key := make([]byte, 16)
 	if _, err := hasher.XOF().Read(key); err != nil {
