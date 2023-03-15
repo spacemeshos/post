@@ -21,7 +21,6 @@ endif
 install: get-gpu-setup get-postrs-lib
 	go mod download
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.50.0
-	go install github.com/spacemeshos/go-scale/scalegen@v1.1.1
 	go install gotest.tools/gotestsum@v1.8.2
 	go install honnef.co/go/tools/cmd/staticcheck@latest
 .PHONY: install
