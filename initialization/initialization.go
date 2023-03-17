@@ -295,6 +295,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 			oracle.WithStartAndEndPosition(i, i+batchSize-1),
 			oracle.WithComputePow(difficulty),
 			oracle.WithComputeLeaves(false),
+			oracle.WithScryptParams(init.opts.Scrypt),
 		)
 		if err != nil {
 			return err
@@ -467,6 +468,7 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 			oracle.WithStartAndEndPosition(startPosition, endPosition),
 			oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
 			oracle.WithComputePow(difficulty),
+			oracle.WithScryptParams(init.opts.Scrypt),
 		)
 		if err != nil {
 			return err

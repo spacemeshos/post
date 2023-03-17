@@ -1,8 +1,8 @@
 package config
 
 import (
+	"errors"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 
@@ -18,22 +18,21 @@ const (
 	// and file truncating is byte-granular regardless of `BitsPerLabel` value.
 	DefaultComputeBatchSize = 1 << 14
 
-	DefaultBitsPerLabel = 8
+	DefaultBitsPerLabel = 8 * 16
 	DefaultMaxNumUnits  = 10
 	DefaultMinNumUnits  = 1
 
 	// These values have been derived from https://colab.research.google.com/github/spacemeshos/notebooks/blob/main/post-proof-params.ipynb
 	// The values here are only intended to be used for tests and are not optimized for performance or security!
 
-	DefaultLabelsPerUnit = 4096
+	DefaultLabelsPerUnit   = 256 // 4kB per unit
+	DefaultK1              = 200
+	DefaultK2              = 212
+	DefaultK3              = 50
+	DefaultK2PowDifficulty = 0x0FFFFFFF_FFFFFFFF
+	DefaultK3PowDifficulty = 0x0FFFFFFF_FFFFFFFF
 
-	DefaultK1             = 200
-	DefaultK2             = 212
 	DefaultNonceBatchSize = 32
-	DefaultAESBatchSize   = 16
-
-	DefaultK2PowDifficulty = math.MaxUint64
-	DefaultK3PowDifficulty = math.MaxUint64
 )
 
 const (
@@ -58,9 +57,7 @@ type Config struct {
 
 	K1 uint32 // K1 specifies the difficulty for a label to be a candidate for a proof.
 	K2 uint32 // K2 is the number of labels below the required difficulty required for a proof.
-	B  uint32 // B is the number of labels used per AES invocation when generating a proof. Lower values speed up verification, higher values proof generation.
-	N  uint32 // N is the number of nonces tried at the same time when generating a proof.
-	// TODO(mafa): N should probably either be derived from the other parameters or be a configuration option of the node.
+	K3 uint32 // K3 is the size of the subset of proof indices that is validated.
 
 	K2PowDifficulty uint64
 	K3PowDifficulty uint64
@@ -74,8 +71,6 @@ func DefaultConfig() Config {
 		MinNumUnits:     DefaultMinNumUnits,
 		K1:              DefaultK1,
 		K2:              DefaultK2,
-		B:               DefaultAESBatchSize,
-		N:               DefaultNonceBatchSize,
 		K2PowDifficulty: DefaultK2PowDifficulty,
 		K3PowDifficulty: DefaultK3PowDifficulty,
 	}
@@ -87,6 +82,40 @@ type InitOpts struct {
 	MaxFileSize       uint64
 	ComputeProviderID int
 	Throttle          bool
+	Scrypt            ScryptParams
+}
+
+type ScryptParams struct {
+	N, R, P uint32
+}
+
+func (p *ScryptParams) Validate() error {
+	if p.N == 0 {
+		return errors.New("scrypt parameter N cannot be 0")
+	}
+	if p.R == 0 {
+		return errors.New("scrypt parameter r cannot be 0")
+	}
+	if p.P == 0 {
+		return errors.New("scrypt parameter p cannot be 0")
+	}
+	return nil
+}
+
+func DefaultPowScryptParams() ScryptParams {
+	return ScryptParams{
+		N: 128,
+		R: 1,
+		P: 1,
+	}
+}
+
+func DefaultLabelsScryptParams() ScryptParams {
+	return ScryptParams{
+		N: 8192,
+		R: 1,
+		P: 1,
+	}
 }
 
 // BestProviderID can be used for selecting the most performant provider
@@ -100,6 +129,7 @@ func DefaultInitOpts() InitOpts {
 		MaxFileSize:       DefaultMaxFileSize,
 		ComputeProviderID: BestProviderID,
 		Throttle:          false,
+		Scrypt:            DefaultLabelsScryptParams(),
 	}
 }
 

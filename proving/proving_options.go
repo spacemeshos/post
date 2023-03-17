@@ -13,11 +13,15 @@ type option struct {
 	nodeId          []byte
 	commitmentAtxId []byte
 	numUnits        uint32
+	powScrypt       config.ScryptParams
 }
 
 func (o *option) validate() error {
 	if o.datadir == "" {
 		return errors.New("`datadir` is required")
+	}
+	if err := o.powScrypt.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -46,6 +50,19 @@ func WithDataSource(cfg config.Config, nodeId, commitmentAtxId []byte, datadir s
 		o.nodeId = nodeId
 		o.commitmentAtxId = commitmentAtxId
 		o.numUnits = m.NumUnits
+		return nil
+	}
+}
+
+func defaultOpts() *option {
+	return &option{
+		powScrypt: config.DefaultPowScryptParams(),
+	}
+}
+
+func WithPowScryptParams(params config.ScryptParams) OptionFunc {
+	return func(o *option) error {
+		o.powScrypt = params
 		return nil
 	}
 }

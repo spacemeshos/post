@@ -7,7 +7,7 @@ import (
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
-	"github.com/spacemeshos/post/proving/postrs"
+	"github.com/spacemeshos/post/postrs"
 	"github.com/spacemeshos/post/shared"
 )
 
@@ -17,25 +17,6 @@ const (
 
 	BlocksPerWorker = 1 << 24 // How many AES blocks are contained per batch sent to a worker. Larger values will increase memory usage, but speed up the proof generation.
 )
-
-func compressIndicies(indicies []uint64, numUnits uint32, cfg config.Config) ([]byte, error) {
-	numLabels := uint64(numUnits) * cfg.LabelsPerUnit
-	bitsPerIndex := uint(shared.BinaryRepresentationMinBits(numLabels))
-	buf := bytes.NewBuffer(make([]byte, 0, shared.Size(bitsPerIndex, uint(cfg.K2))))
-	gsWriter := shared.NewGranSpecificWriter(buf, bitsPerIndex)
-
-	for _, p := range indicies {
-		if err := gsWriter.WriteUintBE(p); err != nil {
-			return nil, fmt.Errorf("writing compressed uint BE: %w", err)
-		}
-	}
-
-	if err := gsWriter.Flush(); err != nil {
-		return nil, fmt.Errorf("flushing index writer: %w", err)
-	}
-
-	return buf.Bytes(), nil
-}
 
 // TODO (mafa): use functional options.
 // TODO (mafa): replace Logger with zap.
@@ -51,29 +32,22 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		return nil, nil, err
 	}
 
-	result, err := postrs.GenerateProof(options.datadir, ch, cfg)
+	result, err := postrs.GenerateProof(options.datadir, ch, cfg, 20, options.powScrypt)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generating proof: %w", err)
 	}
 	logger.Info("proving: generated proof")
-	logger.Debug("Nonce: %v, Indicies: %v, K2PoW: %d, K3PoW: %d", result.Nonce, result.Indicies, result.K2Pow, result.K3Pow)
-	indicies, err := compressIndicies(result.Indicies, options.numUnits, cfg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("compressing proof indicies: %w", err)
-	}
+	logger.Debug("Nonce: %v, Indices: %v, K2PoW: %d, K3PoW: %d", result.Nonce, result.Indices, result.K2Pow, result.K3Pow)
 
-	proof := &shared.Proof{Nonce: result.Nonce, Indices: indicies, K2Pow: result.K2Pow, K3Pow: result.K3Pow}
+	proof := &shared.Proof{Nonce: result.Nonce, Indices: result.Indices, K2Pow: result.K2Pow, K3Pow: result.K3Pow}
 	proofMetadata := &shared.ProofMetadata{
 		NodeId:          options.nodeId,
 		CommitmentAtxId: options.commitmentAtxId,
 		Challenge:       ch,
-		BitsPerLabel:    cfg.BitsPerLabel,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 		NumUnits:        options.numUnits,
 		K1:              cfg.K1,
 		K2:              cfg.K2,
-		N:               cfg.N,
-		B:               cfg.B,
 	}
 	return proof, proofMetadata, nil
 }

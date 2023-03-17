@@ -105,7 +105,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	r := require.New(t)
 
 	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
+	cfg.LabelsPerUnit = 1 << 8
 
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
@@ -296,6 +296,7 @@ func TestReset_WhileInitializing(t *testing.T) {
 	cfg.LabelsPerUnit = 1 << 15
 
 	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ComputeProviderID = int(CPUProviderID())
@@ -330,6 +331,7 @@ func TestInitialize_Repeated(t *testing.T) {
 	cfg.LabelsPerUnit = 1 << 12
 
 	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ComputeProviderID = int(CPUProviderID())
@@ -385,6 +387,7 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	cfg.LabelsPerUnit = 1 << 12
 
 	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ComputeProviderID = int(CPUProviderID())
@@ -439,6 +442,7 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	cfg.LabelsPerUnit = 1 << 12
 
 	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits + 1
 	opts.ComputeProviderID = int(CPUProviderID())
@@ -494,6 +498,7 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 	cfg.BitsPerLabel = 8
 
 	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits + 1
 	opts.MaxFileSize = 1 << 12
@@ -563,6 +568,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	cfg.LabelsPerUnit = 1 << 14
 
 	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.MaxFileSize = deriveTotalSize(cfg, opts)
@@ -588,7 +594,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 		BitsPerLabel:    cfg.BitsPerLabel,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
-	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
+	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
 
 	// TODO(mafa): since we are not looking for the absolute lowest nonce, we can't guarantee that the nonce will be the same.
 	// see also https://github.com/spacemeshos/post/issues/90
@@ -626,7 +632,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 				BitsPerLabel:    cfg.BitsPerLabel,
 				LabelsPerUnit:   cfg.LabelsPerUnit,
 			}
-			r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
+			r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
 
 			// TODO(mafa): see above
 			// r.Equal(oneFileNonce, *init.Nonce())
@@ -641,6 +647,7 @@ func TestNumLabelsWritten(t *testing.T) {
 	cfg.LabelsPerUnit = 1 << 12
 
 	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ComputeProviderID = int(CPUProviderID())
@@ -696,6 +703,7 @@ func TestValidateMetadata(t *testing.T) {
 	cfg.LabelsPerUnit = 1 << 12
 
 	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ComputeProviderID = int(CPUProviderID())
@@ -792,6 +800,7 @@ func TestStop(t *testing.T) {
 	cfg.LabelsPerUnit = 1 << 12
 
 	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 512
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = 10
 	opts.ComputeProviderID = int(CPUProviderID())

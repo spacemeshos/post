@@ -16,10 +16,9 @@ import (
 
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
-	cfg.K2PowDifficulty = 0x00FFFFFF_FFFFFFFF
-	cfg.K3PowDifficulty = 0x00FFFFFF_FFFFFFFF
 
 	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 16 // speed up initialization
 	opts.DataDir = tb.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ComputeProviderID = int(initialization.CPUProviderID())
@@ -66,7 +65,13 @@ func Test_Generate(t *testing.T) {
 			r.NoError(err)
 			r.Equal(len(ch), n)
 
-			proof, proofMetaData, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+			proof, proofMetaData, err := Generate(
+				context.Background(),
+				ch,
+				cfg,
+				log,
+				WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
+				WithPowScryptParams(config.DefaultPowScryptParams()))
 			r.NoError(err, "numUnits: %d", opts.NumUnits)
 			r.NotNil(proof)
 			r.NotNil(proofMetaData)
@@ -74,20 +79,23 @@ func Test_Generate(t *testing.T) {
 			r.Equal(nodeId, proofMetaData.NodeId)
 			r.Equal(commitmentAtxId, proofMetaData.CommitmentAtxId)
 			r.Equal(ch, proofMetaData.Challenge)
-			r.Equal(cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
 			r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
 			r.Equal(opts.NumUnits, proofMetaData.NumUnits)
 			r.Equal(cfg.K1, proofMetaData.K1)
 			r.Equal(cfg.K2, proofMetaData.K2)
-			r.Equal(cfg.B, proofMetaData.B)
-			r.Equal(cfg.N, proofMetaData.N)
 
 			numLabels := cfg.LabelsPerUnit * uint64(numUnits)
 			indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
 			r.Equal(shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
 
 			log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
-			r.NoError(verifying.Verify(proof, proofMetaData, verifying.WithLogger(log)))
+			r.NoError(verifying.Verify(
+				proof,
+				proofMetaData,
+				cfg,
+				verifying.WithLogger(log),
+				verifying.WithPowScryptParams(config.DefaultPowScryptParams()),
+				verifying.WithLabelScryptParams(opts.Scrypt)))
 		})
 	}
 }
@@ -168,14 +176,14 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	ch := make(shared.Challenge, 32)
 	cfg := config.DefaultConfig()
 
-	// https://colab.research.google.com/github/spacemeshos/notebooks/blob/main/post-proof-params.ipynb
-	cfg.LabelsPerUnit = 2 << 16
-	cfg.B = 16
-	cfg.K1 = 279
-	cfg.K2 = 287
-	cfg.N = 24
+	// Test-net settings:
+	cfg.LabelsPerUnit = 20 * 1024 / 16 // 20kB unit
+	cfg.K1 = 273
+	cfg.K2 = 300
+	cfg.K3 = 100
 
 	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 16
 	opts.ComputeProviderID = int(initialization.CPUProviderID())
 	opts.NumUnits = 2
 	opts.DataDir = t.TempDir()
@@ -194,7 +202,8 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	r.NoError(err)
 	r.Equal(len(ch), n)
 
-	proof, proofMetaData, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+	proof, proofMetaData, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
+		WithPowScryptParams(config.DefaultPowScryptParams()))
 	r.NoError(err, "numUnits: %d", opts.NumUnits)
 	r.NotNil(proof)
 	r.NotNil(proofMetaData)
@@ -202,7 +211,6 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	r.Equal(nodeId, proofMetaData.NodeId)
 	r.Equal(commitmentAtxId, proofMetaData.CommitmentAtxId)
 	r.Equal(ch, proofMetaData.Challenge)
-	r.Equal(cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
 	r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
 	r.Equal(opts.NumUnits, proofMetaData.NumUnits)
 	r.Equal(cfg.K1, proofMetaData.K1)
@@ -213,5 +221,11 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	r.Equal(shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
 
 	log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
-	r.NoError(verifying.Verify(proof, proofMetaData, verifying.WithLogger(log)))
+	r.NoError(verifying.Verify(
+		proof,
+		proofMetaData,
+		cfg,
+		verifying.WithLogger(log),
+		verifying.WithPowScryptParams(config.DefaultPowScryptParams()),
+		verifying.WithLabelScryptParams(opts.Scrypt)))
 }

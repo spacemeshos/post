@@ -1,16 +1,11 @@
 package oracle
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
-	"encoding/binary"
 	"errors"
 	"fmt"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/gpu"
-	"github.com/spacemeshos/post/shared"
-	"lukechampine.com/blake3"
 )
 
 type option struct {
@@ -26,6 +21,8 @@ type option struct {
 	computeLeaves bool
 
 	difficulty []byte
+
+	scrypt *config.ScryptParams
 }
 
 func (o *option) validate() error {
@@ -35,6 +32,10 @@ func (o *option) validate() error {
 
 	if o.computeLeaves && (o.bitsPerLabel < config.MinBitsPerLabel || o.bitsPerLabel > config.MaxBitsPerLabel) {
 		return fmt.Errorf("invalid `bitsPerLabel`; expected: %d-%d, given: %v", config.MinBitsPerLabel, config.MaxBitsPerLabel, o.bitsPerLabel)
+	}
+
+	if o.scrypt == nil {
+		return errors.New("scrypt parameters are required")
 	}
 
 	return nil
@@ -125,6 +126,13 @@ func WithComputePow(difficulty []byte) OptionFunc {
 	}
 }
 
+func WithScryptParams(params config.ScryptParams) OptionFunc {
+	return func(opts *option) error {
+		opts.scrypt = &params
+		return nil
+	}
+}
+
 // WorkOracleResult is the result of a call to WorkOracle.
 // It contains the computed labels and the nonce as a proof of work.
 type WorkOracleResult struct {
@@ -159,6 +167,7 @@ func WorkOracle(opts ...OptionFunc) (WorkOracleResult, error) {
 		gpu.WithBitsPerLabel(options.bitsPerLabel),
 		gpu.WithComputeLeaves(options.computeLeaves),
 		gpu.WithComputePow(options.difficulty),
+		gpu.WithScryptParams(options.scrypt.N, options.scrypt.R, options.scrypt.P),
 	)
 	if err != nil {
 		return WorkOracleResult{}, err
@@ -168,19 +177,4 @@ func WorkOracle(opts ...OptionFunc) (WorkOracleResult, error) {
 		Output: res.Output,
 		Nonce:  res.IdxSolution,
 	}, nil
-}
-
-// CreateBlockCipher creates an AES cipher for given fast oracle block.
-// A cipher is created using an idx encrypted with challenge.
-func CreateBlockCipher(ch shared.Challenge, nonceGroup uint32, k2Pow uint64) (cipher.Block, error) {
-	hasher := blake3.New(16, nil)
-	binary.Write(hasher, binary.LittleEndian, ch)
-	binary.Write(hasher, binary.LittleEndian, nonceGroup)
-	binary.Write(hasher, binary.LittleEndian, k2Pow)
-
-	key := make([]byte, 16)
-	if _, err := hasher.XOF().Read(key); err != nil {
-		return nil, fmt.Errorf("finalizing blake3 hash for AES cipher: %w", err)
-	}
-	return aes.NewCipher(key)
 }

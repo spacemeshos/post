@@ -44,9 +44,9 @@ func CPUProviderID() uint {
 
 // Benchmark returns the hashes per second the selected compute provider achieves on the current machine.
 func Benchmark(p ComputeProvider) (int, error) {
-	endPosition := uint64(1 << 17)
+	endPosition := uint64(1 << 13)
 	if p.Model == CPUProviderName {
-		endPosition = uint64(1 << 14)
+		endPosition = uint64(1 << 10)
 	}
 
 	res, err := ScryptPositions(
@@ -55,6 +55,7 @@ func Benchmark(p ComputeProvider) (int, error) {
 		WithSalt(make([]byte, 32)),
 		WithStartAndEndPosition(1, endPosition),
 		WithBitsPerLabel(8),
+		WithScryptParams(8192, 1, 1),
 	)
 	if err != nil {
 		return 0, err
@@ -103,6 +104,16 @@ func (o *option) optionBits() uint32 {
 func (o *option) validate() error {
 	if o.computeLeaves && (o.bitsPerLabel < config.MinBitsPerLabel || o.bitsPerLabel > config.MaxBitsPerLabel) {
 		return fmt.Errorf("invalid `bitsPerLabel`; expected: %d-%d, given: %v", config.MinBitsPerLabel, config.MaxBitsPerLabel, o.bitsPerLabel)
+	}
+
+	if o.n == 0 {
+		return errors.New("scrypt parameter 'N' must be set")
+	}
+	if o.r == 0 {
+		return errors.New("scrypt parameter 'r' must be set")
+	}
+	if o.p == 0 {
+		return errors.New("scrypt parameter 'p' must be set")
 	}
 
 	return nil
@@ -189,12 +200,18 @@ func WithComputePow(difficulty []byte) OptionFunc {
 	}
 }
 
+func WithScryptParams(n, r, p uint32) OptionFunc {
+	return func(opts *option) error {
+		opts.n = n
+		opts.r = r
+		opts.p = p
+		return nil
+	}
+}
+
 // ScryptPositions computes the scrypt output for the given options.
 func ScryptPositions(opts ...OptionFunc) (*ScryptPositionsResult, error) {
 	options := &option{
-		n:             512,
-		r:             1,
-		p:             1,
 		computeLeaves: true,
 		d:             make([]byte, 32),
 	}

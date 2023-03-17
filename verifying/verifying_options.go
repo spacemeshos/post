@@ -1,31 +1,46 @@
 package verifying
 
-import "github.com/spacemeshos/post/shared"
+import (
+	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/shared"
+)
 
 type option struct {
-	verifyFunc func(val uint64) bool
-
 	logger shared.Logger
+	// scrypt parameters for AES PoW
+	powScrypt config.ScryptParams
+	// scrypt paramters for labels initialization
+	labelScrypt config.ScryptParams
 }
 
-func (o *option) validate() error {
-	return nil
+func defaultOpts() *option {
+	return &option{
+		logger:      &shared.DisabledLogger{},
+		powScrypt:   config.DefaultPowScryptParams(),
+		labelScrypt: config.DefaultLabelsScryptParams(),
+	}
 }
 
 type OptionFunc func(*option) error
-
-// withVerifyFunc sets a custom verify function. This is provided for testing purposes, and should not be used in production.
-func withVerifyFunc(f func(val uint64) bool) OptionFunc {
-	return func(o *option) error {
-		o.verifyFunc = f
-		return nil
-	}
-}
 
 // WithLogger adds a logger to the verifier to log debug messages.
 func WithLogger(logger shared.Logger) OptionFunc {
 	return func(o *option) error {
 		o.logger = logger
+		return nil
+	}
+}
+
+func WithLabelScryptParams(params config.ScryptParams) OptionFunc {
+	return func(o *option) error {
+		o.labelScrypt = params
+		return nil
+	}
+}
+
+func WithPowScryptParams(params config.ScryptParams) OptionFunc {
+	return func(o *option) error {
+		o.powScrypt = params
 		return nil
 	}
 }
