@@ -59,8 +59,7 @@ func Test_Verify(t *testing.T) {
 		ch,
 		cfg,
 		log,
-		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
-		proving.WithPowScryptParams(config.DefaultPowScryptParams()))
+		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
 	r.NoError(err)
 
 	r.NoError(Verify(proof, proofMetadata, cfg))
@@ -89,8 +88,7 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 		ch,
 		cfg,
 		log,
-		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
-		proving.WithPowScryptParams(config.DefaultPowScryptParams()))
+		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
 	r.NoError(err)
 
 	for i := range proof.Indices {

@@ -22,7 +22,7 @@ const (
 // TODO (mafa): replace Logger with zap.
 // TODO (mafa): replace datadir with functional option for data provider. `verifyMetadata` and `initCompleted` should be part of the `WithDataDir` option.
 func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logger shared.Logger, opts ...OptionFunc) (*shared.Proof, *shared.ProofMetadata, error) {
-	options := &option{}
+	options := defaultOpts()
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
 			return nil, nil, err

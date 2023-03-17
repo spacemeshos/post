@@ -9,7 +9,7 @@ type option struct {
 	logger shared.Logger
 	// scrypt parameters for AES PoW
 	powScrypt config.ScryptParams
-	// scrypt paramters for labels initialization
+	// scrypt parameters for labels initialization
 	labelScrypt config.ScryptParams
 }
 
