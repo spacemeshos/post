@@ -71,6 +71,7 @@ func DefaultConfig() Config {
 		MinNumUnits:     DefaultMinNumUnits,
 		K1:              DefaultK1,
 		K2:              DefaultK2,
+		K3:              DefaultK3,
 		K2PowDifficulty: DefaultK2PowDifficulty,
 		K3PowDifficulty: DefaultK3PowDifficulty,
 	}
@@ -102,7 +103,7 @@ func (p *ScryptParams) Validate() error {
 	return nil
 }
 
-func DefaultPowScryptParams() ScryptParams {
+func DefaultPowParams() ScryptParams {
 	return ScryptParams{
 		N: 128,
 		R: 1,
@@ -110,7 +111,7 @@ func DefaultPowScryptParams() ScryptParams {
 	}
 }
 
-func DefaultLabelsScryptParams() ScryptParams {
+func DefaultLabelParams() ScryptParams {
 	return ScryptParams{
 		N: 8192,
 		R: 1,
@@ -129,7 +130,7 @@ func DefaultInitOpts() InitOpts {
 		MaxFileSize:       DefaultMaxFileSize,
 		ComputeProviderID: BestProviderID,
 		Throttle:          false,
-		Scrypt:            DefaultLabelsScryptParams(),
+		Scrypt:            DefaultLabelParams(),
 	}
 }
 

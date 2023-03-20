@@ -70,7 +70,8 @@ func Test_Generate(t *testing.T) {
 				ch,
 				cfg,
 				log,
-				WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+				WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
+			)
 			r.NoError(err, "numUnits: %d", opts.NumUnits)
 			r.NotNil(proof)
 			r.NotNil(proofMetaData)
@@ -93,7 +94,8 @@ func Test_Generate(t *testing.T) {
 				proofMetaData,
 				cfg,
 				verifying.WithLogger(log),
-				verifying.WithLabelScryptParams(opts.Scrypt)))
+				verifying.WithLabelScryptParams(opts.Scrypt)),
+			)
 		})
 	}
 }
@@ -223,5 +225,6 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 		proofMetaData,
 		cfg,
 		verifying.WithLogger(log),
-		verifying.WithLabelScryptParams(opts.Scrypt)))
+		verifying.WithLabelScryptParams(opts.Scrypt)),
+	)
 }

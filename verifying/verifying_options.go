@@ -16,8 +16,8 @@ type option struct {
 func defaultOpts() *option {
 	return &option{
 		logger:      &shared.DisabledLogger{},
-		powScrypt:   config.DefaultPowScryptParams(),
-		labelScrypt: config.DefaultLabelsScryptParams(),
+		powScrypt:   config.DefaultPowParams(),
+		labelScrypt: config.DefaultLabelParams(),
 	}
 }
 
