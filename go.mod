@@ -4,7 +4,6 @@ go 1.19
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/spacemeshos/bitstream v0.1.1
 	github.com/spacemeshos/ed25519 v0.1.1
 	github.com/stretchr/testify v1.8.2
 	github.com/zeebo/blake3 v0.2.3
