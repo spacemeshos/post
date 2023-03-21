@@ -3,8 +3,9 @@ package postrs
 import (
 	"testing"
 
-	"github.com/spacemeshos/post/config"
 	"github.com/stretchr/testify/require"
+
+	"github.com/spacemeshos/post/config"
 )
 
 func TestTranslateScryptParams(t *testing.T) {
