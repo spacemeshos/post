@@ -5,7 +5,6 @@ type PostMetadata struct {
 	NodeId          []byte
 	CommitmentAtxId []byte
 
-	BitsPerLabel  uint8
 	LabelsPerUnit uint64
 	NumUnits      uint32
 	MaxFileSize   uint64

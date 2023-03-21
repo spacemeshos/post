@@ -26,6 +26,5 @@ type VRFNonceMetadata struct {
 	CommitmentAtxId []byte
 
 	NumUnits      uint32
-	BitsPerLabel  uint8
 	LabelsPerUnit uint64
 }

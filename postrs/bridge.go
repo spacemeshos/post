@@ -6,8 +6,10 @@ package postrs
 import "C"
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"unsafe"
 
 	"github.com/spacemeshos/post/config"
@@ -68,6 +70,25 @@ func GenerateProof(datadir string, challenge []byte, cfg config.Config, nonces u
 }
 
 func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config.Config, theads uint, powScrypt, labelScrypt config.ScryptParams) error {
+	if proof == nil {
+		return errors.New("proof cannot be nil")
+	}
+	if metadata == nil {
+		return errors.New("metadata cannot be nil")
+	}
+	if len(metadata.NodeId) != 32 {
+		return errors.New("node id length must be 32")
+	}
+	if len(metadata.CommitmentAtxId) != 32 {
+		return errors.New("commitment atx id length must be 32")
+	}
+	if len(metadata.Challenge) != 32 {
+		return errors.New("challenge length must be 32")
+	}
+	if len(proof.Indices) == 0 {
+		return errors.New("proof indices are empty")
+	}
+
 	config := C.Config{
 		k1:                C.uint32_t(cfg.K1),
 		k2:                C.uint32_t(cfg.K2),
@@ -78,14 +99,15 @@ func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config
 		scrypt:            translateScryptParams(labelScrypt),
 	}
 
+	indicesSliceHdr := (*reflect.SliceHeader)(unsafe.Pointer(&proof.Indices))
 	cProof := C.Proof{
 		nonce:  C.uint32_t(proof.Nonce),
 		k2_pow: C.uint64_t(proof.K2Pow),
 		k3_pow: C.uint64_t(proof.K3Pow),
 		indices: C.ArrayU8{
-			ptr: (*C.uchar)(unsafe.Pointer(&proof.Indices[0])),
-			len: C.size_t(len(proof.Indices)),
-			cap: C.size_t(cap(proof.Indices)),
+			ptr: (*C.uchar)(unsafe.Pointer(indicesSliceHdr.Data)),
+			len: C.size_t(indicesSliceHdr.Len),
+			cap: C.size_t(indicesSliceHdr.Cap),
 		},
 	}
 

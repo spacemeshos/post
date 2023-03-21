@@ -71,15 +71,6 @@ func verifyMetadata(m *shared.PostMetadata, cfg config.Config, datadir string, n
 		}
 	}
 
-	if cfg.BitsPerLabel != m.BitsPerLabel {
-		return shared.ConfigMismatchError{
-			Param:    "BitsPerLabel",
-			Expected: fmt.Sprintf("%d", cfg.BitsPerLabel),
-			Found:    fmt.Sprintf("%d", m.BitsPerLabel),
-			DataDir:  datadir,
-		}
-	}
-
 	if cfg.LabelsPerUnit != m.LabelsPerUnit {
 		return shared.ConfigMismatchError{
 			Param:    "LabelsPerUnit",
@@ -94,8 +85,8 @@ func verifyMetadata(m *shared.PostMetadata, cfg config.Config, datadir string, n
 
 // TODO(mafa): this should be part of the new persistence package
 // missing data should be ignored up to a certain threshold.
-func initCompleted(datadir string, numUnits uint32, bitsPerLabel uint8, labelsPerUnit uint64) (bool, error) {
-	diskState := initialization.NewDiskState(datadir, uint(bitsPerLabel))
+func initCompleted(datadir string, numUnits uint32, labelsPerUnit uint64) (bool, error) {
+	diskState := initialization.NewDiskState(datadir, config.BitsPerLabel)
 	numLabelsWritten, err := diskState.NumLabelsWritten()
 	if err != nil {
 		return false, err

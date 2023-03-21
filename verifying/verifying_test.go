@@ -121,7 +121,6 @@ func TestVerifyPow(t *testing.T) {
 		NodeId:          nodeId,
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
-		BitsPerLabel:    cfg.BitsPerLabel,
 		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
 	}
 	r.NoError(VerifyVRFNonce(init.Nonce(), m, WithLabelScryptParams(opts.Scrypt)))
@@ -170,7 +169,6 @@ func Benchmark_Verify_Fastnet(b *testing.B) {
 	ch := make(shared.Challenge, 32)
 
 	cfg, opts := getTestConfig(b)
-	cfg.LabelsPerUnit = 32
 	cfg.K1 = 12
 	cfg.K2 = 4
 	cfg.K3 = 2

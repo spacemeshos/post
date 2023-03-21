@@ -70,7 +70,6 @@ func TestInitialize(t *testing.T) {
 		NodeId:          nodeId,
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
-		BitsPerLabel:    cfg.BitsPerLabel,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
@@ -80,8 +79,7 @@ func TestMaxFileSize(t *testing.T) {
 	r := require.New(t)
 
 	cfg := Config{
-		BitsPerLabel:  8,
-		LabelsPerUnit: 2048,
+		LabelsPerUnit: 128,
 	}
 	opts := InitOpts{
 		NumUnits:    10,
@@ -90,15 +88,16 @@ func TestMaxFileSize(t *testing.T) {
 
 	layout := deriveFilesLayout(cfg, opts)
 	r.Equal(10, int(layout.NumFiles))
-	r.Equal(2048, int(layout.FileNumLabels))
-	r.Equal(2048, int(layout.LastFileNumLabels))
+	r.Equal(128, int(layout.FileNumLabels))
+	r.Equal(128, int(layout.LastFileNumLabels))
 
 	opts.MaxFileSize = 2000
 
 	layout = deriveFilesLayout(cfg, opts)
+	r.Equal(10*128, 10*125+30)
 	r.Equal(11, int(layout.NumFiles))
-	r.Equal(2000, int(layout.FileNumLabels))
-	r.Equal(480, int(layout.LastFileNumLabels))
+	r.Equal(125, int(layout.FileNumLabels))
+	r.Equal(30, int(layout.LastFileNumLabels))
 }
 
 func TestInitialize_PowOutOfRange(t *testing.T) {
@@ -140,7 +139,6 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 		NodeId:          nodeId,
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
-		BitsPerLabel:    cfg.BitsPerLabel,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
@@ -176,7 +174,6 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		NodeId:          nodeId,
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
-		BitsPerLabel:    cfg.BitsPerLabel,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta))
@@ -248,7 +245,6 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		NodeId:          nodeId,
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
-		BitsPerLabel:    cfg.BitsPerLabel,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta))
@@ -283,7 +279,6 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		NodeId:          nodeId,
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
-		BitsPerLabel:    cfg.BitsPerLabel,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta))
@@ -495,7 +490,6 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 
 	cfg := config.DefaultConfig()
 	cfg.LabelsPerUnit = 1 << 12
-	cfg.BitsPerLabel = 8
 
 	opts := config.DefaultInitOpts()
 	opts.Scrypt.N = 16
@@ -584,14 +578,13 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))
 
-	oneFileData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
+	oneFileData, err := initData(opts.DataDir)
 	r.NoError(err)
 
 	m := &shared.VRFNonceMetadata{
 		NodeId:          nodeId,
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
-		BitsPerLabel:    cfg.BitsPerLabel,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
@@ -620,7 +613,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			r.NoError(err)
 			r.NoError(init.Initialize(context.Background()))
 
-			multipleFilesData, err := initData(opts.DataDir, uint(cfg.BitsPerLabel))
+			multipleFilesData, err := initData(opts.DataDir)
 			r.NoError(err)
 
 			r.Equal(multipleFilesData, oneFileData)
@@ -629,7 +622,6 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 				NodeId:          nodeId,
 				CommitmentAtxId: commitmentAtxId,
 				NumUnits:        opts.NumUnits,
-				BitsPerLabel:    cfg.BitsPerLabel,
 				LabelsPerUnit:   cfg.LabelsPerUnit,
 			}
 			r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
@@ -753,19 +745,6 @@ func TestValidateMetadata(t *testing.T) {
 	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("CommitmentAtxId", errConfigMismatch.Param)
 
-	// Attempt to initialize with different `cfg.BitsPerLabel`.
-	newCfg := cfg
-	newCfg.BitsPerLabel = cfg.BitsPerLabel + 1
-	_, err = NewInitializer(
-		WithNodeId(nodeId),
-		WithCommitmentAtxId(commitmentAtxId),
-		WithConfig(newCfg),
-		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
-	)
-	r.ErrorAs(err, &errConfigMismatch)
-	r.Equal("BitsPerLabel", errConfigMismatch.Param)
-
 	// Attempt to initialize with different `opts.MaxFileSize`.
 	newOpts := opts
 	newOpts.MaxFileSize = opts.MaxFileSize + 1
@@ -871,14 +850,14 @@ func assertNumLabelsWritten(ctx context.Context, t *testing.T, init *Initializer
 	}
 }
 
-func initData(datadir string, bitsPerLabel uint) ([]byte, error) {
-	reader, err := persistence.NewLabelsReader(datadir, bitsPerLabel)
+func initData(datadir string) ([]byte, error) {
+	reader, err := persistence.NewLabelsReader(datadir, config.BitsPerLabel)
 	if err != nil {
 		return nil, err
 	}
 	defer reader.Close()
 
-	gsReader := shared.NewGranSpecificReader(reader, bitsPerLabel)
+	gsReader := shared.NewGranSpecificReader(reader, config.BitsPerLabel)
 	writer := bytes.NewBuffer(nil)
 	for {
 		b, err := gsReader.ReadNext()
@@ -895,7 +874,7 @@ func initData(datadir string, bitsPerLabel uint) ([]byte, error) {
 }
 
 func deriveTotalSize(cfg Config, opts InitOpts) uint64 {
-	totalSizeBits := uint64(opts.NumUnits) * cfg.LabelsPerUnit * uint64(cfg.BitsPerLabel)
+	totalSizeBits := uint64(opts.NumUnits) * cfg.LabelsPerUnit * config.BitsPerLabel
 	totalSize := totalSizeBits / 8
 	if totalSizeBits%8 > 0 {
 		totalSize++

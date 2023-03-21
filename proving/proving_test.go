@@ -37,7 +37,7 @@ func (l testLogger) Debug(msg string, args ...any) { l.tb.Logf("\tDEBUG\t"+msg, 
 func (l testLogger) Error(msg string, args ...any) { l.tb.Logf("\tERROR\t"+msg, args...) }
 
 func Test_Generate(t *testing.T) {
-	for numUnits := uint32(config.DefaultMinNumUnits); numUnits < 6; numUnits++ {
+	for numUnits := uint32(1); numUnits < 6; numUnits++ {
 		numUnits := numUnits
 		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
 			t.Parallel()
@@ -140,18 +140,6 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 		var errConfigMismatch initialization.ConfigMismatchError
 		require.ErrorAs(t, err, &errConfigMismatch)
 		require.Equal(t, "CommitmentAtxId", errConfigMismatch.Param)
-	})
-
-	t.Run("invalid BitsPerLabel", func(t *testing.T) {
-		log := testLogger{tb: t}
-
-		newCfg := cfg
-		newCfg.BitsPerLabel++
-
-		_, _, err := Generate(context.Background(), ch, newCfg, log, WithDataSource(newCfg, nodeId, commitmentAtxId, opts.DataDir))
-		var errConfigMismatch initialization.ConfigMismatchError
-		require.ErrorAs(t, err, &errConfigMismatch)
-		require.Equal(t, "BitsPerLabel", errConfigMismatch.Param)
 	})
 
 	t.Run("invalid LabelsPerUnit", func(t *testing.T) {

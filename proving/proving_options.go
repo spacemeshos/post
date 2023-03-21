@@ -40,7 +40,7 @@ func WithDataSource(cfg config.Config, nodeId, commitmentAtxId []byte, datadir s
 			return err
 		}
 
-		if ok, err := initCompleted(datadir, m.NumUnits, cfg.BitsPerLabel, cfg.LabelsPerUnit); err != nil {
+		if ok, err := initCompleted(datadir, m.NumUnits, cfg.LabelsPerUnit); err != nil {
 			return err
 		} else if !ok {
 			return shared.ErrInitNotCompleted
