@@ -32,7 +32,7 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		return nil, nil, err
 	}
 
-	result, err := postrs.GenerateProof(options.datadir, ch, cfg, 20, options.powScrypt)
+	result, err := postrs.GenerateProof(options.datadir, ch, cfg, options.nonces, options.powScrypt)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generating proof: %w", err)
 	}

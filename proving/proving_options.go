@@ -14,11 +14,16 @@ type option struct {
 	commitmentAtxId []byte
 	numUnits        uint32
 	powScrypt       config.ScryptParams
+	// How many nonces to try in parallel.
+	nonces uint
 }
 
 func (o *option) validate() error {
 	if o.datadir == "" {
 		return errors.New("`datadir` is required")
+	}
+	if o.nonces == 0 {
+		return errors.New("`nonces` must be greater than 0")
 	}
 	if err := o.powScrypt.Validate(); err != nil {
 		return err
@@ -56,6 +61,7 @@ func WithDataSource(cfg config.Config, nodeId, commitmentAtxId []byte, datadir s
 
 func defaultOpts() *option {
 	return &option{
+		nonces:    20,
 		powScrypt: config.DefaultPowParams(),
 	}
 }
@@ -63,6 +69,16 @@ func defaultOpts() *option {
 func WithPowScryptParams(params config.ScryptParams) OptionFunc {
 	return func(o *option) error {
 		o.powScrypt = params
+		return nil
+	}
+}
+
+func WithNonces(nonces uint) OptionFunc {
+	return func(o *option) error {
+		if nonces == 0 {
+			return errors.New("`nonces` must be greater than 0")
+		}
+		o.nonces = nonces
 		return nil
 	}
 }
