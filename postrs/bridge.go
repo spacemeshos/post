@@ -84,8 +84,8 @@ func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config
 		k3_pow: C.uint64_t(proof.K3Pow),
 		indices: C.ArrayU8{
 			ptr: (*C.uchar)(unsafe.Pointer(&proof.Indices[0])),
-			len: C.uint64_t(len(proof.Indices)),
-			cap: C.uint64_t(cap(proof.Indices)),
+			len: C.size_t(len(proof.Indices)),
+			cap: C.size_t(cap(proof.Indices)),
 		},
 	}
 
