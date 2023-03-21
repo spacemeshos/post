@@ -113,7 +113,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	opts.ComputeProviderID = int(CPUProviderID())
 
 	// nodeId where no label in the first uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit satisfies the PoW requirement.
-	nodeId, err := hex.DecodeString("52fdfc072182654f163f5f0f9a621d729566c74d10037c4d7bbb0407d1e2c649")
+	nodeId, err := hex.DecodeString("54fdfc072182654f163f5f0f9a621d729566c74d10037c4d7bbb0407d1e2c649")
 	r.NoError(err)
 
 	init, err := NewInitializer(
@@ -146,7 +146,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
 
 	// check that the found nonce is outside of the range for calculating labels
-	r.Less(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *init.Nonce())
+	r.GreaterOrEqual(*init.Nonce(), uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit)
 }
 
 func TestInitialize_ContinueWithLastPos(t *testing.T) {

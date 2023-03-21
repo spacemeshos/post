@@ -6,8 +6,8 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/spacemeshos/bitstream v0.1.1
 	github.com/spacemeshos/ed25519 v0.1.1
-	github.com/spacemeshos/sha256-simd v0.1.0
 	github.com/stretchr/testify v1.8.2
+	github.com/zeebo/blake3 v0.2.3
 	golang.org/x/sync v0.1.0
 )
 
