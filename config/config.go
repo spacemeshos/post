@@ -23,7 +23,12 @@ const (
 	defaultMaxNumUnits = 10
 	defaultMinNumUnits = 1
 
-	minFileSize = 1024
+	KiB = 1024
+	MiB = 1024 * KiB
+	GiB = 1024 * MiB
+
+	defaultMaxFileSize = 4 * GiB
+	minFileSize        = 1024
 )
 
 var DefaultDataDir string
@@ -109,7 +114,7 @@ func DefaultInitOpts() InitOpts {
 	return InitOpts{
 		DataDir:           DefaultDataDir,
 		NumUnits:          defaultMinNumUnits + 1,
-		MaxFileSize:       4 * 1024 * 1024 * 1024, // 4 GB,
+		MaxFileSize:       defaultMaxFileSize,
 		ComputeProviderID: BestProviderID,
 		Throttle:          false,
 		Scrypt:            DefaultLabelParams(),

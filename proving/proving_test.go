@@ -14,6 +14,8 @@ import (
 	"github.com/spacemeshos/post/verifying"
 )
 
+const KiB = 1024
+
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
 
@@ -93,7 +95,6 @@ func Test_Generate(t *testing.T) {
 				proof,
 				proofMetaData,
 				cfg,
-				verifying.WithLogger(log),
 				verifying.WithLabelScryptParams(opts.Scrypt)),
 			)
 		})
@@ -165,7 +166,7 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	cfg := config.DefaultConfig()
 
 	// Test-net settings:
-	cfg.LabelsPerUnit = 20 * 1024 / 16 // 20kB unit
+	cfg.LabelsPerUnit = 20 * KiB / 16 // 20kB unit
 	cfg.K1 = 273
 	cfg.K2 = 300
 	cfg.K3 = 100
@@ -212,7 +213,6 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 		proof,
 		proofMetaData,
 		cfg,
-		verifying.WithLogger(log),
 		verifying.WithLabelScryptParams(opts.Scrypt)),
 	)
 }
