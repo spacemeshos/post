@@ -46,8 +46,6 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		Challenge:       ch,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 		NumUnits:        options.numUnits,
-		K1:              cfg.K1,
-		K2:              cfg.K2,
 	}
 	return proof, proofMetadata, nil
 }
