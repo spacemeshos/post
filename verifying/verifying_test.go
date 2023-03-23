@@ -1,7 +1,6 @@
 package verifying
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
@@ -55,10 +54,16 @@ func Test_Verify(t *testing.T) {
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))
 
-	proof, proofMetadata, err := proving.Generate(context.Background(), ch, cfg, log, proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+	proof, proofMetadata, err := proving.Generate(
+		context.Background(),
+		ch,
+		cfg,
+		log,
+		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
+	)
 	r.NoError(err)
 
-	r.NoError(Verify(proof, proofMetadata))
+	r.NoError(Verify(proof, proofMetadata, cfg))
 }
 
 func Test_Verify_Detects_invalid_proof(t *testing.T) {
@@ -79,14 +84,20 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))
 
-	proof, proofMetadata, err := proving.Generate(context.Background(), ch, cfg, log, proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+	proof, proofMetadata, err := proving.Generate(
+		context.Background(),
+		ch,
+		cfg,
+		log,
+		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
+	)
 	r.NoError(err)
 
 	for i := range proof.Indices {
 		proof.Indices[i] ^= 255 // flip bits in all indices
 	}
 
-	r.ErrorContains(Verify(proof, proofMetadata), "fast oracle output is doesn't pass difficulty check")
+	r.ErrorContains(Verify(proof, proofMetadata, cfg), "invalid proof")
 }
 
 func TestVerifyPow(t *testing.T) {
@@ -96,6 +107,7 @@ func TestVerifyPow(t *testing.T) {
 	commitmentAtxId := make([]byte, 32)
 
 	cfg, opts := getTestConfig(t)
+	opts.Scrypt.N = 16
 	init, err := initialization.NewInitializer(
 		initialization.WithNodeId(nodeId),
 		initialization.WithCommitmentAtxId(commitmentAtxId),
@@ -109,83 +121,60 @@ func TestVerifyPow(t *testing.T) {
 		NodeId:          nodeId,
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
-		BitsPerLabel:    cfg.BitsPerLabel,
 		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
 	}
-	r.NoError(VerifyVRFNonce(init.Nonce(), m))
+	r.NoError(VerifyVRFNonce(init.Nonce(), m, WithLabelScryptParams(opts.Scrypt)))
 }
 
 func BenchmarkVerifying(b *testing.B) {
-	for _, mB := range []uint32{8, 16} {
-		for _, k2 := range []uint32{170, 288, 500, 800} {
-			testName := fmt.Sprintf("256GiB/B=%d/k2=%d", mB, k2)
-
-			b.Run(testName, func(b *testing.B) {
-				benchmarkVerifying(b, mB, k2)
-			})
-		}
-	}
-}
-
-func benchmarkVerifying(b *testing.B, mB, k2 uint32) {
 	nodeId := make([]byte, 32)
 	commitmentAtxId := make([]byte, 32)
 
 	cfg, opts := getTestConfig(b)
 
-	m := &shared.ProofMetadata{
-		NodeId:          nodeId,
-		CommitmentAtxId: commitmentAtxId,
-		Challenge:       []byte("hello world, challenge me!!!!!!!"),
-		NumUnits:        opts.NumUnits,
-		BitsPerLabel:    cfg.BitsPerLabel,
-		LabelsPerUnit:   256 * 1024 * 1024 * 1024, // 256GiB
-		K1:              cfg.K1,
-		K2:              k2,
-		B:               mB,
-		N:               cfg.N,
-	}
+	init, err := initialization.NewInitializer(
+		initialization.WithNodeId(nodeId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
+		initialization.WithConfig(cfg),
+		initialization.WithInitOpts(opts),
+	)
+	require.NoError(b, err)
+	require.NoError(b, init.Initialize(context.Background()))
 
-	numLabels := uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
-	bitsPerIndex := uint(shared.BinaryRepresentationMinBits(numLabels))
+	ch := make(shared.Challenge, 32)
+	rand.Read(ch)
+	p, m, err := proving.Generate(context.Background(), ch, cfg, &shared.DisabledLogger{}, proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+	require.NoError(b, err)
 
-	var buf bytes.Buffer
-	gsWriter := shared.NewGranSpecificWriter(&buf, bitsPerIndex)
-	for i := uint32(0); i < m.K2; i++ {
-		require.NoError(b, gsWriter.WriteUintBE(uint64(i)))
-	}
-	require.NoError(b, gsWriter.Flush())
+	for _, k3 := range []uint32{5, 25, 50, 100} {
+		testName := fmt.Sprintf("k3=%d", k3)
 
-	p := &shared.Proof{
-		Nonce:   rand.Uint32(),
-		Indices: buf.Bytes(),
-	}
+		cfg.K3 = k3
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		start := time.Now()
-		err := Verify(p, m, withVerifyFunc(func(val uint64) bool { return true }))
-		require.NoError(b, err)
-		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
+		b.Run(testName, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				start := time.Now()
+				err := Verify(p, m, cfg)
+				require.NoError(b, err)
+				b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
+			}
+		})
 	}
 }
 
 func Benchmark_Verify_Fastnet(b *testing.B) {
 	r := require.New(b)
-
 	nodeId := make([]byte, 32)
 	commitmentAtxId := make([]byte, 32)
 	ch := make(shared.Challenge, 32)
 
 	cfg, opts := getTestConfig(b)
-	cfg.BitsPerLabel = 8
 	cfg.K1 = 12
 	cfg.K2 = 4
-	cfg.LabelsPerUnit = 32 // bytes
+	cfg.K3 = 2
+	cfg.LabelsPerUnit = 32
 	cfg.MaxNumUnits = 4
 	cfg.MinNumUnits = 2
-	cfg.N = 32
-	cfg.B = 2
 
 	opts.NumUnits = cfg.MinNumUnits
 
@@ -205,7 +194,7 @@ func Benchmark_Verify_Fastnet(b *testing.B) {
 
 		b.StartTimer()
 		start := time.Now()
-		r.NoError(Verify(proof, proofMetadata))
+		r.NoError(Verify(proof, proofMetadata, cfg))
 		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
 		b.StopTimer()
 	}

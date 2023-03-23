@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,32 +12,23 @@ import (
 const (
 	DefaultDataDirName = "data"
 
-	DefaultMaxFileSize = uint64(4294967296) // 4 GB
-
 	// DefaultComputeBatchSize value must be divisible by 8, to guarantee that writing to disk
-	// and file truncating is byte-granular regardless of `BitsPerLabel` value.
+	// and file truncating is byte-granular.
 	DefaultComputeBatchSize = 1 << 14
 
-	DefaultBitsPerLabel = 8
-	DefaultMaxNumUnits  = 10
-	DefaultMinNumUnits  = 1
-
-	// These values have been derived from https://colab.research.google.com/github/spacemeshos/notebooks/blob/main/post-proof-params.ipynb
-	// The values here are only intended to be used for tests and are not optimized for performance or security!
-
-	DefaultLabelsPerUnit = 4096
-
-	DefaultK1             = 200
-	DefaultK2             = 212
-	DefaultNonceBatchSize = 32
-	DefaultAESBatchSize   = 16
-)
-
-const (
-	MaxBitsPerLabel = 256
 	MinBitsPerLabel = 1
+	MaxBitsPerLabel = 256
+	BitsPerLabel    = 8 * 16
 
-	MinFileSize = 1024
+	defaultMaxNumUnits = 10
+	defaultMinNumUnits = 1
+
+	KiB = 1024
+	MiB = 1024 * KiB
+	GiB = 1024 * MiB
+
+	defaultMaxFileSize = 4 * GiB
+	minFileSize        = 1024
 )
 
 var DefaultDataDir string
@@ -49,26 +41,26 @@ func init() {
 type Config struct {
 	MinNumUnits   uint32
 	MaxNumUnits   uint32
-	BitsPerLabel  uint8
 	LabelsPerUnit uint64
 
 	K1 uint32 // K1 specifies the difficulty for a label to be a candidate for a proof.
 	K2 uint32 // K2 is the number of labels below the required difficulty required for a proof.
-	B  uint32 // B is the number of labels used per AES invocation when generating a proof. Lower values speed up verification, higher values proof generation.
-	N  uint32 // N is the number of nonces tried at the same time when generating a proof.
-	// TODO(mafa): N should probably either be derived from the other parameters or be a configuration option of the node.
+	K3 uint32 // K3 is the size of the subset of proof indices that is validated.
+
+	K2PowDifficulty uint64
+	K3PowDifficulty uint64
 }
 
 func DefaultConfig() Config {
 	return Config{
-		BitsPerLabel:  DefaultBitsPerLabel,
-		LabelsPerUnit: DefaultLabelsPerUnit,
-		MaxNumUnits:   DefaultMaxNumUnits,
-		MinNumUnits:   DefaultMinNumUnits,
-		K1:            DefaultK1,
-		K2:            DefaultK2,
-		B:             DefaultAESBatchSize,
-		N:             DefaultNonceBatchSize,
+		LabelsPerUnit:   512, // 8kB units
+		MaxNumUnits:     defaultMaxNumUnits,
+		MinNumUnits:     defaultMinNumUnits,
+		K1:              273,
+		K2:              300,
+		K3:              100,
+		K2PowDifficulty: 0x0FFFFFFF_FFFFFFFF,
+		K3PowDifficulty: 0x0FFFFFFF_FFFFFFFF,
 	}
 }
 
@@ -78,6 +70,40 @@ type InitOpts struct {
 	MaxFileSize       uint64
 	ComputeProviderID int
 	Throttle          bool
+	Scrypt            ScryptParams
+}
+
+type ScryptParams struct {
+	N, R, P uint32
+}
+
+func (p *ScryptParams) Validate() error {
+	if p.N == 0 {
+		return errors.New("scrypt parameter N cannot be 0")
+	}
+	if p.R == 0 {
+		return errors.New("scrypt parameter r cannot be 0")
+	}
+	if p.P == 0 {
+		return errors.New("scrypt parameter p cannot be 0")
+	}
+	return nil
+}
+
+func DefaultPowParams() ScryptParams {
+	return ScryptParams{
+		N: 128,
+		R: 1,
+		P: 1,
+	}
+}
+
+func DefaultLabelParams() ScryptParams {
+	return ScryptParams{
+		N: 8192,
+		R: 1,
+		P: 1,
+	}
 }
 
 // BestProviderID can be used for selecting the most performant provider
@@ -87,10 +113,11 @@ const BestProviderID = -1
 func DefaultInitOpts() InitOpts {
 	return InitOpts{
 		DataDir:           DefaultDataDir,
-		NumUnits:          DefaultMinNumUnits + 1,
-		MaxFileSize:       DefaultMaxFileSize,
+		NumUnits:          defaultMinNumUnits + 1,
+		MaxFileSize:       defaultMaxFileSize,
 		ComputeProviderID: BestProviderID,
 		Throttle:          false,
+		Scrypt:            DefaultLabelParams(),
 	}
 }
 
@@ -103,16 +130,8 @@ func Validate(cfg Config, opts InitOpts) error {
 		return fmt.Errorf("invalid `opts.NumUnits`; expected: <= %d, given: %d", cfg.MaxNumUnits, opts.NumUnits)
 	}
 
-	if opts.MaxFileSize < MinFileSize {
-		return fmt.Errorf("invalid `opts.MaxFileSize`; expected: >= %d, given: %d", MinFileSize, opts.MaxFileSize)
-	}
-
-	if int(cfg.BitsPerLabel) > MaxBitsPerLabel {
-		return fmt.Errorf("invalid `cfg.BitsPerLabel`; expected: <= %d, given: %d", MaxBitsPerLabel, cfg.BitsPerLabel)
-	}
-
-	if cfg.BitsPerLabel < MinBitsPerLabel {
-		return fmt.Errorf("invalid `cfg.BitsPerLabel`; expected: >= %d, given: %d", MinBitsPerLabel, cfg.BitsPerLabel)
+	if opts.MaxFileSize < minFileSize {
+		return fmt.Errorf("invalid `opts.MaxFileSize`; expected: >= %d, given: %d", minFileSize, opts.MaxFileSize)
 	}
 
 	if res := shared.Uint64MulOverflow(cfg.LabelsPerUnit, uint64(opts.NumUnits)); res {

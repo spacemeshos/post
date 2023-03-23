@@ -7,7 +7,7 @@ import (
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
-	"github.com/spacemeshos/post/proving/postrs"
+	"github.com/spacemeshos/post/postrs"
 	"github.com/spacemeshos/post/shared"
 )
 
@@ -18,32 +18,14 @@ const (
 	BlocksPerWorker = 1 << 24 // How many AES blocks are contained per batch sent to a worker. Larger values will increase memory usage, but speed up the proof generation.
 )
 
-func compressIndicies(indicies []uint64, numUnits uint32, cfg config.Config) ([]byte, error) {
-	numLabels := uint64(numUnits) * cfg.LabelsPerUnit
-	bitsPerIndex := uint(shared.BinaryRepresentationMinBits(numLabels))
-	buf := bytes.NewBuffer(make([]byte, 0, shared.Size(bitsPerIndex, uint(cfg.K2))))
-	gsWriter := shared.NewGranSpecificWriter(buf, bitsPerIndex)
-
-	for _, p := range indicies {
-		if err := gsWriter.WriteUintBE(p); err != nil {
-			return nil, fmt.Errorf("writing compressed uint BE: %w", err)
-		}
-	}
-
-	if err := gsWriter.Flush(); err != nil {
-		return nil, fmt.Errorf("flushing index writer: %w", err)
-	}
-
-	return buf.Bytes(), nil
-}
-
-// TODO (mafa): use functional options.
 // TODO (mafa): replace Logger with zap.
-// TODO (mafa): replace datadir with functional option for data provider. `verifyMetadata` and `initCompleted` should be part of the `WithDataDir` option.
 func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logger shared.Logger, opts ...OptionFunc) (*shared.Proof, *shared.ProofMetadata, error) {
-	options := &option{}
+	options := option{
+		nonces:    20,
+		powScrypt: config.DefaultPowParams(),
+	}
 	for _, opt := range opts {
-		if err := opt(options); err != nil {
+		if err := opt(&options); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -51,29 +33,20 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		return nil, nil, err
 	}
 
-	result, err := postrs.GenerateProof(options.datadir, ch, cfg)
+	result, err := postrs.GenerateProof(options.datadir, ch, cfg, options.nonces, options.powScrypt)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generating proof: %w", err)
 	}
 	logger.Info("proving: generated proof")
-	logger.Debug("Nonce: %v, Indicies: %v", result.Nonce, result.Indicies)
-	indicies, err := compressIndicies(result.Indicies, options.numUnits, cfg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("compressing proof indicies: %w", err)
-	}
+	logger.Debug("Nonce: %v, Indices: %v, K2PoW: %d, K3PoW: %d", result.Nonce, result.Indices, result.K2Pow, result.K3Pow)
 
-	proof := &shared.Proof{Nonce: result.Nonce, Indices: indicies}
+	proof := &shared.Proof{Nonce: result.Nonce, Indices: result.Indices, K2Pow: result.K2Pow, K3Pow: result.K3Pow}
 	proofMetadata := &shared.ProofMetadata{
 		NodeId:          options.nodeId,
 		CommitmentAtxId: options.commitmentAtxId,
 		Challenge:       ch,
-		BitsPerLabel:    cfg.BitsPerLabel,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 		NumUnits:        options.numUnits,
-		K1:              cfg.K1,
-		K2:              cfg.K2,
-		N:               cfg.N,
-		B:               cfg.B,
 	}
 	return proof, proofMetadata, nil
 }
@@ -97,15 +70,6 @@ func verifyMetadata(m *shared.PostMetadata, cfg config.Config, datadir string, n
 		}
 	}
 
-	if cfg.BitsPerLabel != m.BitsPerLabel {
-		return shared.ConfigMismatchError{
-			Param:    "BitsPerLabel",
-			Expected: fmt.Sprintf("%d", cfg.BitsPerLabel),
-			Found:    fmt.Sprintf("%d", m.BitsPerLabel),
-			DataDir:  datadir,
-		}
-	}
-
 	if cfg.LabelsPerUnit != m.LabelsPerUnit {
 		return shared.ConfigMismatchError{
 			Param:    "LabelsPerUnit",
@@ -120,8 +84,8 @@ func verifyMetadata(m *shared.PostMetadata, cfg config.Config, datadir string, n
 
 // TODO(mafa): this should be part of the new persistence package
 // missing data should be ignored up to a certain threshold.
-func initCompleted(datadir string, numUnits uint32, bitsPerLabel uint8, labelsPerUnit uint64) (bool, error) {
-	diskState := initialization.NewDiskState(datadir, uint(bitsPerLabel))
+func initCompleted(datadir string, numUnits uint32, labelsPerUnit uint64) (bool, error) {
+	diskState := initialization.NewDiskState(datadir, config.BitsPerLabel)
 	numLabelsWritten, err := diskState.NumLabelsWritten()
 	if err != nil {
 		return false, err

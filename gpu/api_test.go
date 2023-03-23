@@ -49,6 +49,7 @@ func TestScryptPositions(t *testing.T) {
 			WithSalt(salt),
 			WithStartAndEndPosition(1, 1<<8),
 			WithBitsPerLabel(hashLenBits),
+			WithScryptParams(32, 1, 1),
 		)
 		r.NoError(err)
 		r.NotNil(res)
@@ -83,6 +84,7 @@ func TestScryptPositions_HashLenBits(t *testing.T) {
 				WithSalt(salt),
 				WithStartAndEndPosition(1, 1<<12),
 				WithBitsPerLabel(hashLenBits),
+				WithScryptParams(32, 1, 1),
 			)
 			r.NoError(err)
 			r.NotNil(res)
@@ -111,6 +113,7 @@ func TestScryptPositions_InvalidProviderId(t *testing.T) {
 		WithSalt(salt),
 		WithStartAndEndPosition(1, 1),
 		WithBitsPerLabel(8),
+		WithScryptParams(32, 1, 1),
 	)
 	req.EqualError(err, "gpu-post error: invalid provider")
 	req.Nil(res)
@@ -141,6 +144,7 @@ func TestStop(t *testing.T) {
 				WithSalt(salt),
 				WithStartAndEndPosition(startPosition, endPosition),
 				WithBitsPerLabel(hashLenBits),
+				WithScryptParams(512, 1, 1),
 			)
 			r.NoError(err)
 			r.NotNil(res)
@@ -173,6 +177,7 @@ func TestStop(t *testing.T) {
 			WithSalt(salt),
 			WithStartAndEndPosition(startPosition, endPosition),
 			WithBitsPerLabel(hashLenBits),
+			WithScryptParams(2, 1, 1),
 		)
 		r.NoError(err)
 		r.NotNil(res)
@@ -203,6 +208,7 @@ func TestStop_SameThread(t *testing.T) {
 			WithSalt(salt),
 			WithStartAndEndPosition(startPosition, endPosition),
 			WithBitsPerLabel(hashLenBits),
+			WithScryptParams(512, 1, 1),
 		)
 		r.NoError(err)
 		r.NotNil(res)
@@ -223,6 +229,7 @@ func TestStop_SameThread(t *testing.T) {
 			WithSalt(salt),
 			WithStartAndEndPosition(startPosition, endPosition),
 			WithBitsPerLabel(hashLenBits),
+			WithScryptParams(32, 1, 1),
 		)
 		r.NoError(err)
 		r.NotNil(res)
@@ -247,6 +254,7 @@ func TestScryptPositions_PartialByte(t *testing.T) {
 			WithSalt(salt),
 			WithStartAndEndPosition(1, 9),
 			WithBitsPerLabel(hashLenBits),
+			WithScryptParams(32, 1, 1),
 		)
 		req.NoError(err)
 		req.NotNil(res)
@@ -281,7 +289,7 @@ func Test_ScryptPositions_Pow(t *testing.T) {
 	d, err := hex.DecodeString("00003fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
 	require.NoError(t, err)
 
-	nonce := uint64(126202)
+	nonce := uint64(0x10f1d)
 
 	for _, p := range Providers() {
 		t.Run(fmt.Sprintf("Only PoW, Provider %s", p.Model), func(t *testing.T) {
@@ -289,12 +297,14 @@ func Test_ScryptPositions_Pow(t *testing.T) {
 				WithComputeProviderID(p.ID),
 				WithCommitment(commitment),
 				WithSalt(salt),
-				WithStartAndEndPosition(0, 128*1024),
+				WithStartAndEndPosition(0, 256*1024),
+				WithBitsPerLabel(8*16),
 				WithComputePow(d),
 				WithComputeLeaves(false),
+				WithScryptParams(128, 1, 1),
 			)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, res.IdxSolution)
 			assert.Equal(t, nonce, *res.IdxSolution)
 		})
@@ -304,13 +314,14 @@ func Test_ScryptPositions_Pow(t *testing.T) {
 				WithComputeProviderID(p.ID),
 				WithCommitment(commitment),
 				WithSalt(salt),
-				WithStartAndEndPosition(0, 128*1024),
-				WithBitsPerLabel(8),
+				WithStartAndEndPosition(0, 256*1024),
+				WithBitsPerLabel(8*16),
 				WithComputePow(d),
 				WithComputeLeaves(true),
+				WithScryptParams(128, 1, 1),
 			)
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, res.Output)
 			assert.NotNil(t, res.IdxSolution)
 			assert.Equal(t, nonce, *res.IdxSolution)

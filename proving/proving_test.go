@@ -14,10 +14,13 @@ import (
 	"github.com/spacemeshos/post/verifying"
 )
 
+const KiB = 1024
+
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
 
 	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 16 // speed up initialization
 	opts.DataDir = tb.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ComputeProviderID = int(initialization.CPUProviderID())
@@ -36,7 +39,7 @@ func (l testLogger) Debug(msg string, args ...any) { l.tb.Logf("\tDEBUG\t"+msg, 
 func (l testLogger) Error(msg string, args ...any) { l.tb.Logf("\tERROR\t"+msg, args...) }
 
 func Test_Generate(t *testing.T) {
-	for numUnits := uint32(config.DefaultMinNumUnits); numUnits < 6; numUnits++ {
+	for numUnits := uint32(1); numUnits < 6; numUnits++ {
 		numUnits := numUnits
 		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
 			t.Parallel()
@@ -64,7 +67,13 @@ func Test_Generate(t *testing.T) {
 			r.NoError(err)
 			r.Equal(len(ch), n)
 
-			proof, proofMetaData, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+			proof, proofMetaData, err := Generate(
+				context.Background(),
+				ch,
+				cfg,
+				log,
+				WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
+			)
 			r.NoError(err, "numUnits: %d", opts.NumUnits)
 			r.NotNil(proof)
 			r.NotNil(proofMetaData)
@@ -72,20 +81,20 @@ func Test_Generate(t *testing.T) {
 			r.Equal(nodeId, proofMetaData.NodeId)
 			r.Equal(commitmentAtxId, proofMetaData.CommitmentAtxId)
 			r.Equal(ch, proofMetaData.Challenge)
-			r.Equal(cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
 			r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
 			r.Equal(opts.NumUnits, proofMetaData.NumUnits)
-			r.Equal(cfg.K1, proofMetaData.K1)
-			r.Equal(cfg.K2, proofMetaData.K2)
-			r.Equal(cfg.B, proofMetaData.B)
-			r.Equal(cfg.N, proofMetaData.N)
 
 			numLabels := cfg.LabelsPerUnit * uint64(numUnits)
 			indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
 			r.Equal(shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
 
 			log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
-			r.NoError(verifying.Verify(proof, proofMetaData, verifying.WithLogger(log)))
+			r.NoError(verifying.Verify(
+				proof,
+				proofMetaData,
+				cfg,
+				verifying.WithLabelScryptParams(opts.Scrypt)),
+			)
 		})
 	}
 }
@@ -132,18 +141,6 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 		require.Equal(t, "CommitmentAtxId", errConfigMismatch.Param)
 	})
 
-	t.Run("invalid BitsPerLabel", func(t *testing.T) {
-		log := testLogger{tb: t}
-
-		newCfg := cfg
-		newCfg.BitsPerLabel++
-
-		_, _, err := Generate(context.Background(), ch, newCfg, log, WithDataSource(newCfg, nodeId, commitmentAtxId, opts.DataDir))
-		var errConfigMismatch initialization.ConfigMismatchError
-		require.ErrorAs(t, err, &errConfigMismatch)
-		require.Equal(t, "BitsPerLabel", errConfigMismatch.Param)
-	})
-
 	t.Run("invalid LabelsPerUnit", func(t *testing.T) {
 		log := testLogger{tb: t}
 
@@ -166,14 +163,14 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	ch := make(shared.Challenge, 32)
 	cfg := config.DefaultConfig()
 
-	// https://colab.research.google.com/github/spacemeshos/notebooks/blob/main/post-proof-params.ipynb
-	cfg.LabelsPerUnit = 2 << 16
-	cfg.B = 16
-	cfg.K1 = 279
-	cfg.K2 = 287
-	cfg.N = 24
+	// Test-net settings:
+	cfg.LabelsPerUnit = 20 * KiB / 16 // 20kB unit
+	cfg.K1 = 273
+	cfg.K2 = 300
+	cfg.K3 = 100
 
 	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 16
 	opts.ComputeProviderID = int(initialization.CPUProviderID())
 	opts.NumUnits = 2
 	opts.DataDir = t.TempDir()
@@ -200,16 +197,18 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	r.Equal(nodeId, proofMetaData.NodeId)
 	r.Equal(commitmentAtxId, proofMetaData.CommitmentAtxId)
 	r.Equal(ch, proofMetaData.Challenge)
-	r.Equal(cfg.BitsPerLabel, proofMetaData.BitsPerLabel)
 	r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
 	r.Equal(opts.NumUnits, proofMetaData.NumUnits)
-	r.Equal(cfg.K1, proofMetaData.K1)
-	r.Equal(cfg.K2, proofMetaData.K2)
 
 	numLabels := cfg.LabelsPerUnit * uint64(opts.NumUnits)
 	indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
 	r.Equal(shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
 
 	log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
-	r.NoError(verifying.Verify(proof, proofMetaData, verifying.WithLogger(log)))
+	r.NoError(verifying.Verify(
+		proof,
+		proofMetaData,
+		cfg,
+		verifying.WithLabelScryptParams(opts.Scrypt)),
+	)
 }

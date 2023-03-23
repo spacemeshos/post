@@ -197,7 +197,7 @@ func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 		nodeId:            options.nodeId,
 		commitmentAtxId:   options.commitmentAtxId,
 		commitment:        options.commitment,
-		diskState:         NewDiskState(options.initOpts.DataDir, uint(options.cfg.BitsPerLabel)),
+		diskState:         NewDiskState(options.initOpts.DataDir, uint(config.BitsPerLabel)),
 		logger:            options.logger,
 		powDifficultyFunc: options.powDifficultyFunc,
 	}
@@ -234,8 +234,8 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 	defer init.mtx.Unlock()
 
-	init.logger.Info("initialization: datadir: %v, number of units: %v, max file size: %v, number of labels per unit: %v, number of bits per label: %v",
-		init.opts.DataDir, init.opts.NumUnits, init.opts.MaxFileSize, init.cfg.LabelsPerUnit, init.cfg.BitsPerLabel)
+	init.logger.Info("initialization: datadir: %v, number of units: %v, max file size: %v, number of labels per unit: %v",
+		init.opts.DataDir, init.opts.NumUnits, init.opts.MaxFileSize, init.cfg.LabelsPerUnit)
 
 	layout := deriveFilesLayout(init.cfg, init.opts)
 	init.logger.Info("initialization: files layout: number of files: %v, number of labels per file: %v, last file number of labels: %v",
@@ -295,6 +295,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 			oracle.WithStartAndEndPosition(i, i+batchSize-1),
 			oracle.WithComputePow(difficulty),
 			oracle.WithComputeLeaves(false),
+			oracle.WithScryptParams(init.opts.Scrypt),
 		)
 		if err != nil {
 			return err
@@ -398,7 +399,7 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 	fileTargetPosition := fileOffset + fileNumLabels
 
 	// Initialize the labels file writer.
-	writer, err := persistence.NewLabelsWriter(init.opts.DataDir, fileIndex, uint(init.cfg.BitsPerLabel))
+	writer, err := persistence.NewLabelsWriter(init.opts.DataDir, fileIndex, config.BitsPerLabel)
 	if err != nil {
 		return err
 	}
@@ -465,8 +466,8 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 			oracle.WithComputeProviderID(uint(init.opts.ComputeProviderID)),
 			oracle.WithCommitment(init.commitment),
 			oracle.WithStartAndEndPosition(startPosition, endPosition),
-			oracle.WithBitsPerLabel(uint32(init.cfg.BitsPerLabel)),
 			oracle.WithComputePow(difficulty),
+			oracle.WithScryptParams(init.opts.Scrypt),
 		)
 		if err != nil {
 			return err
@@ -519,15 +520,6 @@ func (init *Initializer) verifyMetadata(m *shared.PostMetadata) error {
 		}
 	}
 
-	if init.cfg.BitsPerLabel != m.BitsPerLabel {
-		return ConfigMismatchError{
-			Param:    "BitsPerLabel",
-			Expected: fmt.Sprintf("%d", init.cfg.BitsPerLabel),
-			Found:    fmt.Sprintf("%d", m.BitsPerLabel),
-			DataDir:  init.opts.DataDir,
-		}
-	}
-
 	if init.cfg.LabelsPerUnit != m.LabelsPerUnit {
 		return ConfigMismatchError{
 			Param:    "LabelsPerUnit",
@@ -562,7 +554,6 @@ func (init *Initializer) saveMetadata() error {
 	v := shared.PostMetadata{
 		NodeId:          init.nodeId,
 		CommitmentAtxId: init.commitmentAtxId,
-		BitsPerLabel:    init.cfg.BitsPerLabel,
 		LabelsPerUnit:   init.cfg.LabelsPerUnit,
 		NumUnits:        init.opts.NumUnits,
 		MaxFileSize:     init.opts.MaxFileSize,
