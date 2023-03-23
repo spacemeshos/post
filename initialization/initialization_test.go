@@ -1,7 +1,6 @@
 package initialization
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -857,20 +856,7 @@ func initData(datadir string) ([]byte, error) {
 	}
 	defer reader.Close()
 
-	gsReader := shared.NewGranSpecificReader(reader, config.BitsPerLabel)
-	writer := bytes.NewBuffer(nil)
-	for {
-		b, err := gsReader.ReadNext()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-		writer.Write(b)
-	}
-
-	return writer.Bytes(), nil
+	return io.ReadAll(reader)
 }
 
 func deriveTotalSize(cfg Config, opts InitOpts) uint64 {
