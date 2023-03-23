@@ -147,6 +147,7 @@ func WorkOracle(opts ...OptionFunc) (WorkOracleResult, error) {
 		computeProviderID: gpu.CPUProviderID(),
 		salt:              make([]byte, 32), // TODO(moshababo): apply salt
 		computeLeaves:     true,
+		bitsPerLabel:      config.BitsPerLabel,
 	}
 
 	for _, opt := range opts {

@@ -64,12 +64,6 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata, cfg config.Config, opts ..
 			return err
 		}
 	}
-	if m.K1 != cfg.K1 {
-		return fmt.Errorf("invalid `K1` in proof metadata: %d != %d", m.K1, cfg.K1)
-	}
-	if m.K2 != cfg.K2 {
-		return fmt.Errorf("invalid `K2` in proof metadata: %d != %d", m.K2, cfg.K2)
-	}
 	if len(m.NodeId) != 32 {
 		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(m.NodeId))
 	}

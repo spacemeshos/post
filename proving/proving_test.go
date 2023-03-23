@@ -14,6 +14,8 @@ import (
 	"github.com/spacemeshos/post/verifying"
 )
 
+const KiB = 1024
+
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
 
@@ -37,7 +39,7 @@ func (l testLogger) Debug(msg string, args ...any) { l.tb.Logf("\tDEBUG\t"+msg, 
 func (l testLogger) Error(msg string, args ...any) { l.tb.Logf("\tERROR\t"+msg, args...) }
 
 func Test_Generate(t *testing.T) {
-	for numUnits := uint32(config.DefaultMinNumUnits); numUnits < 6; numUnits++ {
+	for numUnits := uint32(1); numUnits < 6; numUnits++ {
 		numUnits := numUnits
 		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
 			t.Parallel()
@@ -81,8 +83,6 @@ func Test_Generate(t *testing.T) {
 			r.Equal(ch, proofMetaData.Challenge)
 			r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
 			r.Equal(opts.NumUnits, proofMetaData.NumUnits)
-			r.Equal(cfg.K1, proofMetaData.K1)
-			r.Equal(cfg.K2, proofMetaData.K2)
 
 			numLabels := cfg.LabelsPerUnit * uint64(numUnits)
 			indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
@@ -93,7 +93,6 @@ func Test_Generate(t *testing.T) {
 				proof,
 				proofMetaData,
 				cfg,
-				verifying.WithLogger(log),
 				verifying.WithLabelScryptParams(opts.Scrypt)),
 			)
 		})
@@ -142,18 +141,6 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 		require.Equal(t, "CommitmentAtxId", errConfigMismatch.Param)
 	})
 
-	t.Run("invalid BitsPerLabel", func(t *testing.T) {
-		log := testLogger{tb: t}
-
-		newCfg := cfg
-		newCfg.BitsPerLabel++
-
-		_, _, err := Generate(context.Background(), ch, newCfg, log, WithDataSource(newCfg, nodeId, commitmentAtxId, opts.DataDir))
-		var errConfigMismatch initialization.ConfigMismatchError
-		require.ErrorAs(t, err, &errConfigMismatch)
-		require.Equal(t, "BitsPerLabel", errConfigMismatch.Param)
-	})
-
 	t.Run("invalid LabelsPerUnit", func(t *testing.T) {
 		log := testLogger{tb: t}
 
@@ -177,7 +164,7 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	cfg := config.DefaultConfig()
 
 	// Test-net settings:
-	cfg.LabelsPerUnit = 20 * 1024 / 16 // 20kB unit
+	cfg.LabelsPerUnit = 20 * KiB / 16 // 20kB unit
 	cfg.K1 = 273
 	cfg.K2 = 300
 	cfg.K3 = 100
@@ -212,8 +199,6 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	r.Equal(ch, proofMetaData.Challenge)
 	r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
 	r.Equal(opts.NumUnits, proofMetaData.NumUnits)
-	r.Equal(cfg.K1, proofMetaData.K1)
-	r.Equal(cfg.K2, proofMetaData.K2)
 
 	numLabels := cfg.LabelsPerUnit * uint64(opts.NumUnits)
 	indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
@@ -224,7 +209,6 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 		proof,
 		proofMetaData,
 		cfg,
-		verifying.WithLogger(log),
 		verifying.WithLabelScryptParams(opts.Scrypt)),
 	)
 }

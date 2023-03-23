@@ -10,7 +10,7 @@ type filesLayout struct {
 
 func deriveFilesLayout(cfg config.Config, opts config.InitOpts) filesLayout {
 	maxFileSizeBits := opts.MaxFileSize * 8
-	maxFileNumLabels := maxFileSizeBits / uint64(cfg.BitsPerLabel)
+	maxFileNumLabels := maxFileSizeBits / uint64(config.BitsPerLabel)
 	numLabels := cfg.LabelsPerUnit * uint64(opts.NumUnits)
 	numFiles := numLabels / maxFileNumLabels
 

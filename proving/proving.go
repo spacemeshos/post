@@ -18,13 +18,14 @@ const (
 	BlocksPerWorker = 1 << 24 // How many AES blocks are contained per batch sent to a worker. Larger values will increase memory usage, but speed up the proof generation.
 )
 
-// TODO (mafa): use functional options.
 // TODO (mafa): replace Logger with zap.
-// TODO (mafa): replace datadir with functional option for data provider. `verifyMetadata` and `initCompleted` should be part of the `WithDataDir` option.
 func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logger shared.Logger, opts ...OptionFunc) (*shared.Proof, *shared.ProofMetadata, error) {
-	options := defaultOpts()
+	options := option{
+		nonces:    20,
+		powScrypt: config.DefaultPowParams(),
+	}
 	for _, opt := range opts {
-		if err := opt(options); err != nil {
+		if err := opt(&options); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -32,7 +33,7 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		return nil, nil, err
 	}
 
-	result, err := postrs.GenerateProof(options.datadir, ch, cfg, 20, options.powScrypt)
+	result, err := postrs.GenerateProof(options.datadir, ch, cfg, options.nonces, options.powScrypt)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generating proof: %w", err)
 	}
@@ -46,8 +47,6 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		Challenge:       ch,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 		NumUnits:        options.numUnits,
-		K1:              cfg.K1,
-		K2:              cfg.K2,
 	}
 	return proof, proofMetadata, nil
 }
@@ -71,15 +70,6 @@ func verifyMetadata(m *shared.PostMetadata, cfg config.Config, datadir string, n
 		}
 	}
 
-	if cfg.BitsPerLabel != m.BitsPerLabel {
-		return shared.ConfigMismatchError{
-			Param:    "BitsPerLabel",
-			Expected: fmt.Sprintf("%d", cfg.BitsPerLabel),
-			Found:    fmt.Sprintf("%d", m.BitsPerLabel),
-			DataDir:  datadir,
-		}
-	}
-
 	if cfg.LabelsPerUnit != m.LabelsPerUnit {
 		return shared.ConfigMismatchError{
 			Param:    "LabelsPerUnit",
@@ -94,8 +84,8 @@ func verifyMetadata(m *shared.PostMetadata, cfg config.Config, datadir string, n
 
 // TODO(mafa): this should be part of the new persistence package
 // missing data should be ignored up to a certain threshold.
-func initCompleted(datadir string, numUnits uint32, bitsPerLabel uint8, labelsPerUnit uint64) (bool, error) {
-	diskState := initialization.NewDiskState(datadir, uint(bitsPerLabel))
+func initCompleted(datadir string, numUnits uint32, labelsPerUnit uint64) (bool, error) {
+	diskState := initialization.NewDiskState(datadir, config.BitsPerLabel)
 	numLabelsWritten, err := diskState.NumLabelsWritten()
 	if err != nil {
 		return false, err
