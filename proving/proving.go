@@ -18,13 +18,14 @@ const (
 	BlocksPerWorker = 1 << 24 // How many AES blocks are contained per batch sent to a worker. Larger values will increase memory usage, but speed up the proof generation.
 )
 
-// TODO (mafa): use functional options.
 // TODO (mafa): replace Logger with zap.
-// TODO (mafa): replace datadir with functional option for data provider. `verifyMetadata` and `initCompleted` should be part of the `WithDataDir` option.
 func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logger shared.Logger, opts ...OptionFunc) (*shared.Proof, *shared.ProofMetadata, error) {
-	options := defaultOpts()
+	options := option{
+		nonces:    20,
+		powScrypt: config.DefaultPowParams(),
+	}
 	for _, opt := range opts {
-		if err := opt(options); err != nil {
+		if err := opt(&options); err != nil {
 			return nil, nil, err
 		}
 	}

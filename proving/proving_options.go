@@ -59,13 +59,6 @@ func WithDataSource(cfg config.Config, nodeId, commitmentAtxId []byte, datadir s
 	}
 }
 
-func defaultOpts() *option {
-	return &option{
-		nonces:    20,
-		powScrypt: config.DefaultPowParams(),
-	}
-}
-
 func WithPowScryptParams(params config.ScryptParams) OptionFunc {
 	return func(o *option) error {
 		o.powScrypt = params
