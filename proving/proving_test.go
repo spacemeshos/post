@@ -83,8 +83,6 @@ func Test_Generate(t *testing.T) {
 			r.Equal(ch, proofMetaData.Challenge)
 			r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
 			r.Equal(opts.NumUnits, proofMetaData.NumUnits)
-			r.Equal(cfg.K1, proofMetaData.K1)
-			r.Equal(cfg.K2, proofMetaData.K2)
 
 			numLabels := cfg.LabelsPerUnit * uint64(numUnits)
 			indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
@@ -201,8 +199,6 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	r.Equal(ch, proofMetaData.Challenge)
 	r.Equal(cfg.LabelsPerUnit, proofMetaData.LabelsPerUnit)
 	r.Equal(opts.NumUnits, proofMetaData.NumUnits)
-	r.Equal(cfg.K1, proofMetaData.K1)
-	r.Equal(cfg.K2, proofMetaData.K2)
 
 	numLabels := cfg.LabelsPerUnit * uint64(opts.NumUnits)
 	indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
