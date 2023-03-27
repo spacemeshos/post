@@ -30,7 +30,7 @@ func translateScryptParams(params config.ScryptParams) C.ScryptParams {
 	}
 }
 
-func GenerateProof(datadir string, challenge []byte, cfg config.Config, nonces uint, powScrypt config.ScryptParams) (*shared.Proof, error) {
+func GenerateProof(datadir string, challenge []byte, cfg config.Config, nonces uint, threads uint, powScrypt config.ScryptParams) (*shared.Proof, error) {
 	datadirPtr := C.CString(datadir)
 	defer C.free(unsafe.Pointer(datadirPtr))
 
@@ -48,9 +48,9 @@ func GenerateProof(datadir string, challenge []byte, cfg config.Config, nonces u
 	cProof := C.generate_proof(
 		datadirPtr,
 		(*C.uchar)(challengePtr),
-		C.size_t(len(challenge)),
 		config,
 		C.size_t(nonces),
+		C.size_t(threads),
 	)
 
 	if cProof == nil {

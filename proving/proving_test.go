@@ -73,6 +73,7 @@ func Test_Generate(t *testing.T) {
 				cfg,
 				log,
 				WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
+				WithThreads(2),
 			)
 			r.NoError(err, "numUnits: %d", opts.NumUnits)
 			r.NotNil(proof)
