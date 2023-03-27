@@ -21,6 +21,7 @@ const (
 // TODO (mafa): replace Logger with zap.
 func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logger shared.Logger, opts ...OptionFunc) (*shared.Proof, *shared.ProofMetadata, error) {
 	options := option{
+		threads:   1,
 		nonces:    20,
 		powScrypt: config.DefaultPowParams(),
 	}
@@ -33,7 +34,7 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		return nil, nil, err
 	}
 
-	result, err := postrs.GenerateProof(options.datadir, ch, cfg, options.nonces, options.powScrypt)
+	result, err := postrs.GenerateProof(options.datadir, ch, cfg, options.nonces, options.threads, options.powScrypt)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generating proof: %w", err)
 	}

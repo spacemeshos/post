@@ -16,6 +16,9 @@ type option struct {
 	powScrypt       config.ScryptParams
 	// How many nonces to try in parallel.
 	nonces uint
+	// How many threads to use to generate a proof.
+	// 0 - automatically detect
+	threads uint
 }
 
 func (o *option) validate() error {
@@ -72,6 +75,13 @@ func WithNonces(nonces uint) OptionFunc {
 			return errors.New("`nonces` must be greater than 0")
 		}
 		o.nonces = nonces
+		return nil
+	}
+}
+
+func WithThreads(threads uint) OptionFunc {
+	return func(o *option) error {
+		o.threads = threads
 		return nil
 	}
 }
