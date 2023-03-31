@@ -21,6 +21,7 @@ func NewFileWriter(filename string, bitsPerLabel uint) (*FileWriter, error) {
 	if err != nil {
 		return nil, err
 	}
+	f.Seek(0, io.SeekEnd)
 	return &FileWriter{
 		file:         f,
 		buf:          bufio.NewWriter(f),
@@ -29,7 +30,6 @@ func NewFileWriter(filename string, bitsPerLabel uint) (*FileWriter, error) {
 }
 
 func (w *FileWriter) Write(b []byte) error {
-	w.file.Seek(0, io.SeekEnd)
 	_, err := w.buf.Write(b)
 	return err
 }
@@ -62,27 +62,13 @@ func (w *FileWriter) Truncate(numLabels uint64) error {
 		return fmt.Errorf("failed to truncate file: %w", err)
 	}
 	w.file.Sync()
-
 	return nil
 }
 
-func (w *FileWriter) Close() (*os.FileInfo, error) {
-	err := w.buf.Flush()
-	if err != nil {
-		return nil, err
-	}
-	w.buf = nil
-
-	info, err := w.file.Stat()
-	if err != nil {
-		return nil, err
+func (w *FileWriter) Close() error {
+	if err := w.buf.Flush(); err != nil {
+		return err
 	}
 
-	err = w.file.Close()
-	if err != nil {
-		return nil, err
-	}
-	w.file = nil
-
-	return &info, nil
+	return w.file.Close()
 }
