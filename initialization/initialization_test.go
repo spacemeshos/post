@@ -778,10 +778,11 @@ func TestStop(t *testing.T) {
 	cfg.LabelsPerUnit = 1 << 12
 
 	opts := config.DefaultInitOpts()
-	opts.Scrypt.N = 512
+	opts.Scrypt.N = 2
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = 10
 	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ComputeBatchSize = 1 << 10
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
