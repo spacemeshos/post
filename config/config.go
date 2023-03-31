@@ -71,6 +71,7 @@ type InitOpts struct {
 	ComputeProviderID int
 	Throttle          bool
 	Scrypt            ScryptParams
+	ComputeBatchSize  uint64
 }
 
 type ScryptParams struct {
@@ -118,6 +119,7 @@ func DefaultInitOpts() InitOpts {
 		ComputeProviderID: BestProviderID,
 		Throttle:          false,
 		Scrypt:            DefaultLabelParams(),
+		ComputeBatchSize:  DefaultComputeBatchSize,
 	}
 }
 
