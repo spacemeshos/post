@@ -43,6 +43,7 @@ func TestInitialize(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ComputeProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 16
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -71,7 +72,7 @@ func TestInitialize(t *testing.T) {
 		NumUnits:        opts.NumUnits,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
-	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
+	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
 }
 
 func TestMaxFileSize(t *testing.T) {
@@ -109,9 +110,10 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ComputeProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 16
 
 	// nodeId where no label in the first uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit satisfies the PoW requirement.
-	nodeId, err := hex.DecodeString("54fdfc072182654f163f5f0f9a621d729566c74d10037c4d7bbb0407d1e2c649")
+	nodeId, err := hex.DecodeString("57fdfc072182654f163f5f0f9a621d729566c74d10037c4d7bbb0407d1e2c649")
 	r.NoError(err)
 
 	init, err := NewInitializer(
@@ -140,7 +142,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 		NumUnits:        opts.NumUnits,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
-	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m))
+	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
 
 	// check that the found nonce is outside of the range for calculating labels
 	r.GreaterOrEqual(*init.Nonce(), uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit)
@@ -156,6 +158,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ComputeProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 16
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -175,7 +178,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		NumUnits:        opts.NumUnits,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
-	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta))
+	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta, verifying.WithLabelScryptParams(opts.Scrypt)))
 
 	// trying again returns same nonce
 	origNonce := *init.Nonce()
@@ -246,7 +249,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		NumUnits:        opts.NumUnits,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
-	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta))
+	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta, verifying.WithLabelScryptParams(opts.Scrypt)))
 
 	// lastPos sets lower bound for searching for nonce if none was found
 	lastPos := *m.Nonce + 10
@@ -280,7 +283,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		NumUnits:        opts.NumUnits,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
-	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta))
+	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), meta, verifying.WithLabelScryptParams(opts.Scrypt)))
 }
 
 func TestReset_WhileInitializing(t *testing.T) {
@@ -294,6 +297,7 @@ func TestReset_WhileInitializing(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ComputeBatchSize = 1 << 14
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -307,7 +311,7 @@ func TestReset_WhileInitializing(t *testing.T) {
 	{
 		var eg errgroup.Group
 		eg.Go(func() error {
-			r.Eventually(func() bool { return init.NumLabelsWritten() > 0 }, 5*time.Second, 50*time.Millisecond)
+			r.Eventually(func() bool { return init.NumLabelsWritten() > 0 }, 5*time.Second, 10*time.Millisecond)
 			r.ErrorIs(init.Reset(), ErrCannotResetWhileInitializing)
 			return nil
 		})
@@ -778,10 +782,11 @@ func TestStop(t *testing.T) {
 	cfg.LabelsPerUnit = 1 << 12
 
 	opts := config.DefaultInitOpts()
-	opts.Scrypt.N = 512
+	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = 10
 	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ComputeBatchSize = 1 << 10
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),

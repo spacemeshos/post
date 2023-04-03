@@ -246,7 +246,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 
 	numLabels := uint64(init.opts.NumUnits) * init.cfg.LabelsPerUnit
 	difficulty := init.powDifficultyFunc(numLabels)
-	batchSize := uint64(config.DefaultComputeBatchSize)
+	batchSize := init.opts.ComputeBatchSize
 
 	for i := 0; i < int(layout.NumFiles); i++ {
 		fileOffset := uint64(i) * layout.FileNumLabels

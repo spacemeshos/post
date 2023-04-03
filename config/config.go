@@ -14,13 +14,13 @@ const (
 
 	// DefaultComputeBatchSize value must be divisible by 8, to guarantee that writing to disk
 	// and file truncating is byte-granular.
-	DefaultComputeBatchSize = 1 << 14
+	DefaultComputeBatchSize = 1 << 20
 
 	MinBitsPerLabel = 1
 	MaxBitsPerLabel = 256
 	BitsPerLabel    = 8 * 16
 
-	defaultMaxNumUnits = 10
+	defaultMaxNumUnits = 100
 	defaultMinNumUnits = 1
 
 	KiB = 1024
@@ -71,6 +71,7 @@ type InitOpts struct {
 	ComputeProviderID int
 	Throttle          bool
 	Scrypt            ScryptParams
+	ComputeBatchSize  uint64
 }
 
 type ScryptParams struct {
@@ -118,6 +119,7 @@ func DefaultInitOpts() InitOpts {
 		ComputeProviderID: BestProviderID,
 		Throttle:          false,
 		Scrypt:            DefaultLabelParams(),
+		ComputeBatchSize:  DefaultComputeBatchSize,
 	}
 }
 
