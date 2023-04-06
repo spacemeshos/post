@@ -28,7 +28,7 @@ const (
 	StopResultErrorTimeout          = StopResult(C.SPACEMESH_API_ERROR_TIMEOUT)
 	StopResultErrorAlready          = StopResult(C.SPACEMESH_API_ERROR_ALREADY)
 	StopResultErrorCancelled        = StopResult(C.SPACEMESH_API_ERROR_CANCELED)
-	StopResultErrorNoCompoteOptions = StopResult(C.SPACEMESH_API_ERROR_NO_COMPOTE_OPTIONS)
+	StopResultErrorNoComputeOptions = StopResult(C.SPACEMESH_API_ERROR_NO_COMPUTE_OPTIONS)
 	StopResultErrorInvalidParameter = StopResult(C.SPACEMESH_API_ERROR_INVALID_PARAMETER)
 	StopResultErrorInvalidProvider  = StopResult(C.SPACEMESH_API_ERROR_INVALID_PROVIDER_ID)
 )

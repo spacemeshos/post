@@ -255,7 +255,7 @@ func ScryptPositions(opts ...OptionFunc) (*ScryptPositionsResult, error) {
 		return nil, fmt.Errorf("gpu-post error: already stopped")
 	case StopResultErrorCancelled:
 		return &ScryptPositionsResult{output, nil, hashesPerSec, true}, nil
-	case StopResultErrorNoCompoteOptions:
+	case StopResultErrorNoComputeOptions:
 		return nil, fmt.Errorf("gpu-post error: no compute options")
 	case StopResultErrorInvalidParameter:
 		return nil, fmt.Errorf("gpu-post error: invalid param")
