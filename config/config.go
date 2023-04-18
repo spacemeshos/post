@@ -136,6 +136,10 @@ func Validate(cfg Config, opts InitOpts) error {
 		return fmt.Errorf("invalid `opts.MaxFileSize`; expected: >= %d, given: %d", minFileSize, opts.MaxFileSize)
 	}
 
+	if opts.ComputeBatchSize == 0 || opts.ComputeBatchSize%8 != 0 {
+		return fmt.Errorf("invalid `opts.ComputeBatchSize` expected: > 0 and divisible by 8, given: %d", opts.ComputeBatchSize)
+	}
+
 	if res := shared.Uint64MulOverflow(cfg.LabelsPerUnit, uint64(opts.NumUnits)); res {
 		return fmt.Errorf("uint64 overflow: `cfg.LabelsPerUnit` (%v) * `opts.NumUnits` (%v) exceeds the range allowed by uint64",
 			cfg.LabelsPerUnit, opts.NumUnits)
