@@ -29,8 +29,7 @@ func TestLabelsReaderAndWriter(t *testing.T) {
 			// For later assertion.
 			writtenLabels = append(writtenLabels, label)
 		}
-		_, err = writer.Close()
-		req.NoError(err)
+		req.NoError(writer.Close())
 	}
 
 	reader, err := NewLabelsReader(datadir, labelSize)

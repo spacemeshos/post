@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -12,7 +13,6 @@ import (
 	"path/filepath"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/spacemeshos/ed25519"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/gpu"
