@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash/crc64"
 	"math"
 	"os"
 	"path/filepath"
@@ -395,6 +396,8 @@ func (init *Initializer) Status() Status {
 	return StatusNotStarted
 }
 
+var isotable = crc64.MakeTable(crc64.ISO)
+
 func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize, fileOffset, fileNumLabels uint64, difficulty []byte) error {
 	fileTargetPosition := fileOffset + fileNumLabels
 
@@ -481,8 +484,14 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 		}
 
 		// Write labels batch to disk.
+		// Write labels batch to disk.
+		before := crc64.Checksum(res.Output, isotable)
 		if err := writer.Write(res.Output); err != nil {
 			return err
+		}
+		after := crc64.Checksum(res.Output, isotable)
+		if before != after {
+			panic("checksum mismatch")
 		}
 
 		init.numLabelsWritten.Store(fileOffset + currentPosition + uint64(batchSize))
