@@ -834,6 +834,23 @@ func TestStop(t *testing.T) {
 	}
 }
 
+func TestValidateComputeBatchSize(t *testing.T) {
+	cfg := config.DefaultConfig()
+	opts := config.DefaultInitOpts()
+
+	// Set invalid value of 0
+	opts.ComputeBatchSize = 0
+
+	_, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(testLogger{t: t}),
+	)
+	assert.Error(t, err)
+}
+
 func assertNumLabelsWritten(ctx context.Context, t *testing.T, init *Initializer) func() error {
 	return func() error {
 		timer := time.NewTimer(50 * time.Millisecond)

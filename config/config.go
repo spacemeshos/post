@@ -12,8 +12,6 @@ import (
 const (
 	DefaultDataDirName = "data"
 
-	// DefaultComputeBatchSize value must be divisible by 8, to guarantee that writing to disk
-	// and file truncating is byte-granular.
 	DefaultComputeBatchSize = 1 << 20
 
 	MinBitsPerLabel = 1
@@ -71,7 +69,8 @@ type InitOpts struct {
 	ComputeProviderID int
 	Throttle          bool
 	Scrypt            ScryptParams
-	ComputeBatchSize  uint64
+	// ComputeBatchSize must be greater than 0
+	ComputeBatchSize uint64
 }
 
 type ScryptParams struct {
@@ -134,6 +133,10 @@ func Validate(cfg Config, opts InitOpts) error {
 
 	if opts.MaxFileSize < minFileSize {
 		return fmt.Errorf("invalid `opts.MaxFileSize`; expected: >= %d, given: %d", minFileSize, opts.MaxFileSize)
+	}
+
+	if opts.ComputeBatchSize == 0 {
+		return fmt.Errorf("invalid `opts.ComputeBatchSize` expected: > 0, given: %d", opts.ComputeBatchSize)
 	}
 
 	if res := shared.Uint64MulOverflow(cfg.LabelsPerUnit, uint64(opts.NumUnits)); res {
