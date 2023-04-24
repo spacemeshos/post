@@ -22,7 +22,7 @@ const (
 func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logger shared.Logger, opts ...OptionFunc) (*shared.Proof, *shared.ProofMetadata, error) {
 	options := option{
 		threads:   1,
-		nonces:    20,
+		nonces:    16,
 		powScrypt: config.DefaultPowParams(),
 	}
 	for _, opt := range opts {
