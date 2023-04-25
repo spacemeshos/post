@@ -6,8 +6,8 @@ import (
 	"math/big"
 
 	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/oracle"
-	"github.com/spacemeshos/post/postrs"
 	"github.com/spacemeshos/post/shared"
 )
 

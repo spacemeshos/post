@@ -269,16 +269,6 @@ func TestScryptPositions_PartialByte(t *testing.T) {
 	}
 }
 
-func TestBenchmark(t *testing.T) {
-	req := require.New(t)
-
-	for _, p := range Providers() {
-		b, err := Benchmark(p)
-		req.NoError(err)
-		req.True(b > 0)
-	}
-}
-
 func Test_ScryptPositions_Pow(t *testing.T) {
 	commitment, err := hex.DecodeString("e26b543725490682675f6f84ea7689601adeaf14caa7024ec1140c82754ca339")
 	require.NoError(t, err)

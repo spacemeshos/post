@@ -15,8 +15,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/spacemeshos/post/config"
-	"github.com/spacemeshos/post/gpu"
 	"github.com/spacemeshos/post/initialization"
+	"github.com/spacemeshos/post/internal/gpu"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/verifying"

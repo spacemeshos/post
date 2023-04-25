@@ -7,7 +7,7 @@ import (
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
-	"github.com/spacemeshos/post/postrs"
+	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/shared"
 )
 

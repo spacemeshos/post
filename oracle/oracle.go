@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/spacemeshos/post/config"
-	"github.com/spacemeshos/post/gpu"
+	"github.com/spacemeshos/post/internal/gpu"
 )
 
 type option struct {

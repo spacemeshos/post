@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/spacemeshos/post/config"
-	"github.com/spacemeshos/post/gpu"
+	"github.com/spacemeshos/post/internal/gpu"
 	"github.com/spacemeshos/post/oracle"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
