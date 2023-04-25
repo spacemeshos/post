@@ -84,21 +84,29 @@ func Initialize() error {
 	cDifficulty := C.CBytes(difficulty)
 	defer C.free(cDifficulty)
 
-	// TODO(mafa): panics because 0 is not a valid device (although it's returned by cGetProviders()
 	init := C.new_initializer(0, 8192, (*C.uchar)(cCommitment), (*C.uchar)(cDifficulty))
 	defer C.free_initializer(init)
 
-	cOutputSize := C.size_t(16 * 1 << 12)
+	cOutputSize := C.size_t(16 * 2)
 	cOut := (C.calloc(cOutputSize, 1))
 	defer C.free(cOut)
 
 	var cIdxSolution C.uint64_t
 
-	retVal := C.initialize(init, 0, 1<<12, (*C.uchar)(cOut), &cIdxSolution)
+	// TODO(mafa): does this calculate 1 or 2 labels? - in gpu-post it's 2, here it appears to be 1
+	retVal := C.initialize(init, 1, 2, (*C.uchar)(cOut), &cIdxSolution)
 	if retVal != C.InitializeOk {
 		return fmt.Errorf("failed to initialize: %d", retVal)
 	}
 
+	output := C.GoBytes(cOut, C.int(cOutputSize))
+
+	// TODO(mafa): in gpu-post calculating 16 byte labels 1 and 2 with commitment 0x0 gives
+	// 0x82032392c5605bfbfed09343fa06f086073b1e043c5746ee6e48af178ebeac91
+	// here it is
+	// 0x82032392c5605bfbfed09343fa06f08600000000000000000000000000000000
+	// (only one label?)
+	fmt.Printf("output: %x\n", output)
 	return nil
 }
 
