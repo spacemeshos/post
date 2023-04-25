@@ -105,8 +105,18 @@ $(BINDIR_POSTRS_SETUP_LIBS): $(PROJ_DIR)$(POSTRS_SETUP_ZIP)
 $(PROJ_DIR)$(POSTRS_SETUP_ZIP):
 	curl -L $(POSTRS_SETUP_URL_ZIP) -o $(PROJ_DIR)$(POSTRS_SETUP_ZIP)
 
-get-postrs-lib: $(PROJ_DIR)$(POSTRS_SETUP_ZIP) $(BINDIR_POSTRS_SETUP_LIBS)
+get-postrs-lib: $(PROJ_DIR)$(POSTRS_SETUP_ZIP) $(BINDIR_POSTRS_SETUP_LIBS) install-deps
 
+ifeq ($(platform), $(filter $(platform), linux linux-arm64))
+install-deps:
+ifeq (, $(shell which clinfo))
+	sudo apt-get update && sudo apt-get install ocl-icd-opencl-dev libpocl2 clinfo
+endif
+.PHONY: install-deps
+else
+install-deps:
+.PHONY: install-deps
+endif
 
 SUBDIRS_LVL1 := $(foreach X,$(wildcard $(dir $(PROJ_DIR))*/.), $(lastword $(subst /, ,$(dir $(X)))))
 SUBDIRS_ONLY := $(sort \
