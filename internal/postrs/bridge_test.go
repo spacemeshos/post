@@ -21,3 +21,16 @@ func TestTranslateScryptParams(t *testing.T) {
 	require.EqualValues(t, 5, cParams.rfactor)
 	require.EqualValues(t, 1, cParams.pfactor)
 }
+
+func TestGetProviders(t *testing.T) {
+	providers, err := cGetProviders()
+	require.NoError(t, err)
+	require.NotNil(t, providers)
+}
+
+func TestInitialize(t *testing.T) {
+	t.Skip("skipping test - panics if no GPU is available")
+
+	err := Initialize()
+	require.NoError(t, err)
+}
