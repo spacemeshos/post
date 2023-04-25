@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"reflect"
 	"unsafe"
 
@@ -28,6 +29,77 @@ func translateScryptParams(params config.ScryptParams) C.ScryptParams {
 		rfactor: C.uint8_t(math.Log2(float64(params.R))),
 		pfactor: C.uint8_t(math.Log2(float64(params.P))),
 	}
+}
+
+var ErrFetchProviders = errors.New("failed to fetch providers")
+
+type ComputeProvider struct {
+	ID    uint
+	Model string
+}
+
+func cGetProviders() ([]ComputeProvider, error) {
+	var cNumProviders C.uintptr_t
+
+	// TODO(mafa): can we change this call to
+	//   cNumProviders := C.get_providers_count()
+	// and return a value < 0 in case of an error? would make the code simpler
+	retVal := C.get_providers_count(&cNumProviders)
+	if retVal != C.InitializeOk {
+		return nil, ErrFetchProviders
+	}
+
+	if cNumProviders == 0 {
+		return nil, nil
+	}
+
+	cProviders := make([]C.Provider, cNumProviders)
+	providers := make([]ComputeProvider, cNumProviders)
+	retVal = C.get_providers(&cProviders[0], cNumProviders)
+	if retVal != C.InitializeOk {
+		return nil, ErrFetchProviders
+	}
+
+	for i := uint(0); i < uint(cNumProviders); i++ {
+		providers[i].ID = i
+		providers[i].Model = C.GoString((*C.char)(&cProviders[i].name[0]))
+
+		// TODO(mafa): the gpu-post code had an additional field in the provider struct
+		// that indicated what class of device it was.
+
+		// I only need it to know which provider is the CPU provider, so this could
+		// also be a boolean `isCPU`, a separate function like `get_cpu_provider_id()` or
+		// any other way that makes sense.
+	}
+
+	return providers, nil
+}
+
+func Initialize() error {
+	commitment := make([]byte, 32)
+	cCommitment := C.CBytes(commitment)
+	defer C.free(cCommitment)
+
+	difficulty := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1)).Bytes()
+	cDifficulty := C.CBytes(difficulty)
+	defer C.free(cDifficulty)
+
+	// TODO(mafa): panics because 0 is not a valid device (although it's returned by cGetProviders()
+	init := C.new_initializer(0, 8192, (*C.uchar)(cCommitment), (*C.uchar)(cDifficulty))
+	defer C.free_initializer(init)
+
+	cOutputSize := C.size_t(16 * 1 << 12)
+	cOut := (C.calloc(cOutputSize, 1))
+	defer C.free(cOut)
+
+	var cIdxSolution C.uint64_t
+
+	retVal := C.initialize(init, 0, 1<<12, (*C.uchar)(cOut), &cIdxSolution)
+	if retVal != C.InitializeOk {
+		return fmt.Errorf("failed to initialize: %d", retVal)
+	}
+
+	return nil
 }
 
 func GenerateProof(dataDir string, challenge []byte, cfg config.Config, nonces uint, threads uint, powScrypt config.ScryptParams) (*shared.Proof, error) {
