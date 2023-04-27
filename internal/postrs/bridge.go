@@ -33,34 +33,21 @@ func translateScryptParams(params config.ScryptParams) C.ScryptParams {
 
 var ErrFetchProviders = errors.New("failed to fetch providers")
 
-type ComputeProvider struct {
-	ID    uint
-	Model string
-}
-
 func cGetProviders() ([]ComputeProvider, error) {
-	var cNumProviders C.uintptr_t
-
-	// TODO(mafa): can we change this call to
-	//   cNumProviders := C.get_providers_count()
-	// and return a value < 0 in case of an error? would make the code simpler
-	retVal := C.get_providers_count(&cNumProviders)
-	if retVal != C.InitializeOk {
-		return nil, ErrFetchProviders
-	}
-
+	cNumProviders := C.get_providers_count()
 	if cNumProviders == 0 {
 		return nil, nil
 	}
 
 	cProviders := make([]C.Provider, cNumProviders)
 	providers := make([]ComputeProvider, cNumProviders)
-	retVal = C.get_providers(&cProviders[0], cNumProviders)
+	retVal := C.get_providers(&cProviders[0], cNumProviders)
 	if retVal != C.InitializeOk {
 		return nil, ErrFetchProviders
 	}
 
 	for i := uint(0); i < uint(cNumProviders); i++ {
+		// TODO(mafa): imo the id should come from the postrs library and not be assigned be me (for consistency)
 		providers[i].ID = i
 		providers[i].Model = C.GoString((*C.char)(&cProviders[i].name[0]))
 
@@ -70,6 +57,7 @@ func cGetProviders() ([]ComputeProvider, error) {
 		// I only need it to know which provider is the CPU provider, so this could
 		// also be a boolean `isCPU`, a separate function like `get_cpu_provider_id()` or
 		// any other way that makes sense.
+		providers[i].ComputeAPI = ComputeAPIClassUnspecified
 	}
 
 	return providers, nil
