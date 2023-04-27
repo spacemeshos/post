@@ -19,8 +19,6 @@ var (
 	cpuProviderID uint
 )
 
-const CPUProviderName = "CPU"
-
 func init() {
 	providers = cGetProviders()
 	for _, p := range providers {

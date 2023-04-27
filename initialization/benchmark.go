@@ -5,7 +5,7 @@ import "github.com/spacemeshos/post/internal/gpu"
 // Benchmark returns the hashes per second the selected compute provider achieves on the current machine.
 func Benchmark(p ComputeProvider) (int, error) {
 	endPosition := uint64(1 << 13)
-	if p.Model == gpu.CPUProviderName {
+	if p.ComputeAPI == gpu.ComputeAPIClassCPU {
 		endPosition = uint64(1 << 10)
 	}
 
