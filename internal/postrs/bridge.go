@@ -9,13 +9,144 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/big"
 	"reflect"
+	"sync"
 	"unsafe"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/shared"
 )
+
+// gpuMtx is a mutual exclusion lock for calls to gpu functions. It is required
+// to prevent concurrent calls to the GPU library that are expected to cause a
+// crash.
+var gpuMtx sync.Mutex
+
+type DeviceClass int
+
+const (
+	ClassCPU     = DeviceClass((C.DeviceClass)(C.CPU))
+	ClassGPU     = DeviceClass((C.DeviceClass)(C.GPU))
+	ClassUnknown = DeviceClass((C.DeviceClass)(C.UNKNOWN))
+)
+
+type ComputeProvider struct {
+	ID         uint
+	Model      string
+	DeviceType DeviceClass
+}
+
+func (c DeviceClass) String() string {
+	switch c {
+	case ClassCPU:
+		return "CPU"
+	case ClassGPU:
+		return "GPU"
+	default:
+		return "Unknown"
+	}
+}
+
+var (
+	ErrDeviceBusy        = errors.New("device is busy")
+	ErrInvalidProviderID = errors.New("invalid provider ID")
+
+	ErrInvalidLabelsRange = errors.New("invalid labels range")
+	ErrOclError           = errors.New("OpenCL error")
+	ErrInvalidArgument    = errors.New("invalid argument")
+	ErrFetchProviders     = errors.New("failed to fetch providers")
+)
+
+const (
+	// LabelLength is the length of the label in bytes.
+	LabelLength = 16
+)
+
+func InitResultToError(retVal uint32) error {
+	switch retVal {
+	case C.InitializeOk:
+		return nil
+	case C.InitializeInvalidLabelsRange:
+		return ErrInvalidLabelsRange
+	case C.InitializeOclError:
+		return ErrOclError
+	case C.InitializeInvalidArgument:
+		return ErrInvalidArgument
+	case C.InitializeFailedToGetProviders:
+		return ErrFetchProviders
+	default:
+		return fmt.Errorf("unknown error")
+	}
+}
+
+func cScryptPositions(opt *option) ([]byte, *uint64, error) {
+	if !gpuMtx.TryLock() {
+		return nil, nil, ErrDeviceBusy
+	}
+	defer gpuMtx.Unlock()
+
+	cProviderId := C.uint32_t(*opt.providerID)
+	cN := C.uintptr_t(opt.n)
+	cCommitment := C.CBytes(opt.commitment)
+	defer C.free(cCommitment)
+	cDifficulty := C.CBytes(opt.vrfDifficulty)
+	defer C.free(cDifficulty)
+	init := C.new_initializer(cProviderId, cN, (*C.uchar)(cCommitment), (*C.uchar)(cDifficulty))
+	if init == nil {
+		return nil, nil, ErrInvalidProviderID
+	}
+
+	defer C.free_initializer(init)
+
+	outputSize := LabelLength * (opt.endPosition - opt.startPosition + 1)
+	cStartPosition := C.uint64_t(opt.startPosition)
+	cEndPosition := C.uint64_t(opt.endPosition)
+	cOutputSize := C.uint64_t(outputSize)
+	cOut := (C.calloc(cOutputSize, 1))
+	defer C.free(cOut)
+
+	var cIdxSolution C.uint64_t
+	retVal := C.initialize(init, cStartPosition, cEndPosition, (*C.uint8_t)(cOut), &cIdxSolution)
+	if err := InitResultToError(retVal); err != nil {
+		return nil, nil, err
+	}
+
+	var vrfNonce *uint64
+	if cIdxSolution != 0 { // TODO(mafa): since 0 could be a valid nonce, we should find a better way to indicate no solution (e.g. InitializeOk = no solution, InitializeOkPow = solution)
+		vrfNonce = new(uint64)
+		*vrfNonce = uint64(cIdxSolution)
+	}
+
+	output := C.GoBytes(cOut, C.int(cOutputSize))
+	return output, vrfNonce, nil
+}
+
+func cGetProviders() ([]ComputeProvider, error) {
+	if !gpuMtx.TryLock() {
+		return nil, ErrDeviceBusy
+	}
+	defer gpuMtx.Unlock()
+
+	cNumProviders := C.get_providers_count()
+	if cNumProviders == 0 {
+		return nil, ErrFetchProviders
+	}
+
+	cProviders := make([]C.Provider, cNumProviders)
+	providers := make([]ComputeProvider, cNumProviders)
+	retVal := C.get_providers(&cProviders[0], cNumProviders)
+	if err := InitResultToError(retVal); err != nil {
+		return nil, err
+	}
+
+	for i := uint(0); i < uint(cNumProviders); i++ {
+		providers[i].ID = (uint)(cProviders[i].id)
+		providers[i].Model = C.GoString((*C.char)(&cProviders[i].name[0]))
+		providers[i].DeviceType = DeviceClass(cProviders[i].class_)
+	}
+
+	return providers, nil
+}
 
 // Translate scrypt parameters expressed as N,R,P to Nfactor, Rfactor and Pfactor
 // that are understood by scrypt-jane.
@@ -29,73 +160,6 @@ func translateScryptParams(params config.ScryptParams) C.ScryptParams {
 		rfactor: C.uint8_t(math.Log2(float64(params.R))),
 		pfactor: C.uint8_t(math.Log2(float64(params.P))),
 	}
-}
-
-var ErrFetchProviders = errors.New("failed to fetch providers")
-
-func cGetProviders() ([]ComputeProvider, error) {
-	cNumProviders := C.get_providers_count()
-	if cNumProviders == 0 {
-		return nil, nil
-	}
-
-	cProviders := make([]C.Provider, cNumProviders)
-	providers := make([]ComputeProvider, cNumProviders)
-	retVal := C.get_providers(&cProviders[0], cNumProviders)
-	if retVal != C.InitializeOk {
-		return nil, ErrFetchProviders
-	}
-
-	for i := uint(0); i < uint(cNumProviders); i++ {
-		// TODO(mafa): imo the id should come from the postrs library and not be assigned be me (for consistency)
-		providers[i].ID = i
-		providers[i].Model = C.GoString((*C.char)(&cProviders[i].name[0]))
-
-		// TODO(mafa): the gpu-post code had an additional field in the provider struct
-		// that indicated what class of device it was.
-
-		// I only need it to know which provider is the CPU provider, so this could
-		// also be a boolean `isCPU`, a separate function like `get_cpu_provider_id()` or
-		// any other way that makes sense.
-		providers[i].ComputeAPI = ComputeAPIClassUnspecified
-	}
-
-	return providers, nil
-}
-
-func Initialize() error {
-	commitment := make([]byte, 32)
-	cCommitment := C.CBytes(commitment)
-	defer C.free(cCommitment)
-
-	difficulty := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1)).Bytes()
-	cDifficulty := C.CBytes(difficulty)
-	defer C.free(cDifficulty)
-
-	init := C.new_initializer(0, 8192, (*C.uchar)(cCommitment), (*C.uchar)(cDifficulty))
-	defer C.free_initializer(init)
-
-	cOutputSize := C.size_t(16 * 2)
-	cOut := (C.calloc(cOutputSize, 1))
-	defer C.free(cOut)
-
-	var cIdxSolution C.uint64_t
-
-	// TODO(mafa): does this calculate 1 or 2 labels? - in gpu-post it's 2, here it appears to be 1
-	retVal := C.initialize(init, 1, 2, (*C.uchar)(cOut), &cIdxSolution)
-	if retVal != C.InitializeOk {
-		return fmt.Errorf("failed to initialize: %d", retVal)
-	}
-
-	output := C.GoBytes(cOut, C.int(cOutputSize))
-
-	// TODO(mafa): in gpu-post calculating 16 byte labels 1 and 2 with commitment 0x0 gives
-	// 0x82032392c5605bfbfed09343fa06f086073b1e043c5746ee6e48af178ebeac91
-	// here it is
-	// 0x82032392c5605bfbfed09343fa06f08600000000000000000000000000000000
-	// (only one label?)
-	fmt.Printf("output: %x\n", output)
-	return nil
 }
 
 func GenerateProof(dataDir string, challenge []byte, cfg config.Config, nonces uint, threads uint, powScrypt config.ScryptParams) (*shared.Proof, error) {
