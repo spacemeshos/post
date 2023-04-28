@@ -3,7 +3,6 @@ package verifying
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/internal/postrs"
@@ -35,21 +34,19 @@ func VerifyVRFNonce(nonce *uint64, m *shared.VRFNonceMetadata, opts ...OptionFun
 
 	numLabels := uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
 	difficulty := shared.PowDifficulty(numLabels)
-	threshold := new(big.Int).SetBytes(difficulty)
 
 	res, err := oracle.WorkOracle(
 		oracle.WithCommitment(oracle.CommitmentBytes(m.NodeId, m.CommitmentAtxId)),
 		oracle.WithPosition(*nonce),
-		oracle.WithBitsPerLabel(256),
 		oracle.WithScryptParams(options.labelScrypt),
+		oracle.WithVRFDifficulty(difficulty),
 	)
 	if err != nil {
 		return err
 	}
 
-	label := new(big.Int).SetBytes(res.Output)
-	if label.Cmp(threshold) > 0 {
-		return fmt.Errorf("label is above the threshold; label: %#32x, threshold: %#32x", label, threshold)
+	if res.Nonce == nil || *res.Nonce != *nonce {
+		return fmt.Errorf("nonce %v is not valid for node %v", *nonce, m.NodeId)
 	}
 
 	return nil

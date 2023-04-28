@@ -7,7 +7,10 @@ import (
 )
 
 func TestBenchmark(t *testing.T) {
-	for _, p := range Providers() {
+	providers, err := OpenCLProviders()
+	require.NoError(t, err)
+
+	for _, p := range providers {
 		b, err := Benchmark(p)
 		require.NoError(t, err)
 		require.Greater(t, b, 0)

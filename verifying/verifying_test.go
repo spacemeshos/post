@@ -11,6 +11,7 @@ import (
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
+	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
 )
@@ -18,10 +19,13 @@ import (
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
 
+	id, err := postrs.CPUProviderID()
+	require.NoError(tb, err)
+
 	opts := config.DefaultInitOpts()
 	opts.DataDir = tb.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(initialization.CPUProviderID())
+	opts.ComputeProviderID = int(id)
 	opts.ComputeBatchSize = 1 << 14
 	return cfg, opts
 }

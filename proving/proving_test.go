@@ -19,11 +19,14 @@ const KiB = 1024
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
 
+	id, err := initialization.CPUProviderID()
+	require.NoError(tb, err)
+
 	opts := config.DefaultInitOpts()
 	opts.Scrypt.N = 16 // speed up initialization
 	opts.DataDir = tb.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(initialization.CPUProviderID())
+	opts.ComputeProviderID = int(id)
 	opts.ComputeBatchSize = 1 << 14
 	return cfg, opts
 }
@@ -42,7 +45,6 @@ func Test_Generate(t *testing.T) {
 	for numUnits := uint32(1); numUnits < 6; numUnits++ {
 		numUnits := numUnits
 		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
-			t.Parallel()
 			r := require.New(t)
 			log := testLogger{tb: t}
 
@@ -170,9 +172,12 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	cfg.K2 = 300
 	cfg.K3 = 100
 
+	id, err := initialization.CPUProviderID()
+	require.NoError(t, err)
+
 	opts := config.DefaultInitOpts()
 	opts.Scrypt.N = 16
-	opts.ComputeProviderID = int(initialization.CPUProviderID())
+	opts.ComputeProviderID = int(id)
 	opts.NumUnits = 2
 	opts.DataDir = t.TempDir()
 

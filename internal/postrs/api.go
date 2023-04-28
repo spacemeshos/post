@@ -64,7 +64,7 @@ func (o *option) validate() error {
 
 type OptionFunc func(*option) error
 
-// WithProviderID sets the ID of the provider to use.
+// WithProviderID sets the ID of the openCL provider to use.
 func WithProviderID(id uint) OptionFunc {
 	return func(opts *option) error {
 		opts.providerID = new(uint)
