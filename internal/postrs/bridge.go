@@ -48,7 +48,6 @@ func (c DeviceClass) String() string {
 }
 
 var (
-	ErrDeviceBusy        = errors.New("device is busy")
 	ErrInvalidProviderID = errors.New("invalid provider ID")
 
 	ErrInvalidLabelsRange = errors.New("invalid labels range")
@@ -80,9 +79,7 @@ func InitResultToError(retVal uint32) error {
 }
 
 func cScryptPositions(opt *option) ([]byte, *uint64, error) {
-	if !gpuMtx.TryLock() {
-		return nil, nil, ErrDeviceBusy
-	}
+	gpuMtx.Lock()
 	defer gpuMtx.Unlock()
 
 	cProviderId := C.uint32_t(*opt.providerID)
@@ -122,9 +119,7 @@ func cScryptPositions(opt *option) ([]byte, *uint64, error) {
 }
 
 func cGetProviders() ([]ComputeProvider, error) {
-	if !gpuMtx.TryLock() {
-		return nil, ErrDeviceBusy
-	}
+	gpuMtx.Lock()
 	defer gpuMtx.Unlock()
 
 	cNumProviders := C.get_providers_count()
