@@ -11,14 +11,7 @@ import (
 	"github.com/spacemeshos/post/shared"
 )
 
-// TODO (mafa): these should be configurable by a node.
-const (
-	NumWorkers = 1 // Number of workers creating a proof in parallel. Each one will max out one CPU core.
-
-	BlocksPerWorker = 1 << 24 // How many AES blocks are contained per batch sent to a worker. Larger values will increase memory usage, but speed up the proof generation.
-)
-
-// TODO (mafa): replace Logger with zap.
+// TODO(mafa): replace Logger with zap.
 func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logger shared.Logger, opts ...OptionFunc) (*shared.Proof, *shared.ProofMetadata, error) {
 	options := option{
 		threads:   1,

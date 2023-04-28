@@ -618,10 +618,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
-
-	// TODO(mafa): since we are not looking for the absolute lowest nonce, we can't guarantee that the nonce will be the same.
-	// see also https://github.com/spacemeshos/post/issues/90
-	// oneFileNonce := *m.Nonce
+	oneFileNonce := *init.Nonce()
 
 	for numFiles := 2; numFiles <= 16; numFiles <<= 1 {
 		opts.MaxFileSize = opts.MaxFileSize / 2
@@ -655,9 +652,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 				LabelsPerUnit:   cfg.LabelsPerUnit,
 			}
 			r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
-
-			// TODO(mafa): see above
-			// r.Equal(oneFileNonce, *init.Nonce())
+			r.Equal(oneFileNonce, *init.Nonce())
 		})
 	}
 }
