@@ -43,13 +43,16 @@ func TestScryptPositions(t *testing.T) {
 	copy(vrfDifficulty, defaultDifficulty)
 	vrfDifficulty[0] = 0
 
+	start := uint64(1)
+	end := uint64(1 << 8)
+
 	var prevOutput []byte
 	var nonce *uint64
 	for _, p := range providers {
 		res, err := ScryptPositions(
 			WithProviderID(p.ID),
 			WithCommitment(commitment),
-			WithStartAndEndPosition(1, 1<<8),
+			WithStartAndEndPosition(start, end),
 			WithVRFDifficulty(vrfDifficulty),
 			WithScryptN(32),
 		)
@@ -71,6 +74,10 @@ func TestScryptPositions(t *testing.T) {
 		}
 	}
 
+	require.NotNil(t, prevOutput)
+	require.Len(t, prevOutput, 16*int(end-start+1))
+	require.NotNil(t, nonce)
+
 	// sanity test against output of gpu-post
 	gpuProviders := gpu.Providers()
 	salt := make([]byte, 32)
@@ -80,7 +87,7 @@ func TestScryptPositions(t *testing.T) {
 			gpu.WithComputeProviderID(p.ID),
 			gpu.WithCommitment(commitment),
 			gpu.WithSalt(salt),
-			gpu.WithStartAndEndPosition(1, 1<<8),
+			gpu.WithStartAndEndPosition(start, end),
 			gpu.WithBitsPerLabel(128), // 16 byte labels
 			gpu.WithScryptParams(32, 1, 1),
 			gpu.WithComputePow(vrfDifficulty),
@@ -88,6 +95,7 @@ func TestScryptPositions(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.NotNil(t, res.Output)
+		require.Len(t, res.Output, 16*int(end-start+1))
 
 		require.Equal(t, prevOutput, res.Output)
 		require.Equal(t, *nonce, *res.IdxSolution)
@@ -120,13 +128,15 @@ func Test_ScryptPositions_Pow(t *testing.T) {
 	vrfDifficulty[2] = 0x3f
 	require.NoError(t, err)
 
-	nonce := uint64(0x286a9)
+	start := uint64(1 << 10)
+	end := uint64(1 << 18)
+	nonce := uint64(165545)
 
 	for _, p := range providers {
 		res, err := ScryptPositions(
 			WithProviderID(p.ID),
 			WithCommitment(commitment),
-			WithStartAndEndPosition(0, 1<<18),
+			WithStartAndEndPosition(start, end),
 			WithVRFDifficulty(vrfDifficulty),
 			WithScryptN(32),
 		)
@@ -134,5 +144,36 @@ func Test_ScryptPositions_Pow(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res.IdxSolution)
 		require.Equal(t, nonce, *res.IdxSolution)
+	}
+}
+
+func Test_ScryptPositions_NoPow(t *testing.T) {
+	providers, err := OpenCLProviders()
+	require.NoError(t, err)
+
+	commitment, err := hex.DecodeString("e26b543725490682675f6f84ea7689601adeaf14caa7024ec1140c82754ca339")
+	require.NoError(t, err)
+
+	vrfDifficulty := make([]byte, 32)
+	copy(vrfDifficulty, defaultDifficulty)
+	vrfDifficulty[0] = 0
+	vrfDifficulty[1] = 0
+	vrfDifficulty[2] = 0
+	require.NoError(t, err)
+
+	start := uint64(1 << 10)
+	end := uint64(1 << 18)
+
+	for _, p := range providers {
+		res, err := ScryptPositions(
+			WithProviderID(p.ID),
+			WithCommitment(commitment),
+			WithStartAndEndPosition(start, end),
+			WithVRFDifficulty(vrfDifficulty),
+			WithScryptN(32),
+		)
+
+		require.NoError(t, err)
+		require.Nil(t, res.IdxSolution)
 	}
 }
