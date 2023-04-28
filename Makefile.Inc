@@ -13,58 +13,58 @@ CGO_TEST_LDFLAGS = $(CGO_LDFLAGS) -Wl,-rpath,$(BIN_DIR)
 DYLD_LIBRARY_PATH = $(BIN_DIR)
 
 ifeq ($(OS),Windows_NT)
-  HOST_OS := windows
+	HOST_OS := windows
 else
-  HOST_OS := $(shell uname | tr [A-Z] [a-z])
+	HOST_OS := $(shell uname | tr [A-Z] [a-z])
 endif
 
 ifeq ($(GOOS),)
-  GOOS := $(HOST_OS)
+	GOOS := $(HOST_OS)
 endif
 
 ifeq ($(GOARCH),)
-  GOARCH := $(shell go env GOARCH)
+	GOARCH := $(shell go env GOARCH)
 endif
 
 ifeq ($(GOOS),windows)
-  platform := windows
-  export PATH := $(PATH):$(PROJ_DIR)build
-  EXE := .exe
+	platform := windows
+	export PATH := $(PATH):$(PROJ_DIR)build
+	EXE := .exe
 else
-  TEMP := /tmp
-  ifeq ($(GOOS),darwin)
-    ifeq ($(GOARCH),arm64)
-        platform := macos-m1
-    else
-        platform := macos
-    endif
-    CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,@loader_path
-    ULIMIT := ulimit -n 9999;
-  else
-    ifeq ($(GOARCH),arm64)
-        platform := linux-arm64
-    else
-        platform := linux
-    endif
-    CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,$$ORIGIN
-  endif
+	TEMP := /tmp
+	ifeq ($(GOOS),darwin)
+		ifeq ($(GOARCH),arm64)
+				platform := macos-m1
+		else
+				platform := macos
+		endif
+		CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,@loader_path
+		ULIMIT := ulimit -n 9999;
+	else
+		ifeq ($(GOARCH),arm64)
+				platform := linux-arm64
+		else
+				platform := linux
+		endif
+		CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,$$ORIGIN
+	endif
 endif
 
 ifneq ($(VERBOSE),)
-  $(info "OS: $(OS), HOST_OS: $(HOST_OS), GOOS: $(GOOS), GOARCH: $(GOARCH), BIN_DIR: $(BIN_DIR), platform: $(platform)")
+	$(info "OS: $(OS), HOST_OS: $(HOST_OS), GOOS: $(GOOS), GOARCH: $(GOARCH), BIN_DIR: $(BIN_DIR), platform: $(platform)")
 endif
 
 GPU_SETUP_REV = 0.1.29
 GPU_SETUP_ZIP = libgpu-setup-$(platform)-$(GPU_SETUP_REV).zip
 GPU_SETUP_URL_ZIP = https://github.com/spacemeshos/gpu-post/releases/download/v$(GPU_SETUP_REV)/$(GPU_SETUP_ZIP)
 ifeq ($(platform), windows)
-  GPU_SETUP_LIBS = gpu-setup.dll gpu-setup.lib libgpu-setup.a api.h
+	GPU_SETUP_LIBS = gpu-setup.dll gpu-setup.lib libgpu-setup.a api.h
 else
-  ifeq ($(platform), $(filter $(platform), macos macos-m1))
-    GPU_SETUP_LIBS = libgpu-setup.dylib libMoltenVK.dylib libvulkan.1.dylib MoltenVK_icd.json api.h
-  else
-    GPU_SETUP_LIBS = libgpu-setup.so api.h
-  endif
+	ifeq ($(platform), $(filter $(platform), macos macos-m1))
+		GPU_SETUP_LIBS = libgpu-setup.dylib libMoltenVK.dylib libvulkan.1.dylib MoltenVK_icd.json api.h
+	else
+		GPU_SETUP_LIBS = libgpu-setup.so api.h
+	endif
 endif
 
 BINDIR_GPU_SETUP_LIBS = $(foreach X,$(GPU_SETUP_LIBS),$(BIN_DIR)$(X))
@@ -79,27 +79,23 @@ $(PROJ_DIR)$(GPU_SETUP_ZIP):
 get-gpu-setup: $(PROJ_DIR)$(GPU_SETUP_ZIP) $(BINDIR_GPU_SETUP_LIBS)
 .PHONY: get-gpu-setup
 
-
-####################################################
-# post-rs (https://github.com/spacemeshos/post-rs) #
-####################################################
-ifeq ($(platform), windows)
-    POSTRS_SETUP_LIBS = prover.h post.dll
-else
-  ifeq ($(platform), $(filter $(platform), macos macos-m1))
-    POSTRS_SETUP_LIBS = prover.h libpost.dylib
-  else
-    POSTRS_SETUP_LIBS = prover.h libpost.so
-  endif
-endif
-
 POSTRS_SETUP_REV = 0.1.7-beta1
 POSTRS_SETUP_ZIP = libpost-$(platform)-v$(POSTRS_SETUP_REV).zip
 POSTRS_SETUP_URL_ZIP ?= https://github.com/spacemeshos/post-rs/releases/download/v$(POSTRS_SETUP_REV)/$(POSTRS_SETUP_ZIP)
+ifeq ($(platform), windows)
+	POSTRS_SETUP_LIBS = prover.h post.dll
+else
+	ifeq ($(platform), $(filter $(platform), macos macos-m1))
+		POSTRS_SETUP_LIBS = prover.h libpost.dylib
+	else
+		POSTRS_SETUP_LIBS = prover.h libpost.so
+	endif
+endif
 
 BINDIR_POSTRS_SETUP_LIBS = $(foreach X,$(POSTRS_SETUP_LIBS),$(BIN_DIR)$(X))
 $(BINDIR_POSTRS_SETUP_LIBS): $(PROJ_DIR)$(POSTRS_SETUP_ZIP)
-	unzip -o -j "$(PROJ_DIR)$(POSTRS_SETUP_ZIP)" -d "$(BIN_DIR)" "**/$(notdir $@)"
+	mkdir -p $(dir $@)
+	unzip -o -j $(PROJ_DIR)$(POSTRS_SETUP_ZIP) -d $(dir $@) "**/$(notdir $@)"
 	touch $@
 
 $(PROJ_DIR)$(POSTRS_SETUP_ZIP):
@@ -107,16 +103,15 @@ $(PROJ_DIR)$(POSTRS_SETUP_ZIP):
 
 get-postrs-lib: $(PROJ_DIR)$(POSTRS_SETUP_ZIP) $(BINDIR_POSTRS_SETUP_LIBS) install-deps
 
+install-deps:
 ifeq ($(platform), $(filter $(platform), linux linux-arm64))
-install-deps:
-ifeq (, $(shell which clinfo))
 	sudo apt-get update && sudo apt-get install ocl-icd-opencl-dev libpocl2 clinfo
-endif
-.PHONY: install-deps
 else
-install-deps:
-.PHONY: install-deps
+ifeq ($(platform), windows)
+	choco install opencl-intel-cpu-runtime
 endif
+endif
+.PHONY: install-deps
 
 SUBDIRS_LVL1 := $(foreach X,$(wildcard $(dir $(PROJ_DIR))*/.), $(lastword $(subst /, ,$(dir $(X)))))
 SUBDIRS_ONLY := $(sort \
