@@ -10,7 +10,6 @@ export GOARM
 export BIN_DIR
 
 CGO_TEST_LDFLAGS = $(CGO_LDFLAGS) -Wl,-rpath,$(BIN_DIR)
-DYLD_LIBRARY_PATH = $(BIN_DIR)
 
 ifeq ($(OS),Windows_NT)
 	HOST_OS := windows
@@ -155,11 +154,9 @@ go-env-test: get-gpu-setup
 .PHONY: go-env-test
 
 print-env: get-gpu-setup
-	@echo CGO_CFLAGS="$(CGO_CFLAGS)"
-	@echo CGO_LDFLAGS="$(CGO_LDFLAGS)"
+	@echo CGO_CFLAGS="\"$(CGO_CFLAGS)\"" CGO_LDFLAGS="\"$(CGO_LDFLAGS)\""
 .PHONY: print-env
 
 print-test-env: get-gpu-setup
-	@echo CGO_CFLAGS="$(CGO_CFLAGS)"
-	@echo CGO_TEST_LDFLAGS="$(CGO_TEST_LDFLAGS)"
+	@echo CGO_CFLAGS="\"$(CGO_CFLAGS)\"" CGO_LDFLAGS="\"$(CGO_TEST_LDFLAGS)\""
 .PHONY: print-test-env
