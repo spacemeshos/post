@@ -101,7 +101,7 @@ func cScryptPositions(opt *option) ([]byte, *uint64, error) {
 	outputSize := LabelLength * (opt.endPosition - opt.startPosition + 1)
 	cStartPosition := C.uint64_t(opt.startPosition)
 	cEndPosition := C.uint64_t(opt.endPosition)
-	cOutputSize := C.uint64_t(outputSize)
+	cOutputSize := C.size_t(outputSize)
 	cOut := (C.calloc(cOutputSize, 1))
 	defer C.free(cOut)
 
