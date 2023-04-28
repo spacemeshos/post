@@ -70,9 +70,6 @@ func TestScryptPositions(t *testing.T) {
 // TestScryptPositions_HashLenBits tests output correctness for the entire value range of HashLenBits for a specific batch size.
 func TestScryptPositions_HashLenBits(t *testing.T) {
 	r := require.New(t)
-	if testing.Short() {
-		t.Skip("long test")
-	}
 
 	providers := Providers()
 	for hashLenBits := uint32(1); hashLenBits <= 256; hashLenBits++ {
@@ -84,7 +81,7 @@ func TestScryptPositions_HashLenBits(t *testing.T) {
 				WithSalt(salt),
 				WithStartAndEndPosition(1, 1<<12),
 				WithBitsPerLabel(hashLenBits),
-				WithScryptParams(32, 1, 1),
+				WithScryptParams(16, 1, 1),
 			)
 			r.NoError(err)
 			r.NotNil(res)
