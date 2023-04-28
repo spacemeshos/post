@@ -141,7 +141,8 @@ func cGetProviders() ([]ComputeProvider, error) {
 
 	for i := uint(0); i < uint(cNumProviders); i++ {
 		providers[i].ID = (uint)(cProviders[i].id)
-		providers[i].Model = C.GoString((*C.char)(&cProviders[i].name[0]))
+		// TODO(mafa): `name` should be char instead of `uint8_t` then this cast isn't needed to work around staticcheck
+		providers[i].Model = C.GoString((*C.char)(unsafe.Pointer((&cProviders[i].name[0]))))
 		providers[i].DeviceType = DeviceClass(cProviders[i].class_)
 	}
 
