@@ -16,7 +16,7 @@ import (
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
-	"github.com/spacemeshos/post/internal/gpu"
+	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/verifying"
@@ -90,7 +90,11 @@ func main() {
 	parseFlags()
 
 	if printProviders {
-		spew.Dump(gpu.Providers())
+		providers, err := postrs.OpenCLProviders()
+		if err != nil {
+			log.Panic("cli: failed to get OpenCL providers: %v", err)
+		}
+		spew.Dump(providers)
 		return
 	}
 
