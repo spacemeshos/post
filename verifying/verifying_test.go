@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -67,19 +68,19 @@ func Test_Verify(t *testing.T) {
 
 	var (
 		wg sync.WaitGroup
-		mu sync.Mutex
 	)
-	for j := 0; j < 1000; j++ {
-		wg.Add(1)
-		go func() {
-			mu.Lock()
-			defer mu.Unlock()
-			Verify(proof, proofMetadata, cfg)
-			wg.Done()
-		}()
+	for i := 0; i < 100; i++ {
+		for j := 0; j < 100; j++ {
+			wg.Add(1)
+			go func() {
+				Verify(proof, proofMetadata, cfg)
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+		runtime.GC()
+		fmt.Printf("completed verifications. tasks at /proc/%d/task\n", os.Getpid())
 	}
-	wg.Wait()
-	fmt.Printf("completed verifications. tasks at /proc/%d/task", os.Getpid())
 	time.Sleep(10 * time.Minute)
 }
 
