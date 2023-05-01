@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -63,7 +65,22 @@ func Test_Verify(t *testing.T) {
 	)
 	r.NoError(err)
 
-	r.NoError(Verify(proof, proofMetadata, cfg))
+	var (
+		wg sync.WaitGroup
+		mu sync.Mutex
+	)
+	for j := 0; j < 1000; j++ {
+		wg.Add(1)
+		go func() {
+			mu.Lock()
+			defer mu.Unlock()
+			Verify(proof, proofMetadata, cfg)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	fmt.Printf("completed verifications. tasks at /proc/%d/task", os.Getpid())
+	time.Sleep(10 * time.Minute)
 }
 
 func Test_Verify_Detects_invalid_proof(t *testing.T) {
