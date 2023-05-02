@@ -64,10 +64,7 @@ jobs:
           go-version: ${{ env.go-version }}
       - name: install deps
         run: |
-          git clone https://github.com/microsoft/vcpkg.git
-          cd vcpkg
-          .\bootstrap-vcpkg.bat
-          .\vcpkg.exe --triplet=x64-windows install opencl
+          choco install opencl-intel-cpu-runtime
       - name: setup env
         run: make install
       - name: Clear test cache
