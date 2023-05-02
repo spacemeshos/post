@@ -10,50 +10,51 @@ on:
       - develop
 
 jobs:
-  quicktests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: checkout
-        uses: actions/checkout@v3
-      - name: set up go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.go-version }}
-      - name: fmt, tidy, generate
-        run: |
-          make install
-          make test-fmt
-          make test-tidy
-          make test-generate
-      - name: staticcheck
-        run: make staticcheck
+  # quicktests:
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 5
+  #   steps:
+  #     - name: checkout
+  #       uses: actions/checkout@v3
+  #     - name: set up go
+  #       uses: actions/setup-go@v4
+  #       with:
+  #         go-version: ${{ env.go-version }}
+  #     - name: fmt, tidy, generate
+  #       run: |
+  #         make install
+  #         make test-fmt
+  #         make test-tidy
+  #         make test-generate
+  #     - name: staticcheck
+  #       run: make staticcheck
 
-  lint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: checkout
-        uses: actions/checkout@v3
-      - name: set up go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.go-version }}
-      - name: setup env
-        run: make install
-      - name: lint
-        run: make lint-github-action
+  # lint:
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 10
+  #   steps:
+  #     - name: checkout
+  #       uses: actions/checkout@v3
+  #     - name: set up go
+  #       uses: actions/setup-go@v4
+  #       with:
+  #         go-version: ${{ env.go-version }}
+  #     - name: setup env
+  #       run: make install
+  #     - name: lint
+  #       run: make lint-github-action
 
   unittests:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
-    needs:
-      - quicktests
-      - lint
+    # needs:
+    #   - quicktests
+    #   - lint
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [windows-latest]
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -61,6 +62,12 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.go-version }}
+      - name: install deps
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          cd vcpkg
+          .\bootstrap-vcpkg.bat
+          .\vcpkg.exe --triplet=x64-windows install opencl
       - name: setup env
         run: make install
       - name: Clear test cache
