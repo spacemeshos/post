@@ -43,6 +43,7 @@ func Test_Generate(t *testing.T) {
 	for numUnits := uint32(1); numUnits < 6; numUnits++ {
 		numUnits := numUnits
 		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
+			t.Parallel()
 			r := require.New(t)
 			log := testLogger{tb: t}
 
