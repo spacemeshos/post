@@ -49,7 +49,7 @@ func OpenCLProviders() ([]ComputeProvider, error) {
 }
 
 // CPUProviderID returns the ID of the CPU provider or nil if the CPU provider is not available.
-func CPUProviderID() (uint, error) {
+func CPUProviderID() uint {
 	return postrs.CPUProviderID()
 }
 

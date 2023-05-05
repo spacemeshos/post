@@ -19,8 +19,8 @@ import (
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
 
-	id, err := postrs.CPUProviderID()
-	require.NoError(tb, err)
+	id := postrs.CPUProviderID()
+	require.NotZero(tb, id)
 
 	opts := config.DefaultInitOpts()
 	opts.DataDir = tb.TempDir()

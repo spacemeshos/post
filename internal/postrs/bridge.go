@@ -18,16 +18,34 @@ import (
 )
 
 // gpuMtx is a mutual exclusion lock for calls to gpu functions. It is required
-// to prevent concurrent calls to the GPU library that are expected to cause a
-// crash.
-var gpuMtx sync.Mutex
+// to prevent concurrent calls to the same GPU from multiple goroutines.
+var gpuMtx deviceMutex
+
+type deviceMutex struct {
+	mtx    sync.Mutex
+	device map[uint]*sync.Mutex
+}
+
+func (g *deviceMutex) Device(deviceId uint) *sync.Mutex {
+	g.mtx.Lock()
+	defer g.mtx.Unlock()
+
+	if g.device == nil {
+		g.device = make(map[uint]*sync.Mutex)
+	}
+
+	if _, ok := g.device[deviceId]; !ok {
+		g.device[deviceId] = new(sync.Mutex)
+	}
+
+	return g.device[deviceId]
+}
 
 type DeviceClass int
 
 const (
-	ClassCPU     = DeviceClass((C.DeviceClass)(C.CPU))
-	ClassGPU     = DeviceClass((C.DeviceClass)(C.GPU))
-	ClassUnknown = DeviceClass((C.DeviceClass)(C.UNKNOWN))
+	ClassCPU = DeviceClass((C.DeviceClass)(C.CPU))
+	ClassGPU = DeviceClass((C.DeviceClass)(C.GPU))
 )
 
 type ComputeProvider struct {
@@ -79,8 +97,10 @@ func InitResultToError(retVal uint32) error {
 }
 
 func cScryptPositions(opt *option) ([]byte, *uint64, error) {
-	gpuMtx.Lock()
-	defer gpuMtx.Unlock()
+	if *opt.providerID != cCPUProviderID() {
+		gpuMtx.Device(*opt.providerID).Lock()
+		defer gpuMtx.Device(*opt.providerID).Unlock()
+	}
 
 	cProviderId := C.uint32_t(*opt.providerID)
 	cN := C.uintptr_t(opt.n)
@@ -118,10 +138,11 @@ func cScryptPositions(opt *option) ([]byte, *uint64, error) {
 	return output, vrfNonce, nil
 }
 
-func cGetProviders() ([]ComputeProvider, error) {
-	gpuMtx.Lock()
-	defer gpuMtx.Unlock()
+func cCPUProviderID() uint {
+	return C.CPU_PROVIDER_ID
+}
 
+func cGetProviders() ([]ComputeProvider, error) {
 	cNumProviders := C.get_providers_count()
 	if cNumProviders == 0 {
 		return nil, ErrFetchProviders

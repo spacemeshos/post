@@ -17,8 +17,8 @@ var (
 )
 
 func TestCPUProviderExists(t *testing.T) {
-	id, err := CPUProviderID()
-	require.NoError(t, err, "CPU provider not found")
+	id := CPUProviderID()
+	require.NotZero(t, id, "CPU provider not found")
 
 	providers, err := OpenCLProviders()
 	require.NoError(t, err)

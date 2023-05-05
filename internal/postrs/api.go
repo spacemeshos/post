@@ -9,17 +9,8 @@ func OpenCLProviders() ([]ComputeProvider, error) {
 	return cGetProviders()
 }
 
-func CPUProviderID() (uint, error) {
-	providers, err := OpenCLProviders()
-	if err != nil {
-		return 0, err
-	}
-	for _, p := range providers {
-		if p.DeviceType == ClassCPU {
-			return p.ID, nil
-		}
-	}
-	return 0, errors.New("no CPU provider available")
+func CPUProviderID() uint {
+	return cCPUProviderID()
 }
 
 // ScryptPositionsResult is the result of a ScryptPositions call.

@@ -120,10 +120,8 @@ type WorkOracleResult struct {
 // The labels are computed using the specified compute provider (default: CPU).
 func WorkOracle(opts ...OptionFunc) (WorkOracleResult, error) {
 	options := &option{}
-	if id, err := postrs.CPUProviderID(); err == nil {
-		options.providerID = new(uint)
-		*options.providerID = id
-	}
+	options.providerID = new(uint)
+	*options.providerID = postrs.CPUProviderID()
 
 	for _, opt := range opts {
 		if err := opt(options); err != nil {

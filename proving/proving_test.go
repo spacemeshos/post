@@ -10,6 +10,7 @@ import (
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
+	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/verifying"
 )
@@ -19,14 +20,11 @@ const KiB = 1024
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
 
-	id, err := initialization.CPUProviderID()
-	require.NoError(tb, err)
-
 	opts := config.DefaultInitOpts()
 	opts.Scrypt.N = 16 // speed up initialization
 	opts.DataDir = tb.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(id)
+	opts.ComputeProviderID = int(postrs.CPUProviderID())
 	opts.ComputeBatchSize = 1 << 14
 	return cfg, opts
 }
@@ -172,12 +170,9 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	cfg.K2 = 300
 	cfg.K3 = 100
 
-	id, err := initialization.CPUProviderID()
-	require.NoError(t, err)
-
 	opts := config.DefaultInitOpts()
 	opts.Scrypt.N = 16
-	opts.ComputeProviderID = int(id)
+	opts.ComputeProviderID = int(postrs.CPUProviderID())
 	opts.NumUnits = 2
 	opts.DataDir = t.TempDir()
 
