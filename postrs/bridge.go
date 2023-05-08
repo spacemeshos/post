@@ -69,7 +69,7 @@ func GenerateProof(datadir string, challenge []byte, cfg config.Config, nonces u
 	}, nil
 }
 
-func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config.Config, theads uint, powScrypt, labelScrypt config.ScryptParams) error {
+func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config.Config, powScrypt, labelScrypt config.ScryptParams) error {
 	if proof == nil {
 		return errors.New("proof cannot be nil")
 	}
@@ -122,7 +122,6 @@ func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config
 		cProof,
 		&cMetadata,
 		config,
-		1,
 	)
 
 	switch result {
