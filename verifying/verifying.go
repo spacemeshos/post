@@ -71,5 +71,5 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata, cfg config.Config, opts ..
 		return fmt.Errorf("invalid `commitmentAtxId` length; expected: 32, given: %v", len(m.CommitmentAtxId))
 	}
 
-	return postrs.VerifyProof(p, m, cfg, 1, options.powScrypt, options.labelScrypt)
+	return postrs.VerifyProof(p, m, cfg, options.powScrypt, options.labelScrypt)
 }
