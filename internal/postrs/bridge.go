@@ -97,6 +97,9 @@ func InitResultToError(retVal uint32) error {
 }
 
 func cScryptPositions(opt *option) ([]byte, *uint64, error) {
+	// disabled for now (calling it more than once crashes the program)
+	// C.configure_logging(C.Trace) // TODO(mafa): make this configurable
+
 	if *opt.providerID != cCPUProviderID() {
 		gpuMtx.Device(*opt.providerID).Lock()
 		defer gpuMtx.Device(*opt.providerID).Unlock()
