@@ -7,36 +7,15 @@ import "C"
 
 import (
 	"errors"
-	"fmt"
 	"math"
-	"sync"
 	"unsafe"
 )
 
-// gpuMtx is a mutual exclusion lock for calls to gpu functions. It is required
-// to prevent concurrent calls to the same GPU from multiple goroutines.
+// gpuMtx is an instance of deviceMutex that can be used to prevent concurrent calls
+// to the same GPU (by ProviderID) from multiple goroutines.
 var gpuMtx deviceMutex
 
-type deviceMutex struct {
-	mtx    sync.Mutex
-	device map[uint]*sync.Mutex
-}
-
-func (g *deviceMutex) Device(deviceId uint) *sync.Mutex {
-	g.mtx.Lock()
-	defer g.mtx.Unlock()
-
-	if g.device == nil {
-		g.device = make(map[uint]*sync.Mutex)
-	}
-
-	if _, ok := g.device[deviceId]; !ok {
-		g.device[deviceId] = new(sync.Mutex)
-	}
-
-	return g.device[deviceId]
-}
-
+// DeviceClass is an enum for the type of device (CPU or GPU).
 type DeviceClass int
 
 const (
@@ -44,7 +23,10 @@ const (
 	ClassGPU = DeviceClass((C.DeviceClass)(C.GPU))
 )
 
-type ComputeProvider struct {
+// Provider is a struct that contains information about an OpenCL provider.
+// libpostrs returns a list of these structs when calling cGetProviders().
+// Each Provider is an OpenCL platform + Device combination.
+type Provider struct {
 	ID         uint
 	Model      string
 	DeviceType DeviceClass
@@ -65,9 +47,10 @@ var (
 	ErrInvalidProviderID = errors.New("invalid provider ID")
 
 	ErrInvalidLabelsRange = errors.New("invalid labels range")
-	ErrOclError           = errors.New("OpenCL error")
+	ErrOpenCL             = errors.New("OpenCL error")
 	ErrInvalidArgument    = errors.New("invalid argument")
 	ErrFetchProviders     = errors.New("failed to fetch providers")
+	ErrUnknown            = errors.New("unknown error")
 )
 
 const (
@@ -75,6 +58,7 @@ const (
 	LabelLength = 16
 )
 
+// InitResultToError converts the return value of the C.initialize() function to a Go error.
 func InitResultToError(retVal uint32) error {
 	switch retVal {
 	case C.InitializeOk:
@@ -82,19 +66,21 @@ func InitResultToError(retVal uint32) error {
 	case C.InitializeInvalidLabelsRange:
 		return ErrInvalidLabelsRange
 	case C.InitializeOclError:
-		return ErrOclError
+		return ErrOpenCL
 	case C.InitializeInvalidArgument:
 		return ErrInvalidArgument
 	case C.InitializeFailedToGetProviders:
 		return ErrFetchProviders
 	default:
-		return fmt.Errorf("unknown error")
+		return ErrUnknown
 	}
 }
 
+// cScryptPositions calls the C functions from libpostrs that create the labels
+// and VRF proofs. It returns them as well as well as a possible error.
 func cScryptPositions(opt *option) ([]byte, *uint64, error) {
-	// disabled for now (calling it more than once crashes the program)
-	// C.configure_logging(C.Trace) // TODO(mafa): make this configurable
+	// TODO(mafa): disabled for now (calling it more than once crashes the program)
+	// C.configure_logging(C.Trace)
 
 	if *opt.providerID != cCPUProviderID() {
 		gpuMtx.Device(*opt.providerID).Lock()
@@ -140,9 +126,9 @@ func cCPUProviderID() uint {
 	return C.CPU_PROVIDER_ID
 }
 
-func cGetProviders() ([]ComputeProvider, error) {
-	// disabled for now (calling it more than once crashes the program)
-	// C.configure_logging(C.Trace) // TODO(mafa): make this configurable
+func cGetProviders() ([]Provider, error) {
+	// TODO(mafa): disabled for now (calling it more than once crashes the program)
+	// C.configure_logging(C.Trace)
 
 	cNumProviders := C.get_providers_count()
 	if cNumProviders == 0 {
@@ -150,7 +136,7 @@ func cGetProviders() ([]ComputeProvider, error) {
 	}
 
 	cProviders := make([]C.Provider, cNumProviders)
-	providers := make([]ComputeProvider, cNumProviders)
+	providers := make([]Provider, cNumProviders)
 	retVal := C.get_providers(&cProviders[0], cNumProviders)
 	if err := InitResultToError(retVal); err != nil {
 		return nil, err
@@ -158,7 +144,7 @@ func cGetProviders() ([]ComputeProvider, error) {
 
 	for i := uint(0); i < uint(cNumProviders); i++ {
 		providers[i].ID = (uint)(cProviders[i].id)
-		// TODO(mafa): `name` should be char instead of `uint8_t` then this cast isn't needed to work around staticcheck
+		// TODO(mafa): `name` could be char instead of `uint8_t` then this cast isn't needed to work around staticcheck
 		providers[i].Model = C.GoString((*C.char)(unsafe.Pointer((&cProviders[i].name[0]))))
 		providers[i].DeviceType = DeviceClass(cProviders[i].class_)
 	}

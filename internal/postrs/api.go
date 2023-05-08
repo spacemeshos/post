@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-func OpenCLProviders() ([]ComputeProvider, error) {
+func OpenCLProviders() ([]Provider, error) {
 	return cGetProviders()
 }
 

@@ -110,7 +110,7 @@ func WithScryptParams(params config.ScryptParams) OptionFunc {
 }
 
 // WorkOracleResult is the result of a call to WorkOracle.
-// It contains the computed labels and the nonce for the a proof of work.
+// It contains the computed labels and a nonce for a proof of work.
 type WorkOracleResult struct {
 	Output []byte  // Output are the computed labels
 	Nonce  *uint64 // Nonce is the nonce of the proof of work

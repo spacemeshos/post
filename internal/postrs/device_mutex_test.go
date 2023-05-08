@@ -8,7 +8,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func Test_deviceMutex(t *testing.T) {
+func Test_DeviceMutex(t *testing.T) {
 	var mtx deviceMutex
 
 	lock1A := mtx.Device(1)

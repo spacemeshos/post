@@ -14,7 +14,7 @@ func Benchmark(p ComputeProvider) (int, error) {
 	}
 
 	start := time.Now()
-	res, err := postrs.ScryptPositions(
+	_, err := postrs.ScryptPositions(
 		postrs.WithProviderID(p.ID),
 		postrs.WithCommitment(make([]byte, 32)),
 		postrs.WithStartAndEndPosition(1, endPosition),
@@ -22,7 +22,6 @@ func Benchmark(p ComputeProvider) (int, error) {
 		postrs.WithVRFDifficulty(make([]byte, 32)),
 	)
 	elapsed := time.Since(start)
-	_ = res
 	if err != nil {
 		return 0, err
 	}

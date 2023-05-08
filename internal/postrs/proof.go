@@ -31,8 +31,8 @@ func translateScryptParams(params config.ScryptParams) C.ScryptParams {
 }
 
 func GenerateProof(dataDir string, challenge []byte, cfg config.Config, nonces uint, threads uint, powScrypt config.ScryptParams) (*shared.Proof, error) {
-	// disabled for now (calling it more than once crashes the program)
-	// C.configure_logging(C.Trace) // TODO(mafa): make this configurable
+	// TODO(mafa): disabled for now (calling it more than once crashes the program)
+	// C.configure_logging(C.Trace)
 
 	dataDirPtr := C.CString(dataDir)
 	defer C.free(unsafe.Pointer(dataDirPtr))
@@ -73,8 +73,8 @@ func GenerateProof(dataDir string, challenge []byte, cfg config.Config, nonces u
 }
 
 func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config.Config, powScrypt, labelScrypt config.ScryptParams) error {
-	// disabled for now (calling it more than once crashes the program)
-	// C.configure_logging(C.Trace) // TODO(mafa): make this configurable
+	// TODO(mafa): disabled for now (calling it more than once crashes the program)
+	// C.configure_logging(C.Trace)
 
 	if proof == nil {
 		return errors.New("proof cannot be nil")

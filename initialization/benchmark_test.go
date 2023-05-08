@@ -11,8 +11,8 @@ func TestBenchmark(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, p := range providers {
-		b, err := Benchmark(p)
+		hashes, err := Benchmark(p)
 		require.NoError(t, err)
-		require.Greater(t, b, 0)
+		require.Greater(t, hashes, 0)
 	}
 }
