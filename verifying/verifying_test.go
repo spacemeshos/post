@@ -147,7 +147,7 @@ func BenchmarkVerifying(b *testing.B) {
 
 	ch := make(shared.Challenge, 32)
 	rand.Read(ch)
-	p, m, err := proving.Generate(context.Background(), ch, cfg, &shared.DisabledLogger{}, proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+	p, m, err := proving.Generate(context.Background(), ch, cfg, &shared.NoopLogger{}, proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
 	require.NoError(b, err)
 
 	for _, k3 := range []uint32{5, 25, 50, 100} {
@@ -193,7 +193,7 @@ func Benchmark_Verify_Fastnet(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		rand.Read(ch)
-		proof, proofMetadata, err := proving.Generate(context.Background(), ch, cfg, &shared.DisabledLogger{}, proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+		proof, proofMetadata, err := proving.Generate(context.Background(), ch, cfg, &shared.NoopLogger{}, proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
 		r.NoError(err)
 
 		b.StartTimer()

@@ -177,7 +177,7 @@ type Initializer struct {
 
 func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 	options := &option{
-		logger: shared.DisabledLogger{},
+		logger: shared.NoopLogger{},
 
 		powDifficultyFunc: shared.PowDifficulty,
 	}

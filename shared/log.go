@@ -8,10 +8,10 @@ type Logger interface {
 	Panic(format string, args ...any)
 }
 
-type DisabledLogger struct{}
+type NoopLogger struct{}
 
-func (DisabledLogger) Info(string, ...any)    {}
-func (DisabledLogger) Debug(string, ...any)   {}
-func (DisabledLogger) Warning(string, ...any) {}
-func (DisabledLogger) Error(string, ...any)   {}
-func (DisabledLogger) Panic(string, ...any)   {}
+func (NoopLogger) Info(string, ...any)    {}
+func (NoopLogger) Debug(string, ...any)   {}
+func (NoopLogger) Warning(string, ...any) {}
+func (NoopLogger) Error(string, ...any)   {}
+func (NoopLogger) Panic(string, ...any)   {}
