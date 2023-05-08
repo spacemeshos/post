@@ -143,6 +143,9 @@ func cCPUProviderID() uint {
 }
 
 func cGetProviders() ([]ComputeProvider, error) {
+	// disabled for now (calling it more than once crashes the program)
+	// C.configure_logging(C.Trace) // TODO(mafa): make this configurable
+
 	cNumProviders := C.get_providers_count()
 	if cNumProviders == 0 {
 		return nil, ErrFetchProviders
@@ -180,6 +183,9 @@ func translateScryptParams(params config.ScryptParams) C.ScryptParams {
 }
 
 func GenerateProof(dataDir string, challenge []byte, cfg config.Config, nonces uint, threads uint, powScrypt config.ScryptParams) (*shared.Proof, error) {
+	// disabled for now (calling it more than once crashes the program)
+	// C.configure_logging(C.Trace) // TODO(mafa): make this configurable
+
 	dataDirPtr := C.CString(dataDir)
 	defer C.free(unsafe.Pointer(dataDirPtr))
 
@@ -219,6 +225,9 @@ func GenerateProof(dataDir string, challenge []byte, cfg config.Config, nonces u
 }
 
 func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config.Config, powScrypt, labelScrypt config.ScryptParams) error {
+	// disabled for now (calling it more than once crashes the program)
+	// C.configure_logging(C.Trace) // TODO(mafa): make this configurable
+
 	if proof == nil {
 		return errors.New("proof cannot be nil")
 	}
