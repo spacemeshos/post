@@ -8,9 +8,9 @@ import (
 
 // Benchmark returns the hashes per second the selected compute provider achieves on the current machine.
 func Benchmark(p ComputeProvider) (int, error) {
-	endPosition := uint64(1 << 13)
+	endPosition := uint64(1 << 14)
 	if p.DeviceType == postrs.ClassCPU {
-		endPosition = uint64(1 << 10)
+		endPosition = uint64(1 << 12)
 	}
 
 	start := time.Now()
@@ -19,7 +19,6 @@ func Benchmark(p ComputeProvider) (int, error) {
 		postrs.WithCommitment(make([]byte, 32)),
 		postrs.WithStartAndEndPosition(1, endPosition),
 		postrs.WithScryptN(8192),
-		postrs.WithVRFDifficulty(make([]byte, 32)),
 	)
 	elapsed := time.Since(start)
 	if err != nil {

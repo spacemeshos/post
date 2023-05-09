@@ -7,7 +7,6 @@ import "C"
 
 import (
 	"errors"
-	"math"
 	"unsafe"
 )
 
@@ -63,6 +62,8 @@ func InitResultToError(retVal uint32) error {
 	switch retVal {
 	case C.InitializeOk:
 		return nil
+	case C.InitializeOkNonceNotFound:
+		return nil
 	case C.InitializeInvalidLabelsRange:
 		return ErrInvalidLabelsRange
 	case C.InitializeOclError:
@@ -112,13 +113,14 @@ func cScryptPositions(opt *option) ([]byte, *uint64, error) {
 		return nil, nil, err
 	}
 
-	var vrfNonce *uint64
-	if cIdxSolution != math.MaxUint64 { // TODO(mafa): we should find a better way to indicate no solution (e.g. InitializeOk = no solution, InitializeOkPow = solution)
-		vrfNonce = new(uint64)
-		*vrfNonce = uint64(cIdxSolution)
+	output := C.GoBytes(cOut, C.int(cOutputSize))
+
+	if retVal == C.InitializeOkNonceNotFound {
+		return output, nil, nil
 	}
 
-	output := C.GoBytes(cOut, C.int(cOutputSize))
+	vrfNonce := new(uint64)
+	*vrfNonce = uint64(cIdxSolution)
 	return output, vrfNonce, nil
 }
 

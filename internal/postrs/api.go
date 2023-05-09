@@ -46,10 +46,6 @@ func (o *option) validate() error {
 		return fmt.Errorf("invalid `n`; expected: power of 2, given: %v", o.n)
 	}
 
-	if o.vrfDifficulty == nil {
-		return errors.New("`vrfDifficulty` is required")
-	}
-
 	return nil
 }
 

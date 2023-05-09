@@ -128,7 +128,6 @@ func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config
 		cProof,
 		&cMetadata,
 		config,
-		1, // TODO(mafa): remove this argument after post-rs merge
 	)
 
 	switch result {
