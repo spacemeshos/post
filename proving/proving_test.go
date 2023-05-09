@@ -24,7 +24,7 @@ func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	opts.Scrypt.N = 16 // speed up initialization
 	opts.DataDir = tb.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(postrs.CPUProviderID())
+	opts.ProviderID = int(postrs.CPUProviderID())
 	opts.ComputeBatchSize = 1 << 14
 	return cfg, opts
 }
@@ -173,7 +173,7 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 
 	opts := config.DefaultInitOpts()
 	opts.Scrypt.N = 16
-	opts.ComputeProviderID = int(postrs.CPUProviderID())
+	opts.ProviderID = int(postrs.CPUProviderID())
 	opts.NumUnits = 2
 	opts.DataDir = t.TempDir()
 

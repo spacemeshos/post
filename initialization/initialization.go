@@ -295,7 +295,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		init.logger.Debug("initialization: continue looking for a nonce: start position: %v, batch size: %v", i, batchSize)
 
 		res, err := oracle.WorkOracle(
-			oracle.WithProviderID(uint(init.opts.ComputeProviderID)),
+			oracle.WithProviderID(uint(init.opts.ProviderID)),
 			oracle.WithCommitment(init.commitment),
 			oracle.WithStartAndEndPosition(i, i+batchSize-1),
 			oracle.WithVRFDifficulty(difficulty),
@@ -460,7 +460,7 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 		endPosition := startPosition + uint64(batchSize) - 1
 
 		res, err := oracle.WorkOracle(
-			oracle.WithProviderID(uint(init.opts.ComputeProviderID)),
+			oracle.WithProviderID(uint(init.opts.ProviderID)),
 			oracle.WithCommitment(init.commitment),
 			oracle.WithStartAndEndPosition(startPosition, endPosition),
 			oracle.WithVRFDifficulty(difficulty),

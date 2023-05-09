@@ -25,7 +25,7 @@ func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = tb.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(id)
+	opts.ProviderID = int(id)
 	opts.ComputeBatchSize = 1 << 14
 	return cfg, opts
 }
