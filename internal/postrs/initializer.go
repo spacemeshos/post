@@ -78,11 +78,8 @@ func InitResultToError(retVal uint32) error {
 }
 
 // cScryptPositions calls the C functions from libpostrs that create the labels
-// and VRF proofs. It returns them as well as well as a possible error.
+// and VRF proofs.
 func cScryptPositions(opt *option) ([]byte, *uint64, error) {
-	// TODO(mafa): disabled for now (calling it more than once crashes the program)
-	// C.configure_logging(C.Trace)
-
 	if *opt.providerID != cCPUProviderID() {
 		gpuMtx.Device(*opt.providerID).Lock()
 		defer gpuMtx.Device(*opt.providerID).Unlock()
@@ -129,9 +126,6 @@ func cCPUProviderID() uint {
 }
 
 func cGetProviders() ([]Provider, error) {
-	// TODO(mafa): disabled for now (calling it more than once crashes the program)
-	// C.configure_logging(C.Trace)
-
 	cNumProviders := C.get_providers_count()
 	if cNumProviders == 0 {
 		return nil, ErrFetchProviders

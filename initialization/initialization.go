@@ -471,11 +471,13 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 		}
 
 		if res.Nonce != nil {
-			nonceValue := make([]byte, 16)
-			copy(nonceValue, res.Output[(*res.Nonce-startPosition)*16:])
-			init.logger.Info("initialization: file #%v, found nonce: %d, value: %x", fileIndex, *res.Nonce, nonceValue)
+			candidate := res.Output[(*res.Nonce-startPosition)*16:]
+			init.logger.Info("initialization: file #%v, found nonce: %d, value: %x", fileIndex, *res.Nonce, candidate)
 
-			if init.nonceValue == nil || bytes.Compare(nonceValue, init.nonceValue) < 0 {
+			if init.nonceValue == nil || bytes.Compare(candidate, init.nonceValue) < 0 {
+				nonceValue := make([]byte, 16)
+				copy(nonceValue, candidate)
+
 				init.logger.Info("initialization: file #%v, found new best nonce", fileIndex)
 				init.nonceValue = nonceValue
 				init.nonce.Store(res.Nonce)
