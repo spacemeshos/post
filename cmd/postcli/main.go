@@ -15,8 +15,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/spacemeshos/post/config"
-	"github.com/spacemeshos/post/gpu"
 	"github.com/spacemeshos/post/initialization"
+	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/proving"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/verifying"
@@ -42,7 +42,7 @@ func parseFlags() {
 	flag.BoolVar(&genProof, "genproof", false, "generate proof as a sanity test, after initialization")
 	flag.StringVar(&opts.DataDir, "datadir", opts.DataDir, "filesystem datadir path")
 	flag.Uint64Var(&opts.MaxFileSize, "maxFileSize", opts.MaxFileSize, "max file size")
-	flag.IntVar(&opts.ComputeProviderID, "provider", opts.ComputeProviderID, "compute provider id (required)")
+	flag.IntVar(&opts.ProviderID, "provider", opts.ProviderID, "compute provider id (required)")
 	flag.Uint64Var(&cfg.LabelsPerUnit, "labelsPerUnit", cfg.LabelsPerUnit, "the number of labels per unit")
 	flag.BoolVar(&reset, "reset", false, "whether to reset the datadir before starting")
 	flag.StringVar(&idHex, "id", "", "miner's id (public key), in hex (will be auto-generated if not provided)")
@@ -54,7 +54,7 @@ func parseFlags() {
 }
 
 func processFlags() error {
-	if opts.ComputeProviderID < 0 {
+	if opts.ProviderID < 0 {
 		return errors.New("-provider flag is required")
 	}
 
@@ -90,7 +90,11 @@ func main() {
 	parseFlags()
 
 	if printProviders {
-		spew.Dump(gpu.Providers())
+		providers, err := postrs.OpenCLProviders()
+		if err != nil {
+			log.Panic("cli: failed to get OpenCL providers: %v", err)
+		}
+		spew.Dump(providers)
 		return
 	}
 

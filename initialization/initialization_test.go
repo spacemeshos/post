@@ -42,7 +42,7 @@ func TestInitialize(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ProviderID = int(CPUProviderID())
 	opts.Scrypt.N = 16
 
 	init, err := NewInitializer(
@@ -109,7 +109,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ProviderID = int(CPUProviderID())
 	opts.Scrypt.N = 16
 
 	// nodeId where no label in the first uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit satisfies the PoW requirement.
@@ -157,7 +157,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ProviderID = int(CPUProviderID())
 	opts.Scrypt.N = 16
 
 	init, err := NewInitializer(
@@ -296,7 +296,7 @@ func TestReset_WhileInitializing(t *testing.T) {
 	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ProviderID = int(CPUProviderID())
 	opts.ComputeBatchSize = 1 << 14
 
 	init, err := NewInitializer(
@@ -332,7 +332,7 @@ func TestInitialize_Repeated(t *testing.T) {
 	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -388,7 +388,7 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -443,7 +443,7 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits + 1
-	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -499,7 +499,7 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits + 1
 	opts.MaxFileSize = 1 << 12
-	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -569,7 +569,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
 	opts.MaxFileSize = deriveTotalSize(cfg, opts)
-	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -591,10 +591,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
-
-	// TODO(mafa): since we are not looking for the absolute lowest nonce, we can't guarantee that the nonce will be the same.
-	// see also https://github.com/spacemeshos/post/issues/90
-	// oneFileNonce := *m.Nonce
+	oneFileNonce := *init.Nonce()
 
 	for numFiles := 2; numFiles <= 16; numFiles <<= 1 {
 		opts.MaxFileSize = opts.MaxFileSize / 2
@@ -628,9 +625,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 				LabelsPerUnit:   cfg.LabelsPerUnit,
 			}
 			r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
-
-			// TODO(mafa): see above
-			// r.Equal(oneFileNonce, *init.Nonce())
+			r.Equal(oneFileNonce, *init.Nonce())
 		})
 	}
 }
@@ -645,7 +640,7 @@ func TestNumLabelsWritten(t *testing.T) {
 	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -701,7 +696,7 @@ func TestValidateMetadata(t *testing.T) {
 	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -782,10 +777,10 @@ func TestStop(t *testing.T) {
 	cfg.LabelsPerUnit = 1 << 12
 
 	opts := config.DefaultInitOpts()
-	opts.Scrypt.N = 16
+	opts.Scrypt.N = 64
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = 10
-	opts.ComputeProviderID = int(CPUProviderID())
+	opts.ProviderID = int(CPUProviderID())
 	opts.ComputeBatchSize = 1 << 10
 
 	init, err := NewInitializer(

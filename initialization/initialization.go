@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/spacemeshos/post/config"
-	"github.com/spacemeshos/post/gpu"
+	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/oracle"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
@@ -24,7 +24,7 @@ type (
 	Proof               = shared.Proof
 	Logger              = shared.Logger
 	ConfigMismatchError = shared.ConfigMismatchError
-	ComputeProvider     = gpu.ComputeProvider
+	ComputeProvider     = postrs.Provider
 )
 
 type Status int
@@ -44,13 +44,13 @@ var (
 )
 
 // Providers returns a list of available compute providers.
-func Providers() []ComputeProvider {
-	return gpu.Providers()
+func OpenCLProviders() ([]ComputeProvider, error) {
+	return postrs.OpenCLProviders()
 }
 
 // CPUProviderID returns the ID of the CPU provider or nil if the CPU provider is not available.
 func CPUProviderID() uint {
-	return gpu.CPUProviderID()
+	return postrs.CPUProviderID()
 }
 
 type option struct {
@@ -163,6 +163,7 @@ type Initializer struct {
 	cfg  Config
 	opts InitOpts
 
+	nonceValue   []byte
 	nonce        atomic.Pointer[uint64]
 	lastPosition atomic.Pointer[uint64]
 
@@ -176,7 +177,7 @@ type Initializer struct {
 
 func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 	options := &option{
-		logger: shared.DisabledLogger{},
+		logger: shared.NoopLogger{},
 
 		powDifficultyFunc: shared.PowDifficulty,
 	}
@@ -234,12 +235,19 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 	defer init.mtx.Unlock()
 
-	init.logger.Info("initialization: datadir: %v, number of units: %v, max file size: %v, number of labels per unit: %v",
-		init.opts.DataDir, init.opts.NumUnits, init.opts.MaxFileSize, init.cfg.LabelsPerUnit)
-
 	layout := deriveFilesLayout(init.cfg, init.opts)
+	init.logger.Info(
+		"initialization: datadir: %v, number of units: %v, max file size: %v, number of labels per unit: %v",
+		init.opts.DataDir,
+		init.opts.NumUnits,
+		init.opts.MaxFileSize,
+		init.cfg.LabelsPerUnit,
+	)
 	init.logger.Info("initialization: files layout: number of files: %v, number of labels per file: %v, last file number of labels: %v",
-		layout.NumFiles, layout.FileNumLabels, layout.LastFileNumLabels)
+		layout.NumFiles,
+		layout.FileNumLabels,
+		layout.LastFileNumLabels,
+	)
 	if err := init.removeRedundantFiles(layout); err != nil {
 		return err
 	}
@@ -264,7 +272,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		return nil
 	}
 
-	init.logger.Info("initialization: no nonce found while computing leaves, continue searching")
+	init.logger.Info("initialization: no nonce found while computing labels, continue initializing")
 	if init.lastPosition.Load() == nil || *init.lastPosition.Load() < numLabels {
 		lastPos := numLabels
 		init.lastPosition.Store(&lastPos)
@@ -279,9 +287,6 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			init.logger.Info("initialization: stopped")
-			if res := gpu.Stop(); res != gpu.StopResultOk {
-				return fmt.Errorf("gpu stop error: %s", res)
-			}
 			return ctx.Err()
 		default:
 			// continue looking for a nonce
@@ -290,11 +295,10 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		init.logger.Debug("initialization: continue looking for a nonce: start position: %v, batch size: %v", i, batchSize)
 
 		res, err := oracle.WorkOracle(
-			oracle.WithComputeProviderID(uint(init.opts.ComputeProviderID)),
+			oracle.WithProviderID(uint(init.opts.ProviderID)),
 			oracle.WithCommitment(init.commitment),
 			oracle.WithStartAndEndPosition(i, i+batchSize-1),
-			oracle.WithComputePow(difficulty),
-			oracle.WithComputeLeaves(false),
+			oracle.WithVRFDifficulty(difficulty),
 			oracle.WithScryptParams(init.opts.Scrypt),
 		)
 		if err != nil {
@@ -435,9 +439,6 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 		select {
 		case <-ctx.Done():
 			init.logger.Info("initialization: stopped")
-			if res := gpu.Stop(); res != gpu.StopResultOk {
-				return fmt.Errorf("gpu stop error: %s", res)
-			}
 			if err := writer.Flush(); err != nil {
 				return err
 			}
@@ -457,16 +458,12 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 		// Calculate labels of the batch position range.
 		startPosition := fileOffset + currentPosition
 		endPosition := startPosition + uint64(batchSize) - 1
-		if init.nonce.Load() != nil {
-			// don't look for a nonce, when we already have one
-			difficulty = nil
-		}
 
 		res, err := oracle.WorkOracle(
-			oracle.WithComputeProviderID(uint(init.opts.ComputeProviderID)),
+			oracle.WithProviderID(uint(init.opts.ProviderID)),
 			oracle.WithCommitment(init.commitment),
 			oracle.WithStartAndEndPosition(startPosition, endPosition),
-			oracle.WithComputePow(difficulty),
+			oracle.WithVRFDifficulty(difficulty),
 			oracle.WithScryptParams(init.opts.Scrypt),
 		)
 		if err != nil {
@@ -474,10 +471,19 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 		}
 
 		if res.Nonce != nil {
-			init.logger.Info("initialization: file #%v, found nonce: %d", fileIndex, *res.Nonce)
+			candidate := res.Output[(*res.Nonce-startPosition)*16:]
+			candidate = candidate[:16]
+			init.logger.Info("initialization: file #%v, found nonce: %d, value: %x", fileIndex, *res.Nonce, candidate)
 
-			init.nonce.Store(res.Nonce)
-			init.saveMetadata()
+			if init.nonceValue == nil || bytes.Compare(candidate, init.nonceValue) < 0 {
+				nonceValue := make([]byte, 16)
+				copy(nonceValue, candidate)
+
+				init.logger.Info("initialization: file #%v, found new best nonce", fileIndex)
+				init.nonceValue = nonceValue
+				init.nonce.Store(res.Nonce)
+				init.saveMetadata()
+			}
 		}
 
 		// Write labels batch to disk.

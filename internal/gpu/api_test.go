@@ -26,7 +26,7 @@ func TestCPUProviderExists(t *testing.T) {
 
 	for _, p := range Providers() {
 		if p.ID == id {
-			r.Equal(CPUProviderName, p.Model)
+			r.Equal("CPU", p.Model)
 			r.Equal(ComputeAPIClassCPU, p.ComputeAPI)
 			return
 		}
@@ -70,9 +70,6 @@ func TestScryptPositions(t *testing.T) {
 // TestScryptPositions_HashLenBits tests output correctness for the entire value range of HashLenBits for a specific batch size.
 func TestScryptPositions_HashLenBits(t *testing.T) {
 	r := require.New(t)
-	if testing.Short() {
-		t.Skip("long test")
-	}
 
 	providers := Providers()
 	for hashLenBits := uint32(1); hashLenBits <= 256; hashLenBits++ {
@@ -84,7 +81,7 @@ func TestScryptPositions_HashLenBits(t *testing.T) {
 				WithSalt(salt),
 				WithStartAndEndPosition(1, 1<<12),
 				WithBitsPerLabel(hashLenBits),
-				WithScryptParams(32, 1, 1),
+				WithScryptParams(16, 1, 1),
 			)
 			r.NoError(err)
 			r.NotNil(res)
@@ -266,16 +263,6 @@ func TestScryptPositions_PartialByte(t *testing.T) {
 		} else {
 			req.Equal(prevOutput, res.Output, fmt.Sprintf("not equal: provider: %v, hashLenBits: %v", p.Model, hashLenBits))
 		}
-	}
-}
-
-func TestBenchmark(t *testing.T) {
-	req := require.New(t)
-
-	for _, p := range Providers() {
-		b, err := Benchmark(p)
-		req.NoError(err)
-		req.True(b > 0)
 	}
 }
 

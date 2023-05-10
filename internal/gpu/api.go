@@ -19,8 +19,6 @@ var (
 	cpuProviderID uint
 )
 
-const CPUProviderName = "CPU"
-
 func init() {
 	providers = cGetProviders()
 	for _, p := range providers {
@@ -40,28 +38,6 @@ func Providers() []ComputeProvider {
 // CPUProviderID returns the ID of the CPU provider.
 func CPUProviderID() uint {
 	return cpuProviderID
-}
-
-// Benchmark returns the hashes per second the selected compute provider achieves on the current machine.
-func Benchmark(p ComputeProvider) (int, error) {
-	endPosition := uint64(1 << 13)
-	if p.Model == CPUProviderName {
-		endPosition = uint64(1 << 10)
-	}
-
-	res, err := ScryptPositions(
-		WithComputeProviderID(p.ID),
-		WithCommitment(make([]byte, 32)),
-		WithSalt(make([]byte, 32)),
-		WithStartAndEndPosition(1, endPosition),
-		WithBitsPerLabel(8),
-		WithScryptParams(8192, 1, 1),
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	return res.HashesPerSec, nil
 }
 
 // ScryptPositionsResult is the result of a ScryptPositions call.

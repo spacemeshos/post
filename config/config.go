@@ -63,12 +63,12 @@ func DefaultConfig() Config {
 }
 
 type InitOpts struct {
-	DataDir           string
-	NumUnits          uint32
-	MaxFileSize       uint64
-	ComputeProviderID int
-	Throttle          bool
-	Scrypt            ScryptParams
+	DataDir     string
+	NumUnits    uint32
+	MaxFileSize uint64
+	ProviderID  int
+	Throttle    bool
+	Scrypt      ScryptParams
 	// ComputeBatchSize must be greater than 0
 	ComputeBatchSize uint64
 }
@@ -112,13 +112,13 @@ const BestProviderID = -1
 
 func DefaultInitOpts() InitOpts {
 	return InitOpts{
-		DataDir:           DefaultDataDir,
-		NumUnits:          defaultMinNumUnits + 1,
-		MaxFileSize:       defaultMaxFileSize,
-		ComputeProviderID: BestProviderID,
-		Throttle:          false,
-		Scrypt:            DefaultLabelParams(),
-		ComputeBatchSize:  DefaultComputeBatchSize,
+		DataDir:          DefaultDataDir,
+		NumUnits:         defaultMinNumUnits + 1,
+		MaxFileSize:      defaultMaxFileSize,
+		ProviderID:       BestProviderID,
+		Throttle:         false,
+		Scrypt:           DefaultLabelParams(),
+		ComputeBatchSize: DefaultComputeBatchSize,
 	}
 }
 

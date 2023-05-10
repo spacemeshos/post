@@ -5,37 +5,38 @@ import (
 	"fmt"
 
 	"github.com/spacemeshos/post/config"
-	"github.com/spacemeshos/post/gpu"
+	"github.com/spacemeshos/post/internal/postrs"
 )
 
 type option struct {
-	computeProviderID uint
+	providerID *uint
 
-	commitment []byte
-	salt       []byte
-
+	commitment    []byte
 	startPosition uint64
 	endPosition   uint64
-
-	bitsPerLabel  uint32
-	computeLeaves bool
-
-	difficulty []byte
-
-	scrypt *config.ScryptParams
+	n             uint32
+	vrfDifficulty []byte
 }
 
 func (o *option) validate() error {
+	if o.providerID == nil {
+		return errors.New("`providerID` is required")
+	}
+
 	if o.commitment == nil {
 		return errors.New("`commitment` is required")
 	}
 
-	if o.computeLeaves && (o.bitsPerLabel < config.MinBitsPerLabel || o.bitsPerLabel > config.MaxBitsPerLabel) {
-		return fmt.Errorf("invalid `bitsPerLabel`; expected: %d-%d, given: %v", config.MinBitsPerLabel, config.MaxBitsPerLabel, o.bitsPerLabel)
+	if o.startPosition > o.endPosition {
+		return fmt.Errorf("invalid `startPosition` and `endPosition`; expected: start <= end, given: %v > %v", o.startPosition, o.endPosition)
 	}
 
-	if o.scrypt == nil {
-		return errors.New("scrypt parameters are required")
+	if o.n > 0 && o.n&(o.n-1) != 0 {
+		return fmt.Errorf("invalid `n`; expected: power of 2, given: %v", o.n)
+	}
+
+	if o.vrfDifficulty == nil {
+		return errors.New("`vrfDifficulty` is required")
 	}
 
 	return nil
@@ -43,10 +44,11 @@ func (o *option) validate() error {
 
 type OptionFunc func(*option) error
 
-// WithComputeProviderID sets the ID of the compute provider to use.
-func WithComputeProviderID(id uint) OptionFunc {
+// WithProviderID sets the ID of the openCL provider to use.
+func WithProviderID(id uint) OptionFunc {
 	return func(opts *option) error {
-		opts.computeProviderID = id
+		opts.providerID = new(uint)
+		*opts.providerID = id
 		return nil
 	}
 }
@@ -59,18 +61,6 @@ func WithCommitment(commitment []byte) OptionFunc {
 		}
 
 		opts.commitment = commitment
-		return nil
-	}
-}
-
-// WithSalt sets the salt to use for the oracle.
-func WithSalt(salt []byte) OptionFunc {
-	return func(opts *option) error {
-		if len(salt) != 32 {
-			return fmt.Errorf("invalid `salt` length; expected: 32, given: %v", len(salt))
-		}
-
-		opts.salt = salt
 		return nil
 	}
 }
@@ -93,62 +83,45 @@ func WithStartAndEndPosition(start, end uint64) OptionFunc {
 	}
 }
 
-// WithBitsPerLabel sets the number of bits per label.
-func WithBitsPerLabel(bitsPerLabel uint32) OptionFunc {
+// WithVRFDifficulty sets the difficulty for the VRF Nonce.
+// It is used as a PoW to make creating identities expensive and thereby prevent Sybil attacks.
+func WithVRFDifficulty(difficulty []byte) OptionFunc {
 	return func(opts *option) error {
-		opts.bitsPerLabel = bitsPerLabel
-		return nil
-	}
-}
-
-// WithComputeLeaves instructs the oracle to compute the labels for PoST or not.
-// By default computing leaves is enabled. It can be switched off to save time
-// when continuing a run to compute a proof of work.
-func WithComputeLeaves(enabled bool) OptionFunc {
-	return func(opts *option) error {
-		opts.computeLeaves = enabled
-		return nil
-	}
-}
-
-// WithComputePow instructs the oracle to compute a proof of work or not.
-// If difficulty is nil, no PoW will be computed. Otherwise it specifies the difficulty
-// of the PoW to be computed (higher values are more difficult).
-// By default computing proof of work is disabled.
-func WithComputePow(difficulty []byte) OptionFunc {
-	return func(opts *option) error {
-		if difficulty != nil && len(difficulty) != 32 {
+		if len(difficulty) != 32 {
 			return fmt.Errorf("invalid `difficulty` length; expected: 32, given: %v", len(difficulty))
 		}
 
-		opts.difficulty = difficulty
+		opts.vrfDifficulty = difficulty
 		return nil
 	}
 }
 
+// WithScryptParams sets the parameters for the scrypt algorithm.
+// At the moment only configuring N is supported. r and p are fixed at 1 (due to limitations in the OpenCL implementation).
 func WithScryptParams(params config.ScryptParams) OptionFunc {
 	return func(opts *option) error {
-		opts.scrypt = &params
+		if params.P != 1 || params.R != 1 {
+			return errors.New("invalid scrypt params: only r = 1, p = 1 are supported for initialization")
+		}
+
+		opts.n = params.N
 		return nil
 	}
 }
 
 // WorkOracleResult is the result of a call to WorkOracle.
-// It contains the computed labels and the nonce as a proof of work.
+// It contains the computed labels and a nonce for a proof of work.
 type WorkOracleResult struct {
-	Output []byte  // Output are the computed labels (only if `WithComputeLeaves` is true - default yes).
-	Nonce  *uint64 // Nonce is the nonce of the proof of work (only if `WithComputePow` is true - default no).
+	Output []byte  // Output are the computed labels
+	Nonce  *uint64 // Nonce is the nonce of the proof of work
 }
 
 // WorkOracle computes labels for a given challenge for a Node with the provided CommitmentATX ID.
 // The labels are computed using the specified compute provider (default: CPU).
 func WorkOracle(opts ...OptionFunc) (WorkOracleResult, error) {
-	options := &option{
-		computeProviderID: gpu.CPUProviderID(),
-		salt:              make([]byte, 32), // TODO(moshababo): apply salt
-		computeLeaves:     true,
-		bitsPerLabel:      config.BitsPerLabel,
-	}
+	options := &option{}
+	options.providerID = new(uint)
+	*options.providerID = postrs.CPUProviderID()
 
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
@@ -160,15 +133,12 @@ func WorkOracle(opts ...OptionFunc) (WorkOracleResult, error) {
 		return WorkOracleResult{}, err
 	}
 
-	res, err := gpu.ScryptPositions(
-		gpu.WithComputeProviderID(options.computeProviderID),
-		gpu.WithCommitment(options.commitment),
-		gpu.WithSalt(options.salt),
-		gpu.WithStartAndEndPosition(options.startPosition, options.endPosition),
-		gpu.WithBitsPerLabel(options.bitsPerLabel),
-		gpu.WithComputeLeaves(options.computeLeaves),
-		gpu.WithComputePow(options.difficulty),
-		gpu.WithScryptParams(options.scrypt.N, options.scrypt.R, options.scrypt.P),
+	res, err := postrs.ScryptPositions(
+		postrs.WithProviderID(*options.providerID),
+		postrs.WithCommitment(options.commitment),
+		postrs.WithStartAndEndPosition(options.startPosition, options.endPosition),
+		postrs.WithScryptN(options.n),
+		postrs.WithVRFDifficulty(options.vrfDifficulty),
 	)
 	if err != nil {
 		return WorkOracleResult{}, err
