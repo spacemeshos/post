@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/oracle"
@@ -59,7 +61,7 @@ func VerifyVRFNonce(nonce *uint64, m *shared.VRFNonceMetadata, opts ...OptionFun
 
 // Verify ensures the validity of a proof in respect to its metadata.
 // It returns nil if the proof is valid or an error describing the failure, otherwise.
-func Verify(p *shared.Proof, m *shared.ProofMetadata, cfg config.Config, opts ...OptionFunc) error {
+func Verify(p *shared.Proof, m *shared.ProofMetadata, cfg config.Config, logger *zap.Logger, opts ...OptionFunc) error {
 	options := defaultOpts()
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
@@ -73,5 +75,5 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata, cfg config.Config, opts ..
 		return fmt.Errorf("invalid `commitmentAtxId` length; expected: 32, given: %v", len(m.CommitmentAtxId))
 	}
 
-	return postrs.VerifyProof(p, m, cfg, options.powScrypt, options.labelScrypt)
+	return postrs.VerifyProof(p, m, cfg, logger, options.powScrypt, options.labelScrypt)
 }

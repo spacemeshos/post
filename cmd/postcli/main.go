@@ -7,12 +7,13 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	baseLog "log"
+	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
 
 	"github.com/davecgh/go-spew/spew"
+	"go.uber.org/zap"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
@@ -25,7 +26,6 @@ import (
 var (
 	cfg                = config.DefaultConfig()
 	opts               = config.DefaultInitOpts()
-	log                = logger{}
 	printProviders     bool
 	printConfig        bool
 	genProof           bool
@@ -73,7 +73,7 @@ func processFlags() error {
 			return fmt.Errorf("failed to generate identity: %w", err)
 		}
 		id = pub
-		log.Info("cli: generated id: %x", id)
+		log.Printf("cli: generated id %x\n", id)
 		saveKey(priv) // The key will need to be loaded in clients for the PoST data to be usable.
 	} else {
 		var err error
@@ -92,7 +92,7 @@ func main() {
 	if printProviders {
 		providers, err := postrs.OpenCLProviders()
 		if err != nil {
-			log.Panic("cli: failed to get OpenCL providers: %v", err)
+			log.Fatalln("failed to get OpenCL providers", err)
 		}
 		spew.Dump(providers)
 		return
@@ -105,7 +105,12 @@ func main() {
 	}
 
 	if err := processFlags(); err != nil {
-		log.Panic("cli: %v", err)
+		log.Fatalln("failed to process flags", err)
+	}
+
+	zapLog, err := zap.NewProduction()
+	if err != nil {
+		log.Fatalln("failed to initialize zap logger:", err)
 	}
 
 	init, err := initialization.NewInitializer(
@@ -113,7 +118,7 @@ func main() {
 		initialization.WithInitOpts(opts),
 		initialization.WithNodeId(id),
 		initialization.WithCommitmentAtxId(commitmentAtxId),
-		initialization.WithLogger(log),
+		initialization.WithLogger(zapLog),
 	)
 	if err != nil {
 		log.Panic(err.Error())
@@ -121,9 +126,9 @@ func main() {
 
 	if reset {
 		if err := init.Reset(); err != nil {
-			log.Panic("reset error: %v", err)
+			log.Fatalln("reset error", err)
 		}
-		log.Info("cli: reset completed")
+		log.Println("cli: reset completed")
 		return
 	}
 
@@ -136,27 +141,27 @@ func main() {
 		log.Panic(err.Error())
 		return
 	case errors.Is(err, context.Canceled):
-		log.Info("cli: initialization interrupted")
+		log.Println("cli: initialization interrupted")
 		return
 	case err != nil:
-		log.Error("cli: initialization error: %v", err)
+		log.Println("cli: initialization error", err)
 		return
 	}
 
-	log.Info("cli: initialization completed")
+	log.Println("cli: initialization completed")
 
 	if genProof {
-		log.Info("cli: generating proof as a sanity test")
+		log.Println("cli: generating proof as a sanity test")
 
-		proof, proofMetadata, err := proving.Generate(ctx, shared.ZeroChallenge, cfg, log, proving.WithDataSource(cfg, id, commitmentAtxId, opts.DataDir))
+		proof, proofMetadata, err := proving.Generate(ctx, shared.ZeroChallenge, cfg, zapLog, proving.WithDataSource(cfg, id, commitmentAtxId, opts.DataDir))
 		if err != nil {
-			log.Panic("proof generation error: %v", err)
+			log.Fatalln("proof generation error", err)
 		}
-		if err := verifying.Verify(proof, proofMetadata, cfg); err != nil {
-			log.Panic("failed to verify test proof: %v", err)
+		if err := verifying.Verify(proof, proofMetadata, cfg, zapLog); err != nil {
+			log.Fatalln("failed to verify test proof", err)
 		}
 
-		log.Info("cli: proof is valid")
+		log.Println("cli: proof is valid")
 	}
 }
 
@@ -170,11 +175,3 @@ func saveKey(key []byte) error {
 	}
 	return nil
 }
-
-type logger struct{}
-
-func (l logger) Info(msg string, args ...any)    { baseLog.Printf("\tINFO\t"+msg, args...) }
-func (l logger) Debug(msg string, args ...any)   { baseLog.Printf("\tDEBUG\t"+msg, args...) }
-func (l logger) Warning(msg string, args ...any) { baseLog.Printf("\tWARN\t"+msg, args...) }
-func (l logger) Error(msg string, args ...any)   { baseLog.Printf("\tERROR\t"+msg, args...) }
-func (l logger) Panic(msg string, args ...any)   { baseLog.Fatalf(msg, args...) }

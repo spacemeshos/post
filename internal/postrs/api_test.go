@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 var (
@@ -52,6 +54,7 @@ func TestScryptPositions(t *testing.T) {
 			WithCommitment(commitment),
 			WithVRFDifficulty(vrfDifficulty),
 			WithScryptN(32),
+			WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 		)
 		require.NoError(t, err)
 		require.NotNil(t, scrypt)
@@ -134,6 +137,7 @@ func TestScryptPositions_InvalidProviderId(t *testing.T) {
 		WithCommitment(commitment),
 		WithVRFDifficulty(defaultDifficulty),
 		WithScryptN(32),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	require.ErrorIs(t, err, ErrInvalidProviderID)
 }
@@ -163,6 +167,7 @@ func Test_ScryptPositions_Pow(t *testing.T) {
 				WithCommitment(commitment),
 				WithVRFDifficulty(vrfDifficulty),
 				WithScryptN(32),
+				WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 			)
 			require.NoError(t, err)
 			require.NotNil(t, scrypt)

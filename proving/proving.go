@@ -3,7 +3,10 @@ package proving
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
+
+	"go.uber.org/zap"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
@@ -11,8 +14,7 @@ import (
 	"github.com/spacemeshos/post/shared"
 )
 
-// TODO(mafa): replace Logger with zap.
-func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logger shared.Logger, opts ...OptionFunc) (*shared.Proof, *shared.ProofMetadata, error) {
+func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logger *zap.Logger, opts ...OptionFunc) (*shared.Proof, *shared.ProofMetadata, error) {
 	options := option{
 		threads:   1,
 		nonces:    16,
@@ -27,12 +29,17 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		return nil, nil, err
 	}
 
-	result, err := postrs.GenerateProof(options.datadir, ch, cfg, options.nonces, options.threads, options.powScrypt)
+	result, err := postrs.GenerateProof(options.datadir, ch, cfg, logger, options.nonces, options.threads, options.powScrypt)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generating proof: %w", err)
 	}
 	logger.Info("proving: generated proof")
-	logger.Debug("Nonce: %v, Indices: %v, K2PoW: %d, K3PoW: %d", result.Nonce, result.Indices, result.K2Pow, result.K3Pow)
+	logger.Debug("proving: generated proof",
+		zap.Uint32("Nonce", result.Nonce),
+		zap.String("Indices", hex.EncodeToString(result.Indices)),
+		zap.Uint64("K2PoW", result.K2Pow),
+		zap.Uint64("K3PoW", result.K3Pow),
+	)
 
 	proof := &shared.Proof{Nonce: result.Nonce, Indices: result.Indices, K2Pow: result.K2Pow, K3Pow: result.K3Pow}
 	proofMetadata := &shared.ProofMetadata{

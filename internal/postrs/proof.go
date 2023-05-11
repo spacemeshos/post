@@ -12,6 +12,8 @@ import (
 	"reflect"
 	"unsafe"
 
+	"go.uber.org/zap"
+
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/shared"
 )
@@ -30,7 +32,11 @@ func translateScryptParams(params config.ScryptParams) C.ScryptParams {
 	}
 }
 
-func GenerateProof(dataDir string, challenge []byte, cfg config.Config, nonces uint, threads uint, powScrypt config.ScryptParams) (*shared.Proof, error) {
+func GenerateProof(dataDir string, challenge []byte, cfg config.Config, logger *zap.Logger, nonces uint, threads uint, powScrypt config.ScryptParams) (*shared.Proof, error) {
+	if logger != nil {
+		setLogCallback(logger)
+	}
+
 	dataDirPtr := C.CString(dataDir)
 	defer C.free(unsafe.Pointer(dataDirPtr))
 
@@ -69,7 +75,11 @@ func GenerateProof(dataDir string, challenge []byte, cfg config.Config, nonces u
 	}, nil
 }
 
-func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config.Config, powScrypt, labelScrypt config.ScryptParams) error {
+func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config.Config, logger *zap.Logger, powScrypt, labelScrypt config.ScryptParams) error {
+	if logger != nil {
+		setLogCallback(logger)
+	}
+
 	if proof == nil {
 		return errors.New("proof cannot be nil")
 	}

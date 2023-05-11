@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/spacemeshos/post/config"
@@ -23,15 +25,6 @@ var (
 	nodeId          = make([]byte, 32)
 	commitmentAtxId = make([]byte, 32)
 )
-
-type testLogger struct {
-	shared.Logger
-
-	t *testing.T
-}
-
-func (l testLogger) Info(msg string, args ...any)  { l.t.Logf("\tINFO\t"+msg, args...) }
-func (l testLogger) Debug(msg string, args ...any) { l.t.Logf("\tDEBUG\t"+msg, args...) }
 
 func TestInitialize(t *testing.T) {
 	cfg := config.DefaultConfig()
@@ -48,7 +41,7 @@ func TestInitialize(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	require.NoError(t, err)
 
@@ -119,7 +112,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 		// use a higher difficulty to make sure no Pow is found in the first `numLabels` labels.
 		withDifficultyFunc(func(numLabels uint64) []byte {
 			x := new(big.Int).Lsh(big.NewInt(1), 256)
@@ -163,7 +156,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -185,7 +178,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -207,7 +200,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -227,7 +220,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -260,7 +253,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -302,7 +295,7 @@ func TestReset_WhileInitializing(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -337,7 +330,7 @@ func TestInitialize_Repeated(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -358,7 +351,7 @@ func TestInitialize_Repeated(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -393,7 +386,7 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -415,7 +408,7 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -448,7 +441,7 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -470,7 +463,7 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -504,7 +497,7 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -527,7 +520,7 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(newOpts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -576,7 +569,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			WithCommitmentAtxId(commitmentAtxId),
 			WithConfig(cfg),
 			WithInitOpts(opts),
-			WithLogger(testLogger{t: t}),
+			WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 		)
 		require.NoError(t, err)
 		require.NoError(t, init.Initialize(context.Background()))
@@ -608,7 +601,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 				WithCommitmentAtxId(commitmentAtxId),
 				WithConfig(cfg),
 				WithInitOpts(opts),
-				WithLogger(testLogger{t: t}),
+				WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 			)
 			require.NoError(t, err)
 			require.NoError(t, init.Initialize(context.Background()))
@@ -647,7 +640,7 @@ func TestNumLabelsWritten(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -674,7 +667,7 @@ func TestNumLabelsWritten(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
@@ -703,7 +696,7 @@ func TestValidateMetadata(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 
@@ -724,7 +717,7 @@ func TestValidateMetadata(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	var errConfigMismatch ConfigMismatchError
 	r.ErrorAs(err, &errConfigMismatch)
@@ -738,7 +731,7 @@ func TestValidateMetadata(t *testing.T) {
 		WithCommitmentAtxId(newAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("CommitmentAtxId", errConfigMismatch.Param)
@@ -751,7 +744,7 @@ func TestValidateMetadata(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(newOpts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("MaxFileSize", errConfigMismatch.Param)
@@ -764,7 +757,7 @@ func TestValidateMetadata(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(newOpts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("NumUnits", errConfigMismatch.Param)
@@ -788,7 +781,7 @@ func TestStop(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	r.NoError(err)
 	r.Equal(StatusNotStarted, init.Status())
@@ -841,7 +834,7 @@ func TestValidateComputeBatchSize(t *testing.T) {
 		WithCommitmentAtxId(commitmentAtxId),
 		WithConfig(cfg),
 		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	assert.Error(t, err)
 }

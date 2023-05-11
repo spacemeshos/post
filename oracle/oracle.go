@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/internal/postrs"
 )
@@ -17,6 +19,8 @@ type option struct {
 	commitment    []byte
 	n             uint32
 	vrfDifficulty []byte
+
+	logger *zap.Logger
 }
 
 func (o *option) validate() error {
@@ -89,6 +93,14 @@ func WithScryptParams(params config.ScryptParams) OptionFunc {
 	}
 }
 
+// WithLogger sets the logger to use.
+func WithLogger(logger *zap.Logger) OptionFunc {
+	return func(opts *option) error {
+		opts.logger = logger
+		return nil
+	}
+}
+
 // WorkOracle is a service that can compute labels for a given Node ID and CommitmentATX ID.
 type WorkOracle struct {
 	options *option
@@ -116,6 +128,7 @@ func New(opts ...OptionFunc) (*WorkOracle, error) {
 		postrs.WithCommitment(options.commitment),
 		postrs.WithScryptN(options.n),
 		postrs.WithVRFDifficulty(options.vrfDifficulty),
+		postrs.WithLogger(options.logger),
 	)
 	if err != nil {
 		return nil, err

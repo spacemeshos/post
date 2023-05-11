@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
@@ -30,19 +32,8 @@ func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	return cfg, opts
 }
 
-type testLogger struct {
-	shared.Logger
-
-	tb testing.TB
-}
-
-func (l testLogger) Info(msg string, args ...any)  { l.tb.Logf("\tINFO\t"+msg, args...) }
-func (l testLogger) Debug(msg string, args ...any) { l.tb.Logf("\tDEBUG\t"+msg, args...) }
-func (l testLogger) Error(msg string, args ...any) { l.tb.Logf("\tERROR\t"+msg, args...) }
-
 func Test_Verify(t *testing.T) {
 	r := require.New(t)
-	log := testLogger{tb: t}
 
 	nodeId := make([]byte, 32)
 	commitmentAtxId := make([]byte, 32)
@@ -62,17 +53,16 @@ func Test_Verify(t *testing.T) {
 		context.Background(),
 		ch,
 		cfg,
-		log,
+		zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
 		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
 	)
 	r.NoError(err)
 
-	r.NoError(Verify(proof, proofMetadata, cfg))
+	r.NoError(Verify(proof, proofMetadata, cfg, zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))))
 }
 
 func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	r := require.New(t)
-	log := testLogger{tb: t}
 
 	nodeId := make([]byte, 32)
 	commitmentAtxId := make([]byte, 32)
@@ -92,7 +82,7 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 		context.Background(),
 		ch,
 		cfg,
-		log,
+		zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
 		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
 	)
 	r.NoError(err)
@@ -101,7 +91,7 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 		proof.Indices[i] ^= 255 // flip bits in all indices
 	}
 
-	r.ErrorContains(Verify(proof, proofMetadata, cfg), "invalid proof")
+	r.ErrorContains(Verify(proof, proofMetadata, cfg, zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))), "invalid proof")
 }
 
 func TestVerifyPow(t *testing.T) {
@@ -147,7 +137,7 @@ func BenchmarkVerifying(b *testing.B) {
 
 	ch := make(shared.Challenge, 32)
 	rand.Read(ch)
-	p, m, err := proving.Generate(context.Background(), ch, cfg, &shared.NoopLogger{}, proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+	p, m, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
 	require.NoError(b, err)
 
 	for _, k3 := range []uint32{5, 25, 50, 100} {
@@ -158,7 +148,7 @@ func BenchmarkVerifying(b *testing.B) {
 		b.Run(testName, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				start := time.Now()
-				err := Verify(p, m, cfg)
+				err := Verify(p, m, cfg, zaptest.NewLogger(b))
 				require.NoError(b, err)
 				b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
 			}
@@ -193,12 +183,12 @@ func Benchmark_Verify_Fastnet(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		rand.Read(ch)
-		proof, proofMetadata, err := proving.Generate(context.Background(), ch, cfg, &shared.NoopLogger{}, proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+		proof, proofMetadata, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
 		r.NoError(err)
 
 		b.StartTimer()
 		start := time.Now()
-		r.NoError(Verify(proof, proofMetadata, cfg))
+		r.NoError(Verify(proof, proofMetadata, cfg, zaptest.NewLogger(b)))
 		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
 		b.StopTimer()
 	}
