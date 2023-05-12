@@ -77,14 +77,7 @@ func InitResultToError(retVal uint32) error {
 	}
 }
 
-// cScryptPositions calls the C functions from libpostrs that create the labels
-// and VRF proofs.
-func cScryptPositions(opt *option) ([]byte, *uint64, error) {
-	if *opt.providerID != cCPUProviderID() {
-		gpuMtx.Device(*opt.providerID).Lock()
-		defer gpuMtx.Device(*opt.providerID).Unlock()
-	}
-
+func cNewInitializer(opt *option) (*C.Initializer, error) {
 	cProviderId := C.uint32_t(*opt.providerID)
 	cN := C.uintptr_t(opt.n)
 	cCommitment := C.CBytes(opt.commitment)
@@ -93,10 +86,18 @@ func cScryptPositions(opt *option) ([]byte, *uint64, error) {
 	defer C.free(cDifficulty)
 	init := C.new_initializer(cProviderId, cN, (*C.uchar)(cCommitment), (*C.uchar)(cDifficulty))
 	if init == nil {
-		return nil, nil, ErrInvalidProviderID
+		return nil, ErrInvalidProviderID
 	}
-	defer C.free_initializer(init)
+	return init, nil
+}
 
+func cFreeInitializer(init *C.Initializer) {
+	C.free_initializer(init)
+}
+
+// cScryptPositions calls the C functions from libpostrs that create the labels
+// and VRF proofs.
+func cScryptPositions(init *C.Initializer, opt *option) ([]byte, *uint64, error) {
 	outputSize := LabelLength * (opt.endPosition - opt.startPosition + 1)
 	cStartPosition := C.uint64_t(opt.startPosition)
 	cEndPosition := C.uint64_t(opt.endPosition)

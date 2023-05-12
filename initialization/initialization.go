@@ -294,7 +294,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 
 		init.logger.Debug("initialization: continue looking for a nonce: start position: %v, batch size: %v", i, batchSize)
 
-		res, err := oracle.WorkOracle(
+		res, err := oracle.New(
 			oracle.WithProviderID(uint(init.opts.ProviderID)),
 			oracle.WithCommitment(init.commitment),
 			oracle.WithStartAndEndPosition(i, i+batchSize-1),

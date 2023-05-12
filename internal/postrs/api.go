@@ -1,5 +1,9 @@
 package postrs
 
+// #cgo LDFLAGS: -lpost
+// #include "prover.h"
+import "C"
+
 import (
 	"errors"
 	"fmt"
@@ -71,14 +75,6 @@ func WithCommitment(commitment []byte) OptionFunc {
 	}
 }
 
-func WithStartAndEndPosition(start, end uint64) OptionFunc {
-	return func(opts *option) error {
-		opts.startPosition = start
-		opts.endPosition = end
-		return nil
-	}
-}
-
 func WithScryptN(n uint32) OptionFunc {
 	return func(opts *option) error {
 		opts.n = n
@@ -97,20 +93,64 @@ func WithVRFDifficulty(difficulty []byte) OptionFunc {
 	}
 }
 
-// ScryptPositions computes the scrypt output for the given options.
-func ScryptPositions(opts ...OptionFunc) (ScryptPositionsResult, error) {
+type Scrypt struct {
+	options *option
+	init    *C.Initializer
+}
+
+func NewScrypt(opts ...OptionFunc) (*Scrypt, error) {
 	options := &option{}
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
-			return ScryptPositionsResult{}, err
+			return nil, err
 		}
 	}
 
 	if err := options.validate(); err != nil {
+		return nil, err
+	}
+
+	init, err := cNewInitializer(options)
+	if err != nil {
+		return nil, err
+	}
+	if *options.providerID != cCPUProviderID() {
+		gpuMtx.Device(*options.providerID).Lock()
+	}
+
+	return &Scrypt{
+		options: options,
+		init:    init,
+	}, nil
+}
+
+func (s *Scrypt) Close() {
+	cFreeInitializer(s.init)
+	if *s.options.providerID != cCPUProviderID() {
+		gpuMtx.Device(*s.options.providerID).Unlock()
+	}
+}
+
+type PositionsFunc func(*option) error
+
+func WithStartAndEndPosition(start, end uint64) PositionsFunc {
+	return func(opts *option) error {
+		opts.startPosition = start
+		opts.endPosition = end
+		return nil
+	}
+}
+
+// ScryptPositions computes the scrypt output for the given options.
+func (s *Scrypt) Positions(start, end uint64) (ScryptPositionsResult, error) {
+	s.options.startPosition = start
+	s.options.endPosition = end
+
+	if err := s.options.validate(); err != nil {
 		return ScryptPositionsResult{}, err
 	}
 
-	output, idxSolution, err := cScryptPositions(options)
+	output, idxSolution, err := cScryptPositions(s.init, s.options)
 	return ScryptPositionsResult{
 		Output:      output,
 		IdxSolution: idxSolution,

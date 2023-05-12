@@ -12,8 +12,6 @@ type option struct {
 	providerID *uint
 
 	commitment    []byte
-	startPosition uint64
-	endPosition   uint64
 	n             uint32
 	vrfDifficulty []byte
 }
@@ -25,10 +23,6 @@ func (o *option) validate() error {
 
 	if o.commitment == nil {
 		return errors.New("`commitment` is required")
-	}
-
-	if o.startPosition > o.endPosition {
-		return fmt.Errorf("invalid `startPosition` and `endPosition`; expected: start <= end, given: %v > %v", o.startPosition, o.endPosition)
 	}
 
 	if o.n > 0 && o.n&(o.n-1) != 0 {
@@ -65,24 +59,6 @@ func WithCommitment(commitment []byte) OptionFunc {
 	}
 }
 
-// WithPosition sets the index of one label to compute.
-func WithPosition(position uint64) OptionFunc {
-	return func(opts *option) error {
-		opts.startPosition = position
-		opts.endPosition = position
-		return nil
-	}
-}
-
-// WithStartAndEndPosition sets the range of indices of labels for the oracle to compute.
-func WithStartAndEndPosition(start, end uint64) OptionFunc {
-	return func(opts *option) error {
-		opts.startPosition = start
-		opts.endPosition = end
-		return nil
-	}
-}
-
 // WithVRFDifficulty sets the difficulty for the VRF Nonce.
 // It is used as a PoW to make creating identities expensive and thereby prevent Sybil attacks.
 func WithVRFDifficulty(difficulty []byte) OptionFunc {
@@ -109,6 +85,48 @@ func WithScryptParams(params config.ScryptParams) OptionFunc {
 	}
 }
 
+type WorkOracle struct {
+	options *option
+	scrypt  *postrs.Scrypt
+}
+
+// New returns a WorkOracle that can compute labels for a given challenge for a Node with the provided CommitmentATX ID.
+// The labels are computed using the specified compute provider (default: CPU).
+func New(opts ...OptionFunc) (*WorkOracle, error) {
+	options := &option{}
+	options.providerID = new(uint)
+	*options.providerID = postrs.CPUProviderID()
+
+	for _, opt := range opts {
+		if err := opt(options); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := options.validate(); err != nil {
+		return nil, err
+	}
+
+	scrypt, err := postrs.NewScrypt(
+		postrs.WithProviderID(*options.providerID),
+		postrs.WithCommitment(options.commitment),
+		postrs.WithScryptN(options.n),
+		postrs.WithVRFDifficulty(options.vrfDifficulty),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &WorkOracle{
+		options: options,
+		scrypt:  scrypt,
+	}, nil
+}
+
+func (w *WorkOracle) Close() {
+	w.scrypt.Close()
+}
+
 // WorkOracleResult is the result of a call to WorkOracle.
 // It contains the computed labels and a nonce for a proof of work.
 type WorkOracleResult struct {
@@ -116,30 +134,16 @@ type WorkOracleResult struct {
 	Nonce  *uint64 // Nonce is the nonce of the proof of work
 }
 
-// WorkOracle computes labels for a given challenge for a Node with the provided CommitmentATX ID.
-// The labels are computed using the specified compute provider (default: CPU).
-func WorkOracle(opts ...OptionFunc) (WorkOracleResult, error) {
-	options := &option{}
-	options.providerID = new(uint)
-	*options.providerID = postrs.CPUProviderID()
+func (w *WorkOracle) Position(p uint64) (WorkOracleResult, error) {
+	return w.Positions(p, p)
+}
 
-	for _, opt := range opts {
-		if err := opt(options); err != nil {
-			return WorkOracleResult{}, err
-		}
+func (w *WorkOracle) Positions(start, end uint64) (WorkOracleResult, error) {
+	if start > end {
+		return WorkOracleResult{}, fmt.Errorf("invalid `startPosition` and `endPosition`; expected: start <= end, given: %v > %v", start, end)
 	}
 
-	if err := options.validate(); err != nil {
-		return WorkOracleResult{}, err
-	}
-
-	res, err := postrs.ScryptPositions(
-		postrs.WithProviderID(*options.providerID),
-		postrs.WithCommitment(options.commitment),
-		postrs.WithStartAndEndPosition(options.startPosition, options.endPosition),
-		postrs.WithScryptN(options.n),
-		postrs.WithVRFDifficulty(options.vrfDifficulty),
-	)
+	res, err := w.scrypt.Positions(start, end)
 	if err != nil {
 		return WorkOracleResult{}, err
 	}
