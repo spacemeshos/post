@@ -9,6 +9,9 @@ import (
 	"fmt"
 )
 
+// ErrScryptClosed is returned when calling a method on an already closed Scrypt instance.
+var ErrScryptClosed = errors.New("scrypt has been closed")
+
 func OpenCLProviders() ([]Provider, error) {
 	return cGetProviders()
 }
@@ -53,6 +56,7 @@ func (o *option) validate() error {
 	return nil
 }
 
+// OptionFunc is a function that sets an option for a Scrypt instance.
 type OptionFunc func(*option) error
 
 // WithProviderID sets the ID of the openCL provider to use.
@@ -64,6 +68,7 @@ func WithProviderID(id uint) OptionFunc {
 	}
 }
 
+// WithCommitment sets the commitment to use for the scrypt computation.
 func WithCommitment(commitment []byte) OptionFunc {
 	return func(opts *option) error {
 		if len(commitment) != 32 {
@@ -75,6 +80,7 @@ func WithCommitment(commitment []byte) OptionFunc {
 	}
 }
 
+// WithScryptN sets the N parameter for the scrypt computation.
 func WithScryptN(n uint32) OptionFunc {
 	return func(opts *option) error {
 		opts.n = n
@@ -82,6 +88,7 @@ func WithScryptN(n uint32) OptionFunc {
 	}
 }
 
+// WithVRFDifficulty sets the difficulty for the VRF nonce computation.
 func WithVRFDifficulty(difficulty []byte) OptionFunc {
 	return func(opts *option) error {
 		if len(difficulty) != 32 {
@@ -93,11 +100,14 @@ func WithVRFDifficulty(difficulty []byte) OptionFunc {
 	}
 }
 
+// Scrypt is a scrypt computation instance. It communicates with post-rs to perform
+// the scrypt computation on the GPU or CPU.
 type Scrypt struct {
 	options *option
 	init    *C.Initializer
 }
 
+// NewScrypt creates a new Scrypt instance.
 func NewScrypt(opts ...OptionFunc) (*Scrypt, error) {
 	options := &option{}
 	for _, opt := range opts {
@@ -124,25 +134,26 @@ func NewScrypt(opts ...OptionFunc) (*Scrypt, error) {
 	}, nil
 }
 
-func (s *Scrypt) Close() {
+// Close closes the Scrypt instance.
+func (s *Scrypt) Close() error {
+	if s.init == nil {
+		return ErrScryptClosed
+	}
+
 	cFreeInitializer(s.init)
 	if *s.options.providerID != cCPUProviderID() {
 		gpuMtx.Device(*s.options.providerID).Unlock()
 	}
+	s.init = nil
+	return nil
 }
 
-type PositionsFunc func(*option) error
-
-func WithStartAndEndPosition(start, end uint64) PositionsFunc {
-	return func(opts *option) error {
-		opts.startPosition = start
-		opts.endPosition = end
-		return nil
-	}
-}
-
-// ScryptPositions computes the scrypt output for the given options.
+// Positions computes the scrypt output for the given options.
 func (s *Scrypt) Positions(start, end uint64) (ScryptPositionsResult, error) {
+	if s.init == nil {
+		return ScryptPositionsResult{}, ErrScryptClosed
+	}
+
 	s.options.startPosition = start
 	s.options.endPosition = end
 

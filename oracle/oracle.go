@@ -8,6 +8,9 @@ import (
 	"github.com/spacemeshos/post/internal/postrs"
 )
 
+// ErrWorkOracleClosed is returned when calling a method on an already closed WorkOracle instance.
+var ErrWorkOracleClosed = errors.New("work oracle has been closed")
+
 type option struct {
 	providerID *uint
 
@@ -36,6 +39,7 @@ func (o *option) validate() error {
 	return nil
 }
 
+// OptionFunc is a function that sets an option for a WorkOracle instance.
 type OptionFunc func(*option) error
 
 // WithProviderID sets the ID of the openCL provider to use.
@@ -85,13 +89,13 @@ func WithScryptParams(params config.ScryptParams) OptionFunc {
 	}
 }
 
+// WorkOracle is a service that can compute labels for a given Node ID and CommitmentATX ID.
 type WorkOracle struct {
 	options *option
 	scrypt  *postrs.Scrypt
 }
 
-// New returns a WorkOracle that can compute labels for a given challenge for a Node with the provided CommitmentATX ID.
-// The labels are computed using the specified compute provider (default: CPU).
+// New returns a WorkOracle. If not specified, the labels are computed using the default (CPU) provider.
 func New(opts ...OptionFunc) (*WorkOracle, error) {
 	options := &option{}
 	options.providerID = new(uint)
@@ -123,8 +127,16 @@ func New(opts ...OptionFunc) (*WorkOracle, error) {
 	}, nil
 }
 
-func (w *WorkOracle) Close() {
-	w.scrypt.Close()
+// Close the WorkOracle.
+func (w *WorkOracle) Close() error {
+	if w.scrypt == nil {
+		return ErrWorkOracleClosed
+	}
+	if err := w.scrypt.Close(); err != nil && !errors.Is(err, postrs.ErrScryptClosed) {
+		return fmt.Errorf("failed to close scrypt: %w", err)
+	}
+	w.scrypt = nil
+	return nil
 }
 
 // WorkOracleResult is the result of a call to WorkOracle.
@@ -134,11 +146,17 @@ type WorkOracleResult struct {
 	Nonce  *uint64 // Nonce is the nonce of the proof of work
 }
 
+// Position computes the label for a given position.
 func (w *WorkOracle) Position(p uint64) (WorkOracleResult, error) {
 	return w.Positions(p, p)
 }
 
+// Positions computes the labels for a given range of positions.
 func (w *WorkOracle) Positions(start, end uint64) (WorkOracleResult, error) {
+	if w.scrypt == nil {
+		return WorkOracleResult{}, ErrWorkOracleClosed
+	}
+
 	if start > end {
 		return WorkOracleResult{}, fmt.Errorf("invalid `startPosition` and `endPosition`; expected: start <= end, given: %v > %v", start, end)
 	}
