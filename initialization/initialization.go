@@ -280,6 +280,18 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 
 	// continue searching for a nonce
 	defer init.saveMetadata()
+
+	wo, err := oracle.New(
+		oracle.WithProviderID(uint(init.opts.ProviderID)),
+		oracle.WithCommitment(init.commitment),
+		oracle.WithVRFDifficulty(difficulty),
+		oracle.WithScryptParams(init.opts.Scrypt),
+	)
+	if err != nil {
+		return err
+	}
+	defer wo.Close()
+
 	for i := *init.lastPosition.Load(); i < math.MaxUint64; i += batchSize {
 		lastPos := i
 		init.lastPosition.Store(&lastPos)
@@ -294,13 +306,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 
 		init.logger.Debug("initialization: continue looking for a nonce: start position: %v, batch size: %v", i, batchSize)
 
-		res, err := oracle.New(
-			oracle.WithProviderID(uint(init.opts.ProviderID)),
-			oracle.WithCommitment(init.commitment),
-			oracle.WithStartAndEndPosition(i, i+batchSize-1),
-			oracle.WithVRFDifficulty(difficulty),
-			oracle.WithScryptParams(init.opts.Scrypt),
-		)
+		res, err := wo.Positions(i, i+batchSize-1)
 		if err != nil {
 			return err
 		}
@@ -435,6 +441,17 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 		init.logger.Info("initialization: starting to write file #%v; target number of labels: %v, start position: %v", fileIndex, fileNumLabels, fileOffset)
 	}
 
+	wo, err := oracle.New(
+		oracle.WithProviderID(uint(init.opts.ProviderID)),
+		oracle.WithCommitment(init.commitment),
+		oracle.WithVRFDifficulty(difficulty),
+		oracle.WithScryptParams(init.opts.Scrypt),
+	)
+	if err != nil {
+		return err
+	}
+	defer wo.Close()
+
 	for currentPosition := numLabelsWritten; currentPosition < fileNumLabels; currentPosition += batchSize {
 		select {
 		case <-ctx.Done():
@@ -459,13 +476,7 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 		startPosition := fileOffset + currentPosition
 		endPosition := startPosition + uint64(batchSize) - 1
 
-		res, err := oracle.WorkOracle(
-			oracle.WithProviderID(uint(init.opts.ProviderID)),
-			oracle.WithCommitment(init.commitment),
-			oracle.WithStartAndEndPosition(startPosition, endPosition),
-			oracle.WithVRFDifficulty(difficulty),
-			oracle.WithScryptParams(init.opts.Scrypt),
-		)
+		res, err := wo.Positions(startPosition, endPosition)
 		if err != nil {
 			return err
 		}
