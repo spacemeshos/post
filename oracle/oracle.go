@@ -158,7 +158,7 @@ func (w *WorkOracle) Positions(start, end uint64) (WorkOracleResult, error) {
 	}
 
 	if start > end {
-		return WorkOracleResult{}, fmt.Errorf("invalid `startPosition` and `endPosition`; expected: start <= end, given: %v > %v", start, end)
+		return WorkOracleResult{}, fmt.Errorf("invalid `start` and `end`; expected: start <= end, given: %v > %v", start, end)
 	}
 
 	res, err := w.scrypt.Positions(start, end)

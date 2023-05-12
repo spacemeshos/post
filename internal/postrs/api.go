@@ -30,8 +30,6 @@ type option struct {
 	providerID *uint
 
 	commitment    []byte
-	startPosition uint64
-	endPosition   uint64
 	n             uint32
 	vrfDifficulty []byte
 }
@@ -43,10 +41,6 @@ func (o *option) validate() error {
 
 	if o.commitment == nil {
 		return errors.New("`commitment` is required")
-	}
-
-	if o.startPosition > o.endPosition {
-		return fmt.Errorf("invalid `startPosition` and `endPosition`; expected: start <= end, given: %v > %v", o.startPosition, o.endPosition)
 	}
 
 	if o.n > 0 && o.n&(o.n-1) != 0 {
@@ -154,14 +148,15 @@ func (s *Scrypt) Positions(start, end uint64) (ScryptPositionsResult, error) {
 		return ScryptPositionsResult{}, ErrScryptClosed
 	}
 
-	s.options.startPosition = start
-	s.options.endPosition = end
+	if start > end {
+		return ScryptPositionsResult{}, fmt.Errorf("invalid `start` and `end`; expected: start <= end, given: %v > %v", start, end)
+	}
 
 	if err := s.options.validate(); err != nil {
 		return ScryptPositionsResult{}, err
 	}
 
-	output, idxSolution, err := cScryptPositions(s.init, s.options)
+	output, idxSolution, err := cScryptPositions(s.init, s.options, start, end)
 	return ScryptPositionsResult{
 		Output:      output,
 		IdxSolution: idxSolution,
