@@ -7,7 +7,6 @@ import "C"
 
 import (
 	"errors"
-	"unsafe"
 )
 
 // gpuMtx is an instance of deviceMutex that can be used to prevent concurrent calls
@@ -140,8 +139,7 @@ func cGetProviders() ([]Provider, error) {
 
 	for i := uint(0); i < uint(cNumProviders); i++ {
 		providers[i].ID = (uint)(cProviders[i].id)
-		// TODO(mafa): `name` could be char instead of `uint8_t` then this cast isn't needed to work around staticcheck
-		providers[i].Model = C.GoString((*C.char)(unsafe.Pointer((&cProviders[i].name[0]))))
+		providers[i].Model = C.GoString(&cProviders[i].name[0])
 		providers[i].DeviceType = DeviceClass(cProviders[i].class_)
 	}
 
