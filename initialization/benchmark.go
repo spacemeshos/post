@@ -7,7 +7,7 @@ import (
 )
 
 // Benchmark returns the hashes per second the selected compute provider achieves on the current machine.
-func Benchmark(p ComputeProvider) (int, error) {
+func Benchmark(p Provider) (int, error) {
 	endPosition := uint64(1 << 14)
 	if p.DeviceType == postrs.ClassCPU {
 		endPosition = uint64(1 << 12)

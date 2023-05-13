@@ -24,7 +24,7 @@ type (
 	Proof               = shared.Proof
 	Logger              = shared.Logger
 	ConfigMismatchError = shared.ConfigMismatchError
-	ComputeProvider     = postrs.Provider
+	Provider            = postrs.Provider
 )
 
 type Status int
@@ -44,7 +44,7 @@ var (
 )
 
 // Providers returns a list of available compute providers.
-func OpenCLProviders() ([]ComputeProvider, error) {
+func OpenCLProviders() ([]Provider, error) {
 	return postrs.OpenCLProviders()
 }
 
