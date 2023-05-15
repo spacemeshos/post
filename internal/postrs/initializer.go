@@ -17,8 +17,9 @@ var gpuMtx deviceMutex
 type DeviceClass int
 
 const (
-	ClassCPU = DeviceClass((C.DeviceClass)(C.CPU))
-	ClassGPU = DeviceClass((C.DeviceClass)(C.GPU))
+	ClassUnspecified = 0
+	ClassCPU         = DeviceClass((C.DeviceClass)(C.CPU))
+	ClassGPU         = DeviceClass((C.DeviceClass)(C.GPU))
 )
 
 // Provider is a struct that contains information about an OpenCL provider.
@@ -37,7 +38,7 @@ func (c DeviceClass) String() string {
 	case ClassGPU:
 		return "GPU"
 	default:
-		return "Unknown"
+		return "Unspecified"
 	}
 }
 
