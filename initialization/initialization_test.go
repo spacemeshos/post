@@ -309,7 +309,7 @@ func TestReset_WhileInitializing(t *testing.T) {
 	{
 		var eg errgroup.Group
 		eg.Go(func() error {
-			r.Eventually(func() bool { return init.NumLabelsWritten() > 0 }, 5*time.Second, 10*time.Millisecond)
+			r.Eventually(func() bool { return init.NumLabelsWritten() > 0 }, 5*time.Second, 5*time.Millisecond)
 			r.ErrorIs(init.Reset(), ErrCannotResetWhileInitializing)
 			return nil
 		})
@@ -800,7 +800,7 @@ func TestStop(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(func() error {
-			r.Eventually(func() bool { return init.NumLabelsWritten() > 0 }, 5*time.Second, 50*time.Millisecond)
+			r.Eventually(func() bool { return init.NumLabelsWritten() > 0 }, 5*time.Second, 5*time.Millisecond)
 			cancel()
 			return nil
 		})
@@ -818,7 +818,7 @@ func TestStop(t *testing.T) {
 		var eg errgroup.Group
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
 		eg.Go(func() error {
-			r.Eventually(func() bool { return init.Status() == StatusInitializing }, 5*time.Second, 50*time.Millisecond)
+			r.Eventually(func() bool { return init.Status() == StatusInitializing }, 5*time.Second, 5*time.Millisecond)
 			return nil
 		})
 		r.NoError(init.Initialize(ctx))
