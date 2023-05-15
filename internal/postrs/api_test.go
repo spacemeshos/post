@@ -89,39 +89,41 @@ func TestScrypt_Close(t *testing.T) {
 	end := uint64(1 << 8)
 
 	for _, p := range providers {
-		scrypt, err := NewScrypt(
-			WithProviderID(p.ID),
-			WithCommitment(commitment),
-			WithScryptN(32),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, scrypt)
-		defer scrypt.Close()
+		t.Run(p.Model, func(t *testing.T) {
+			scrypt, err := NewScrypt(
+				WithProviderID(p.ID),
+				WithCommitment(commitment),
+				WithScryptN(32),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, scrypt)
+			defer scrypt.Close()
 
-		res, err := scrypt.Positions(start, end)
-		require.NoError(t, err)
-		require.NotNil(t, res)
-		require.NotNil(t, res.Output)
-		require.NoError(t, scrypt.Close())
+			res, err := scrypt.Positions(start, end)
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			require.NotNil(t, res.Output)
+			require.NoError(t, scrypt.Close())
 
-		reference := res.Output
+			reference := res.Output
 
-		scrypt, err = NewScrypt(
-			WithProviderID(p.ID),
-			WithCommitment(commitment),
-			WithScryptN(32),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, scrypt)
-		defer scrypt.Close()
+			scrypt, err = NewScrypt(
+				WithProviderID(p.ID),
+				WithCommitment(commitment),
+				WithScryptN(32),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, scrypt)
+			defer scrypt.Close()
 
-		res, err = scrypt.Positions(start, end)
-		require.NoError(t, err)
-		require.NotNil(t, res)
-		require.NotNil(t, res.Output)
-		require.NoError(t, scrypt.Close())
+			res, err = scrypt.Positions(start, end)
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			require.NotNil(t, res.Output)
+			require.NoError(t, scrypt.Close())
 
-		require.Equal(t, reference, res.Output)
+			require.Equal(t, reference, res.Output)
+		})
 	}
 }
 
@@ -155,20 +157,22 @@ func Test_ScryptPositions_Pow(t *testing.T) {
 	nonce := uint64(165545)
 
 	for _, p := range providers {
-		scrypt, err := NewScrypt(
-			WithProviderID(p.ID),
-			WithCommitment(commitment),
-			WithVRFDifficulty(vrfDifficulty),
-			WithScryptN(32),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, scrypt)
-		defer scrypt.Close()
+		t.Run(p.Model, func(t *testing.T) {
+			scrypt, err := NewScrypt(
+				WithProviderID(p.ID),
+				WithCommitment(commitment),
+				WithVRFDifficulty(vrfDifficulty),
+				WithScryptN(32),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, scrypt)
+			defer scrypt.Close()
 
-		res, err := scrypt.Positions(start, end)
-		require.NoError(t, err)
-		require.NotNil(t, res.IdxSolution)
-		require.Equal(t, nonce, *res.IdxSolution)
+			res, err := scrypt.Positions(start, end)
+			require.NoError(t, err)
+			require.NotNil(t, res.IdxSolution)
+			require.Equal(t, nonce, *res.IdxSolution)
+		})
 	}
 }
 
@@ -190,18 +194,20 @@ func Test_ScryptPositions_NoPow(t *testing.T) {
 	end := uint64(1 << 18)
 
 	for _, p := range providers {
-		scrypt, err := NewScrypt(
-			WithProviderID(p.ID),
-			WithCommitment(commitment),
-			WithVRFDifficulty(vrfDifficulty),
-			WithScryptN(32),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, scrypt)
-		defer scrypt.Close()
+		t.Run(p.Model, func(t *testing.T) {
+			scrypt, err := NewScrypt(
+				WithProviderID(p.ID),
+				WithCommitment(commitment),
+				WithVRFDifficulty(vrfDifficulty),
+				WithScryptN(32),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, scrypt)
+			defer scrypt.Close()
 
-		res, err := scrypt.Positions(start, end)
-		require.NoError(t, err)
-		require.Nil(t, res.IdxSolution)
+			res, err := scrypt.Positions(start, end)
+			require.NoError(t, err)
+			require.Nil(t, res.IdxSolution)
+		})
 	}
 }
