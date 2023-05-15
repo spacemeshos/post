@@ -50,7 +50,6 @@ func TestScryptPositions(t *testing.T) {
 		scrypt, err := NewScrypt(
 			WithProviderID(p.ID),
 			WithCommitment(commitment),
-
 			WithVRFDifficulty(vrfDifficulty),
 			WithScryptN(32),
 		)
@@ -80,6 +79,50 @@ func TestScryptPositions(t *testing.T) {
 	require.NotNil(t, prevOutput)
 	require.Len(t, prevOutput, 16*int(end-start+1))
 	require.NotNil(t, nonce)
+}
+
+func TestScrypt_Close(t *testing.T) {
+	providers, err := OpenCLProviders()
+	require.NoError(t, err)
+
+	start := uint64(1)
+	end := uint64(1 << 8)
+
+	for _, p := range providers {
+		scrypt, err := NewScrypt(
+			WithProviderID(p.ID),
+			WithCommitment(commitment),
+			WithScryptN(32),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, scrypt)
+		defer scrypt.Close()
+
+		res, err := scrypt.Positions(start, end)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.NotNil(t, res.Output)
+		require.NoError(t, scrypt.Close())
+
+		reference := res.Output
+
+		scrypt, err = NewScrypt(
+			WithProviderID(p.ID),
+			WithCommitment(commitment),
+			WithScryptN(32),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, scrypt)
+		defer scrypt.Close()
+
+		res, err = scrypt.Positions(start, end)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.NotNil(t, res.Output)
+		require.NoError(t, scrypt.Close())
+
+		require.Equal(t, reference, res.Output)
+	}
 }
 
 func TestScryptPositions_InvalidProviderId(t *testing.T) {

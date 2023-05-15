@@ -34,8 +34,6 @@ func (l testLogger) Info(msg string, args ...any)  { l.t.Logf("\tINFO\t"+msg, ar
 func (l testLogger) Debug(msg string, args ...any) { l.t.Logf("\tDEBUG\t"+msg, args...) }
 
 func TestInitialize(t *testing.T) {
-	r := require.New(t)
-
 	cfg := config.DefaultConfig()
 	cfg.LabelsPerUnit = 1 << 12
 
@@ -52,7 +50,7 @@ func TestInitialize(t *testing.T) {
 		WithInitOpts(opts),
 		WithLogger(testLogger{t: t}),
 	)
-	r.NoError(err)
+	require.NoError(t, err)
 
 	{
 		ctx, cancel := context.WithCancel(context.Background())
@@ -60,11 +58,11 @@ func TestInitialize(t *testing.T) {
 
 		var eg errgroup.Group
 		eg.Go(assertNumLabelsWritten(ctx, t, init))
-		r.NoError(init.Initialize(ctx))
+		require.NoError(t, init.Initialize(ctx))
 		cancel()
 		eg.Wait()
 	}
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+	require.Equal(t, uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m := &shared.VRFNonceMetadata{
 		NodeId:          nodeId,
@@ -72,7 +70,7 @@ func TestInitialize(t *testing.T) {
 		NumUnits:        opts.NumUnits,
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
-	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
+	require.NoError(t, verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
 }
 
 func TestMaxFileSize(t *testing.T) {
@@ -559,8 +557,6 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 }
 
 func TestInitialize_MultipleFiles(t *testing.T) {
-	r := require.New(t)
-
 	cfg := config.DefaultConfig()
 	cfg.LabelsPerUnit = 1 << 14
 
@@ -568,40 +564,44 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.MaxFileSize = deriveTotalSize(cfg, opts)
+	opts.MaxFileSize = uint64(opts.NumUnits) * cfg.LabelsPerUnit * config.BitsPerLabel / 8
 	opts.ProviderID = int(CPUProviderID())
 
-	init, err := NewInitializer(
-		WithNodeId(nodeId),
-		WithCommitmentAtxId(commitmentAtxId),
-		WithConfig(cfg),
-		WithInitOpts(opts),
-		WithLogger(testLogger{t: t}),
-	)
-	r.NoError(err)
-	r.NoError(init.Initialize(context.Background()))
+	var oneFileData []byte
+	var oneFileNonce uint64
 
-	oneFileData, err := initData(opts.DataDir)
-	r.NoError(err)
+	t.Run("NumFiles: 1", func(t *testing.T) {
+		init, err := NewInitializer(
+			WithNodeId(nodeId),
+			WithCommitmentAtxId(commitmentAtxId),
+			WithConfig(cfg),
+			WithInitOpts(opts),
+			WithLogger(testLogger{t: t}),
+		)
+		require.NoError(t, err)
+		require.NoError(t, init.Initialize(context.Background()))
 
-	m := &shared.VRFNonceMetadata{
-		NodeId:          nodeId,
-		CommitmentAtxId: commitmentAtxId,
-		NumUnits:        opts.NumUnits,
-		LabelsPerUnit:   cfg.LabelsPerUnit,
-	}
-	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
-	oneFileNonce := *init.Nonce()
+		oneFileData, err = initData(opts.DataDir)
+		require.NoError(t, err)
 
-	for numFiles := 2; numFiles <= 16; numFiles <<= 1 {
-		opts.MaxFileSize = opts.MaxFileSize / 2
-		layout := deriveFilesLayout(cfg, opts)
-		r.Equal(numFiles, int(layout.NumFiles))
+		m := &shared.VRFNonceMetadata{
+			NodeId:          nodeId,
+			CommitmentAtxId: commitmentAtxId,
+			NumUnits:        opts.NumUnits,
+			LabelsPerUnit:   cfg.LabelsPerUnit,
+		}
+		require.NoError(t, verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
+		oneFileNonce = *init.Nonce()
+	})
 
-		t.Run(fmt.Sprintf("NumFiles=%d", numFiles), func(t *testing.T) {
-			r := require.New(t)
+	for numFiles := 2; numFiles <= 16; numFiles *= 2 {
+		t.Run(fmt.Sprintf("NumFiles: %d", numFiles), func(t *testing.T) {
 			opts := opts
+			opts.MaxFileSize /= uint64(numFiles)
 			opts.DataDir = t.TempDir()
+
+			layout := deriveFilesLayout(cfg, opts)
+			require.Equal(t, numFiles, int(layout.NumFiles))
 
 			init, err := NewInitializer(
 				WithNodeId(nodeId),
@@ -610,13 +610,13 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 				WithInitOpts(opts),
 				WithLogger(testLogger{t: t}),
 			)
-			r.NoError(err)
-			r.NoError(init.Initialize(context.Background()))
+			require.NoError(t, err)
+			require.NoError(t, init.Initialize(context.Background()))
 
 			multipleFilesData, err := initData(opts.DataDir)
-			r.NoError(err)
+			require.NoError(t, err)
 
-			r.Equal(multipleFilesData, oneFileData)
+			require.Equal(t, oneFileData, multipleFilesData)
 
 			m := &shared.VRFNonceMetadata{
 				NodeId:          nodeId,
@@ -624,8 +624,8 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 				NumUnits:        opts.NumUnits,
 				LabelsPerUnit:   cfg.LabelsPerUnit,
 			}
-			r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
-			r.Equal(oneFileNonce, *init.Nonce())
+			require.NoError(t, verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
+			require.Equal(t, oneFileNonce, *init.Nonce())
 		})
 	}
 }
@@ -874,13 +874,4 @@ func initData(datadir string) ([]byte, error) {
 	defer reader.Close()
 
 	return io.ReadAll(reader)
-}
-
-func deriveTotalSize(cfg Config, opts InitOpts) uint64 {
-	totalSizeBits := uint64(opts.NumUnits) * cfg.LabelsPerUnit * config.BitsPerLabel
-	totalSize := totalSizeBits / 8
-	if totalSizeBits%8 > 0 {
-		totalSize++
-	}
-	return totalSize
 }
