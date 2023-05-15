@@ -114,6 +114,7 @@ func NewScrypt(opts ...OptionFunc) (*Scrypt, error) {
 		return nil, err
 	}
 
+	fmt.Println("Creating scrypt")
 	init, err := cNewInitializer(options)
 	if err != nil {
 		return nil, err
@@ -121,6 +122,7 @@ func NewScrypt(opts ...OptionFunc) (*Scrypt, error) {
 	if *options.providerID != cCPUProviderID() {
 		gpuMtx.Device(*options.providerID).Lock()
 	}
+	fmt.Println("Scrypt created")
 
 	return &Scrypt{
 		options: options,
@@ -130,6 +132,7 @@ func NewScrypt(opts ...OptionFunc) (*Scrypt, error) {
 
 // Close closes the Scrypt instance.
 func (s *Scrypt) Close() error {
+	fmt.Println("Closing scrypt")
 	if s.init == nil {
 		return ErrScryptClosed
 	}
@@ -139,6 +142,7 @@ func (s *Scrypt) Close() error {
 		gpuMtx.Device(*s.options.providerID).Unlock()
 	}
 	s.init = nil
+	fmt.Println("Scrypt closed")
 	return nil
 }
 

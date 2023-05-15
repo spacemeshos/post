@@ -129,6 +129,7 @@ func New(opts ...OptionFunc) (*WorkOracle, error) {
 
 // Close the WorkOracle.
 func (w *WorkOracle) Close() error {
+	fmt.Println("Closing work oracle")
 	if w.scrypt == nil {
 		return ErrWorkOracleClosed
 	}
@@ -136,6 +137,7 @@ func (w *WorkOracle) Close() error {
 		return fmt.Errorf("failed to close scrypt: %w", err)
 	}
 	w.scrypt = nil
+	fmt.Println("Work oracle closed")
 	return nil
 }
 
