@@ -3,10 +3,6 @@ package postrs
 // #cgo LDFLAGS: -lpost
 // #include <stdlib.h>
 // #include "prover.h"
-//
-// // forward declarations for callback C functions
-// void logCallback(ExternCRecord* record);
-// typedef void (*callback)(const struct ExternCRecord*);
 import "C"
 
 import (

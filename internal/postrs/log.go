@@ -41,7 +41,7 @@ var (
 
 func setLogCallback(logger *zap.Logger) {
 	oncer.Do(func() {
-		C.set_logging_callback(levelMap[log.Level()], C.callback(C.logCallback))
+		C.set_logging_callback(levelMap[logger.Level()], C.callback(C.logCallback))
 		log = logger
 	})
 }
