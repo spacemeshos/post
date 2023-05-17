@@ -77,6 +77,8 @@ func InitResultToError(retVal uint32) error {
 	}
 }
 
+// cNewInitializer calls the C function from libpostrs that creates the
+// initializer.
 func cNewInitializer(opt *option) (*C.Initializer, error) {
 	cProviderId := C.uint32_t(*opt.providerID)
 	cN := C.uintptr_t(opt.n)
@@ -91,6 +93,8 @@ func cNewInitializer(opt *option) (*C.Initializer, error) {
 	return init, nil
 }
 
+// cFreeInitializer calls the C function from libpostrs that frees the memory
+// allocated for the initializer.
 func cFreeInitializer(init *C.Initializer) {
 	C.free_initializer(init)
 }
@@ -122,10 +126,13 @@ func cScryptPositions(init *C.Initializer, opt *option, start, end uint64) ([]by
 	return output, vrfNonce, nil
 }
 
+// cCPUProviderID returns the ID for the (non OpenCL) CPU provider.
 func cCPUProviderID() uint {
 	return C.CPU_PROVIDER_ID
 }
 
+// cGetProviders calls the C function from libpostrs that fetches the list of
+// OpenCL providers.
 func cGetProviders() ([]Provider, error) {
 	cNumProviders := C.get_providers_count()
 	if cNumProviders == 0 {
