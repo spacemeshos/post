@@ -4,7 +4,6 @@ type Proof struct {
 	Nonce   uint32
 	Indices []byte
 	K2Pow   uint64
-	K3Pow   uint64
 }
 
 type ProofMetadata struct {

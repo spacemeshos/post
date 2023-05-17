@@ -46,7 +46,6 @@ type Config struct {
 	K3 uint32 // K3 is the size of the subset of proof indices that is validated.
 
 	K2PowDifficulty uint64
-	K3PowDifficulty uint64
 }
 
 func DefaultConfig() Config {
@@ -58,7 +57,6 @@ func DefaultConfig() Config {
 		K2:              300,
 		K3:              100,
 		K2PowDifficulty: 0x0FFFFFFF_FFFFFFFF,
-		K3PowDifficulty: 0x0FFFFFFF_FFFFFFFF,
 	}
 }
 
