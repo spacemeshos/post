@@ -11,10 +11,6 @@ import "C"
 
 import (
 	"errors"
-	"sync"
-
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 // gpuMtx is an instance of deviceMutex that can be used to prevent concurrent calls
@@ -85,55 +81,9 @@ func InitResultToError(retVal uint32) error {
 	}
 }
 
-var (
-	log   *zap.Logger
-	oncer sync.Once
-
-	levelMap = map[zapcore.Level]C.Level{
-		zapcore.DebugLevel:  C.Debug,
-		zapcore.InfoLevel:   C.Info,
-		zapcore.WarnLevel:   C.Warn,
-		zapcore.ErrorLevel:  C.Error,
-		zapcore.DPanicLevel: C.Error,
-		zapcore.PanicLevel:  C.Error,
-		zapcore.FatalLevel:  C.Error,
-	}
-
-	zapLevelMap = map[C.Level]zapcore.Level{
-		C.Error: zapcore.ErrorLevel,
-		C.Warn:  zapcore.WarnLevel,
-		C.Info:  zapcore.InfoLevel,
-		C.Debug: zapcore.DebugLevel,
-		C.Trace: zapcore.DebugLevel,
-	}
-)
-
-func setLogCallback(logger *zap.Logger) {
-	oncer.Do(func() {
-		log = logger
-		C.set_logging_callback(levelMap[log.Level()], C.callback(C.logCallback))
-	})
-}
-
-//export logCallback
-func logCallback(record *C.ExternCRecord) {
-	msg := C.GoStringN(record.message.ptr, (C.int)(record.message.len))
-	fields := []zap.Field{
-		zap.String("module", C.GoStringN(record.module_path.ptr, (C.int)(record.module_path.len))),
-		zap.String("file", C.GoStringN(record.file.ptr, (C.int)(record.file.len))),
-		zap.Int64("line", int64(record.line)),
-	}
-
-	log.Log(zapLevelMap[record.level], msg, fields...)
-}
-
 // cNewInitializer calls the C function from libpostrs that creates the
 // initializer.
 func cNewInitializer(opt *option) (*C.Initializer, error) {
-	if *opt.providerID != cCPUProviderID() {
-		gpuMtx.Device(*opt.providerID).Lock()
-		defer gpuMtx.Device(*opt.providerID).Unlock()
-	}
 	if opt.logger != nil {
 		setLogCallback(opt.logger)
 	}

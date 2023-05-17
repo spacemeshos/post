@@ -491,20 +491,19 @@ func (init *Initializer) initFile(ctx context.Context, wo *oracle.WorkOracle, fi
 		if res.Nonce != nil {
 			candidate := res.Output[(*res.Nonce-startPosition)*16:]
 			candidate = candidate[:16]
-			init.logger.Info("initialization: found nonce",
+
+			fields := []zap.Field{
 				zap.Int("fileIndex", fileIndex),
 				zap.Uint64("nonce", *res.Nonce),
 				zap.String("value", hex.EncodeToString(candidate)),
-			)
+			}
+			init.logger.Debug("initialization: found nonce", fields...)
 
 			if init.nonceValue == nil || bytes.Compare(candidate, init.nonceValue) < 0 {
 				nonceValue := make([]byte, 16)
 				copy(nonceValue, candidate)
 
-				init.logger.Info("initialization: found new best nonce",
-					zap.Int("fileIndex", fileIndex),
-					zap.Uint64("nonce", *res.Nonce),
-				)
+				init.logger.Info("initialization: found new best nonce", fields...)
 				init.nonceValue = nonceValue
 				init.nonce.Store(res.Nonce)
 				init.saveMetadata()
