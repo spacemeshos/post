@@ -102,7 +102,7 @@ func cScryptPositions(init *C.Initializer, opt *option, start, end uint64) ([]by
 	cStartPosition := C.uint64_t(start)
 	cEndPosition := C.uint64_t(end)
 	cOutputSize := C.size_t(outputSize)
-	cOut := (C.calloc(cOutputSize, 1))
+	cOut := (C.malloc(cOutputSize))
 	defer C.free(cOut)
 
 	var cIdxSolution C.uint64_t
