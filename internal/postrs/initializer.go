@@ -77,14 +77,9 @@ func InitResultToError(retVal uint32) error {
 	}
 }
 
-// cScryptPositions calls the C functions from libpostrs that create the labels
-// and VRF proofs.
-func cScryptPositions(opt *option) ([]byte, *uint64, error) {
-	if *opt.providerID != cCPUProviderID() {
-		gpuMtx.Device(*opt.providerID).Lock()
-		defer gpuMtx.Device(*opt.providerID).Unlock()
-	}
-
+// cNewInitializer calls the C function from libpostrs that creates the
+// initializer.
+func cNewInitializer(opt *option) (*C.Initializer, error) {
 	cProviderId := C.uint32_t(*opt.providerID)
 	cN := C.uintptr_t(opt.n)
 	cCommitment := C.CBytes(opt.commitment)
@@ -93,15 +88,25 @@ func cScryptPositions(opt *option) ([]byte, *uint64, error) {
 	defer C.free(cDifficulty)
 	init := C.new_initializer(cProviderId, cN, (*C.uchar)(cCommitment), (*C.uchar)(cDifficulty))
 	if init == nil {
-		return nil, nil, ErrInvalidProviderID
+		return nil, ErrInvalidProviderID
 	}
-	defer C.free_initializer(init)
+	return init, nil
+}
 
-	outputSize := LabelLength * (opt.endPosition - opt.startPosition + 1)
-	cStartPosition := C.uint64_t(opt.startPosition)
-	cEndPosition := C.uint64_t(opt.endPosition)
+// cFreeInitializer calls the C function from libpostrs that frees the memory
+// allocated for the initializer.
+func cFreeInitializer(init *C.Initializer) {
+	C.free_initializer(init)
+}
+
+// cScryptPositions calls the C functions from libpostrs that create the labels
+// and VRF proofs.
+func cScryptPositions(init *C.Initializer, opt *option, start, end uint64) ([]byte, *uint64, error) {
+	outputSize := LabelLength * (end - start + 1)
+	cStartPosition := C.uint64_t(start)
+	cEndPosition := C.uint64_t(end)
 	cOutputSize := C.size_t(outputSize)
-	cOut := (C.calloc(cOutputSize, 1))
+	cOut := (C.malloc(cOutputSize))
 	defer C.free(cOut)
 
 	var cIdxSolution C.uint64_t
@@ -121,10 +126,13 @@ func cScryptPositions(opt *option) ([]byte, *uint64, error) {
 	return output, vrfNonce, nil
 }
 
+// cCPUProviderID returns the ID for the (non OpenCL) CPU provider.
 func cCPUProviderID() uint {
 	return C.CPU_PROVIDER_ID
 }
 
+// cGetProviders calls the C function from libpostrs that fetches the list of
+// OpenCL providers.
 func cGetProviders() ([]Provider, error) {
 	cNumProviders := C.get_providers_count()
 	if cNumProviders == 0 {

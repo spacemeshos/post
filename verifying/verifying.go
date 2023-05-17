@@ -35,12 +35,17 @@ func VerifyVRFNonce(nonce *uint64, m *shared.VRFNonceMetadata, opts ...OptionFun
 	numLabels := uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
 	difficulty := shared.PowDifficulty(numLabels)
 
-	res, err := oracle.WorkOracle(
+	wo, err := oracle.New(
 		oracle.WithCommitment(oracle.CommitmentBytes(m.NodeId, m.CommitmentAtxId)),
-		oracle.WithPosition(*nonce),
 		oracle.WithScryptParams(options.labelScrypt),
 		oracle.WithVRFDifficulty(difficulty),
 	)
+	if err != nil {
+		return err
+	}
+	defer wo.Close()
+
+	res, err := wo.Position(*nonce)
 	if err != nil {
 		return err
 	}

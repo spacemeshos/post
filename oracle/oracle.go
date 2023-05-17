@@ -8,12 +8,13 @@ import (
 	"github.com/spacemeshos/post/internal/postrs"
 )
 
+// ErrWorkOracleClosed is returned when calling a method on an already closed WorkOracle instance.
+var ErrWorkOracleClosed = errors.New("work oracle has been closed")
+
 type option struct {
 	providerID *uint
 
 	commitment    []byte
-	startPosition uint64
-	endPosition   uint64
 	n             uint32
 	vrfDifficulty []byte
 }
@@ -27,10 +28,6 @@ func (o *option) validate() error {
 		return errors.New("`commitment` is required")
 	}
 
-	if o.startPosition > o.endPosition {
-		return fmt.Errorf("invalid `startPosition` and `endPosition`; expected: start <= end, given: %v > %v", o.startPosition, o.endPosition)
-	}
-
 	if o.n > 0 && o.n&(o.n-1) != 0 {
 		return fmt.Errorf("invalid `n`; expected: power of 2, given: %v", o.n)
 	}
@@ -42,6 +39,7 @@ func (o *option) validate() error {
 	return nil
 }
 
+// OptionFunc is a function that sets an option for a WorkOracle instance.
 type OptionFunc func(*option) error
 
 // WithProviderID sets the ID of the openCL provider to use.
@@ -61,24 +59,6 @@ func WithCommitment(commitment []byte) OptionFunc {
 		}
 
 		opts.commitment = commitment
-		return nil
-	}
-}
-
-// WithPosition sets the index of one label to compute.
-func WithPosition(position uint64) OptionFunc {
-	return func(opts *option) error {
-		opts.startPosition = position
-		opts.endPosition = position
-		return nil
-	}
-}
-
-// WithStartAndEndPosition sets the range of indices of labels for the oracle to compute.
-func WithStartAndEndPosition(start, end uint64) OptionFunc {
-	return func(opts *option) error {
-		opts.startPosition = start
-		opts.endPosition = end
 		return nil
 	}
 }
@@ -109,6 +89,56 @@ func WithScryptParams(params config.ScryptParams) OptionFunc {
 	}
 }
 
+// WorkOracle is a service that can compute labels for a given Node ID and CommitmentATX ID.
+type WorkOracle struct {
+	options *option
+	scrypt  *postrs.Scrypt
+}
+
+// New returns a WorkOracle. If not specified, the labels are computed using the default (CPU) provider.
+func New(opts ...OptionFunc) (*WorkOracle, error) {
+	options := &option{}
+	options.providerID = new(uint)
+	*options.providerID = postrs.CPUProviderID()
+
+	for _, opt := range opts {
+		if err := opt(options); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := options.validate(); err != nil {
+		return nil, err
+	}
+
+	scrypt, err := postrs.NewScrypt(
+		postrs.WithProviderID(*options.providerID),
+		postrs.WithCommitment(options.commitment),
+		postrs.WithScryptN(options.n),
+		postrs.WithVRFDifficulty(options.vrfDifficulty),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &WorkOracle{
+		options: options,
+		scrypt:  scrypt,
+	}, nil
+}
+
+// Close the WorkOracle.
+func (w *WorkOracle) Close() error {
+	if w.scrypt == nil {
+		return ErrWorkOracleClosed
+	}
+	if err := w.scrypt.Close(); err != nil && !errors.Is(err, postrs.ErrScryptClosed) {
+		return fmt.Errorf("failed to close scrypt: %w", err)
+	}
+	w.scrypt = nil
+	return nil
+}
+
 // WorkOracleResult is the result of a call to WorkOracle.
 // It contains the computed labels and a nonce for a proof of work.
 type WorkOracleResult struct {
@@ -116,30 +146,22 @@ type WorkOracleResult struct {
 	Nonce  *uint64 // Nonce is the nonce of the proof of work
 }
 
-// WorkOracle computes labels for a given challenge for a Node with the provided CommitmentATX ID.
-// The labels are computed using the specified compute provider (default: CPU).
-func WorkOracle(opts ...OptionFunc) (WorkOracleResult, error) {
-	options := &option{}
-	options.providerID = new(uint)
-	*options.providerID = postrs.CPUProviderID()
+// Position computes the label for a given position.
+func (w *WorkOracle) Position(p uint64) (WorkOracleResult, error) {
+	return w.Positions(p, p)
+}
 
-	for _, opt := range opts {
-		if err := opt(options); err != nil {
-			return WorkOracleResult{}, err
-		}
+// Positions computes the labels for a given range of positions.
+func (w *WorkOracle) Positions(start, end uint64) (WorkOracleResult, error) {
+	if w.scrypt == nil {
+		return WorkOracleResult{}, ErrWorkOracleClosed
 	}
 
-	if err := options.validate(); err != nil {
-		return WorkOracleResult{}, err
+	if start > end {
+		return WorkOracleResult{}, fmt.Errorf("invalid `start` and `end`; expected: start <= end, given: %v > %v", start, end)
 	}
 
-	res, err := postrs.ScryptPositions(
-		postrs.WithProviderID(*options.providerID),
-		postrs.WithCommitment(options.commitment),
-		postrs.WithStartAndEndPosition(options.startPosition, options.endPosition),
-		postrs.WithScryptN(options.n),
-		postrs.WithVRFDifficulty(options.vrfDifficulty),
-	)
+	res, err := w.scrypt.Positions(start, end)
 	if err != nil {
 		return WorkOracleResult{}, err
 	}

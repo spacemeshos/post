@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/spacemeshos/post/internal/gpu"
 )
 
 var (
@@ -49,13 +47,17 @@ func TestScryptPositions(t *testing.T) {
 	var prevOutput []byte
 	var nonce *uint64
 	for _, p := range providers {
-		res, err := ScryptPositions(
+		scrypt, err := NewScrypt(
 			WithProviderID(p.ID),
 			WithCommitment(commitment),
-			WithStartAndEndPosition(start, end),
 			WithVRFDifficulty(vrfDifficulty),
 			WithScryptN(32),
 		)
+		require.NoError(t, err)
+		require.NotNil(t, scrypt)
+		defer scrypt.Close()
+
+		res, err := scrypt.Positions(start, end)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.NotNil(t, res.Output)
@@ -77,37 +79,59 @@ func TestScryptPositions(t *testing.T) {
 	require.NotNil(t, prevOutput)
 	require.Len(t, prevOutput, 16*int(end-start+1))
 	require.NotNil(t, nonce)
+}
 
-	// sanity test against output of gpu-post
-	gpuProviders := gpu.Providers()
-	salt := make([]byte, 32)
+func TestScrypt_Close(t *testing.T) {
+	providers, err := OpenCLProviders()
+	require.NoError(t, err)
 
-	for _, p := range gpuProviders {
-		res, err := gpu.ScryptPositions(
-			gpu.WithComputeProviderID(p.ID),
-			gpu.WithCommitment(commitment),
-			gpu.WithSalt(salt),
-			gpu.WithStartAndEndPosition(start, end),
-			gpu.WithBitsPerLabel(128), // 16 byte labels
-			gpu.WithScryptParams(32, 1, 1),
-			gpu.WithComputePow(vrfDifficulty),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, res)
-		require.NotNil(t, res.Output)
-		require.Len(t, res.Output, 16*int(end-start+1))
+	start := uint64(1)
+	end := uint64(1 << 8)
 
-		require.Equal(t, prevOutput, res.Output)
-		require.Equal(t, *nonce, *res.IdxSolution)
+	for _, p := range providers {
+		t.Run(p.Model, func(t *testing.T) {
+			scrypt, err := NewScrypt(
+				WithProviderID(p.ID),
+				WithCommitment(commitment),
+				WithScryptN(32),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, scrypt)
+			defer scrypt.Close()
+
+			res, err := scrypt.Positions(start, end)
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			require.NotNil(t, res.Output)
+			require.NoError(t, scrypt.Close())
+
+			reference := res.Output
+
+			scrypt, err = NewScrypt(
+				WithProviderID(p.ID),
+				WithCommitment(commitment),
+				WithScryptN(32),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, scrypt)
+			defer scrypt.Close()
+
+			res, err = scrypt.Positions(start, end)
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			require.NotNil(t, res.Output)
+			require.NoError(t, scrypt.Close())
+
+			require.Equal(t, reference, res.Output)
+		})
 	}
 }
 
 func TestScryptPositions_InvalidProviderId(t *testing.T) {
 	invalidProviderId := uint(1 << 10)
-	_, err := ScryptPositions(
+	_, err := NewScrypt(
 		WithProviderID(invalidProviderId),
 		WithCommitment(commitment),
-		WithStartAndEndPosition(1, 1),
 		WithVRFDifficulty(defaultDifficulty),
 		WithScryptN(32),
 	)
@@ -133,17 +157,22 @@ func Test_ScryptPositions_Pow(t *testing.T) {
 	nonce := uint64(165545)
 
 	for _, p := range providers {
-		res, err := ScryptPositions(
-			WithProviderID(p.ID),
-			WithCommitment(commitment),
-			WithStartAndEndPosition(start, end),
-			WithVRFDifficulty(vrfDifficulty),
-			WithScryptN(32),
-		)
+		t.Run(p.Model, func(t *testing.T) {
+			scrypt, err := NewScrypt(
+				WithProviderID(p.ID),
+				WithCommitment(commitment),
+				WithVRFDifficulty(vrfDifficulty),
+				WithScryptN(32),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, scrypt)
+			defer scrypt.Close()
 
-		require.NoError(t, err)
-		require.NotNil(t, res.IdxSolution)
-		require.Equal(t, nonce, *res.IdxSolution)
+			res, err := scrypt.Positions(start, end)
+			require.NoError(t, err)
+			require.NotNil(t, res.IdxSolution)
+			require.Equal(t, nonce, *res.IdxSolution)
+		})
 	}
 }
 
@@ -165,15 +194,20 @@ func Test_ScryptPositions_NoPow(t *testing.T) {
 	end := uint64(1 << 18)
 
 	for _, p := range providers {
-		res, err := ScryptPositions(
-			WithProviderID(p.ID),
-			WithCommitment(commitment),
-			WithStartAndEndPosition(start, end),
-			WithVRFDifficulty(vrfDifficulty),
-			WithScryptN(32),
-		)
+		t.Run(p.Model, func(t *testing.T) {
+			scrypt, err := NewScrypt(
+				WithProviderID(p.ID),
+				WithCommitment(commitment),
+				WithVRFDifficulty(vrfDifficulty),
+				WithScryptN(32),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, scrypt)
+			defer scrypt.Close()
 
-		require.NoError(t, err)
-		require.Nil(t, res.IdxSolution)
+			res, err := scrypt.Positions(start, end)
+			require.NoError(t, err)
+			require.Nil(t, res.IdxSolution)
+		})
 	}
 }

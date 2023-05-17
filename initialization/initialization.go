@@ -256,6 +256,17 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	difficulty := init.powDifficultyFunc(numLabels)
 	batchSize := init.opts.ComputeBatchSize
 
+	wo, err := oracle.New(
+		oracle.WithProviderID(uint(init.opts.ProviderID)),
+		oracle.WithCommitment(init.commitment),
+		oracle.WithVRFDifficulty(difficulty),
+		oracle.WithScryptParams(init.opts.Scrypt),
+	)
+	if err != nil {
+		return err
+	}
+	defer wo.Close()
+
 	for i := 0; i < int(layout.NumFiles); i++ {
 		fileOffset := uint64(i) * layout.FileNumLabels
 		fileNumLabels := layout.FileNumLabels
@@ -263,7 +274,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 			fileNumLabels = layout.LastFileNumLabels
 		}
 
-		if err := init.initFile(ctx, i, batchSize, fileOffset, fileNumLabels, difficulty); err != nil {
+		if err := init.initFile(ctx, wo, i, batchSize, fileOffset, fileNumLabels, difficulty); err != nil {
 			return err
 		}
 	}
@@ -280,6 +291,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 
 	// continue searching for a nonce
 	defer init.saveMetadata()
+
 	for i := *init.lastPosition.Load(); i < math.MaxUint64; i += batchSize {
 		lastPos := i
 		init.lastPosition.Store(&lastPos)
@@ -294,13 +306,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 
 		init.logger.Debug("initialization: continue looking for a nonce: start position: %v, batch size: %v", i, batchSize)
 
-		res, err := oracle.WorkOracle(
-			oracle.WithProviderID(uint(init.opts.ProviderID)),
-			oracle.WithCommitment(init.commitment),
-			oracle.WithStartAndEndPosition(i, i+batchSize-1),
-			oracle.WithVRFDifficulty(difficulty),
-			oracle.WithScryptParams(init.opts.Scrypt),
-		)
+		res, err := wo.Positions(i, i+batchSize-1)
 		if err != nil {
 			return err
 		}
@@ -399,7 +405,7 @@ func (init *Initializer) Status() Status {
 	return StatusNotStarted
 }
 
-func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize, fileOffset, fileNumLabels uint64, difficulty []byte) error {
+func (init *Initializer) initFile(ctx context.Context, wo *oracle.WorkOracle, fileIndex int, batchSize, fileOffset, fileNumLabels uint64, difficulty []byte) error {
 	fileTargetPosition := fileOffset + fileNumLabels
 
 	// Initialize the labels file writer.
@@ -459,13 +465,7 @@ func (init *Initializer) initFile(ctx context.Context, fileIndex int, batchSize,
 		startPosition := fileOffset + currentPosition
 		endPosition := startPosition + uint64(batchSize) - 1
 
-		res, err := oracle.WorkOracle(
-			oracle.WithProviderID(uint(init.opts.ProviderID)),
-			oracle.WithCommitment(init.commitment),
-			oracle.WithStartAndEndPosition(startPosition, endPosition),
-			oracle.WithVRFDifficulty(difficulty),
-			oracle.WithScryptParams(init.opts.Scrypt),
-		)
+		res, err := wo.Positions(startPosition, endPosition)
 		if err != nil {
 			return err
 		}

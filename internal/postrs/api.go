@@ -1,9 +1,16 @@
 package postrs
 
+// #cgo LDFLAGS: -lpost
+// #include "prover.h"
+import "C"
+
 import (
 	"errors"
 	"fmt"
 )
+
+// ErrScryptClosed is returned when calling a method on an already closed Scrypt instance.
+var ErrScryptClosed = errors.New("scrypt has been closed")
 
 func OpenCLProviders() ([]Provider, error) {
 	return cGetProviders()
@@ -23,8 +30,6 @@ type option struct {
 	providerID *uint
 
 	commitment    []byte
-	startPosition uint64
-	endPosition   uint64
 	n             uint32
 	vrfDifficulty []byte
 }
@@ -38,10 +43,6 @@ func (o *option) validate() error {
 		return errors.New("`commitment` is required")
 	}
 
-	if o.startPosition > o.endPosition {
-		return fmt.Errorf("invalid `startPosition` and `endPosition`; expected: start <= end, given: %v > %v", o.startPosition, o.endPosition)
-	}
-
 	if o.n > 0 && o.n&(o.n-1) != 0 {
 		return fmt.Errorf("invalid `n`; expected: power of 2, given: %v", o.n)
 	}
@@ -49,6 +50,7 @@ func (o *option) validate() error {
 	return nil
 }
 
+// OptionFunc is a function that sets an option for a Scrypt instance.
 type OptionFunc func(*option) error
 
 // WithProviderID sets the ID of the openCL provider to use.
@@ -60,6 +62,7 @@ func WithProviderID(id uint) OptionFunc {
 	}
 }
 
+// WithCommitment sets the commitment to use for the scrypt computation.
 func WithCommitment(commitment []byte) OptionFunc {
 	return func(opts *option) error {
 		if len(commitment) != 32 {
@@ -71,14 +74,7 @@ func WithCommitment(commitment []byte) OptionFunc {
 	}
 }
 
-func WithStartAndEndPosition(start, end uint64) OptionFunc {
-	return func(opts *option) error {
-		opts.startPosition = start
-		opts.endPosition = end
-		return nil
-	}
-}
-
+// WithScryptN sets the N parameter for the scrypt computation.
 func WithScryptN(n uint32) OptionFunc {
 	return func(opts *option) error {
 		opts.n = n
@@ -86,6 +82,7 @@ func WithScryptN(n uint32) OptionFunc {
 	}
 }
 
+// WithVRFDifficulty sets the difficulty for the VRF nonce computation.
 func WithVRFDifficulty(difficulty []byte) OptionFunc {
 	return func(opts *option) error {
 		if len(difficulty) != 32 {
@@ -97,20 +94,69 @@ func WithVRFDifficulty(difficulty []byte) OptionFunc {
 	}
 }
 
-// ScryptPositions computes the scrypt output for the given options.
-func ScryptPositions(opts ...OptionFunc) (ScryptPositionsResult, error) {
+// Scrypt is a scrypt computation instance. It communicates with post-rs to perform
+// the scrypt computation on the GPU or CPU.
+type Scrypt struct {
+	options *option
+	init    *C.Initializer
+}
+
+// NewScrypt creates a new Scrypt instance.
+func NewScrypt(opts ...OptionFunc) (*Scrypt, error) {
 	options := &option{}
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
-			return ScryptPositionsResult{}, err
+			return nil, err
 		}
 	}
 
 	if err := options.validate(); err != nil {
+		return nil, err
+	}
+
+	init, err := cNewInitializer(options)
+	if err != nil {
+		return nil, err
+	}
+	if *options.providerID != cCPUProviderID() {
+		gpuMtx.Device(*options.providerID).Lock()
+	}
+
+	return &Scrypt{
+		options: options,
+		init:    init,
+	}, nil
+}
+
+// Close closes the Scrypt instance.
+func (s *Scrypt) Close() error {
+	if s.init == nil {
+		return ErrScryptClosed
+	}
+
+	cFreeInitializer(s.init)
+	if *s.options.providerID != cCPUProviderID() {
+		gpuMtx.Device(*s.options.providerID).Unlock()
+	}
+	s.init = nil
+	return nil
+}
+
+// Positions computes the scrypt output for the given options.
+func (s *Scrypt) Positions(start, end uint64) (ScryptPositionsResult, error) {
+	if s.init == nil {
+		return ScryptPositionsResult{}, ErrScryptClosed
+	}
+
+	if start > end {
+		return ScryptPositionsResult{}, fmt.Errorf("invalid `start` and `end`; expected: start <= end, given: %v > %v", start, end)
+	}
+
+	if err := s.options.validate(); err != nil {
 		return ScryptPositionsResult{}, err
 	}
 
-	output, idxSolution, err := cScryptPositions(options)
+	output, idxSolution, err := cScryptPositions(s.init, s.options, start, end)
 	return ScryptPositionsResult{
 		Output:      output,
 		IdxSolution: idxSolution,
