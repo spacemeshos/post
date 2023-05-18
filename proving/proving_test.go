@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
@@ -29,23 +31,13 @@ func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	return cfg, opts
 }
 
-type testLogger struct {
-	shared.Logger
-
-	tb testing.TB
-}
-
-func (l testLogger) Info(msg string, args ...any)  { l.tb.Logf("\tINFO\t"+msg, args...) }
-func (l testLogger) Debug(msg string, args ...any) { l.tb.Logf("\tDEBUG\t"+msg, args...) }
-func (l testLogger) Error(msg string, args ...any) { l.tb.Logf("\tERROR\t"+msg, args...) }
-
 func Test_Generate(t *testing.T) {
 	for numUnits := uint32(1); numUnits < 6; numUnits++ {
 		numUnits := numUnits
 		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
 			t.Parallel()
 			r := require.New(t)
-			log := testLogger{tb: t}
+			log := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
 
 			nodeId := make([]byte, 32)
 			commitmentAtxId := make([]byte, 32)
@@ -90,11 +82,15 @@ func Test_Generate(t *testing.T) {
 			indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
 			r.Equal(shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
 
-			log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
+			log.Info("post status",
+				zap.Uint64("numLabels", numLabels),
+				zap.Int("indices size", len(proof.Indices)),
+			)
 			r.NoError(verifying.Verify(
 				proof,
 				proofMetaData,
 				cfg,
+				zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
 				verifying.WithLabelScryptParams(opts.Scrypt)),
 			)
 		})
@@ -112,44 +108,38 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 		initialization.WithCommitmentAtxId(commitmentAtxId),
 		initialization.WithConfig(cfg),
 		initialization.WithInitOpts(opts),
-		initialization.WithLogger(testLogger{tb: t}),
+		initialization.WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	require.NoError(t, err)
 	require.NoError(t, init.Initialize(context.Background()))
 
 	t.Run("invalid nodeId", func(t *testing.T) {
-		log := testLogger{tb: t}
-
 		newNodeId := make([]byte, 32)
 		copy(newNodeId, nodeId)
 		newNodeId[0] = newNodeId[0] + 1
 
-		_, _, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, newNodeId, commitmentAtxId, opts.DataDir))
+		_, _, err := Generate(context.Background(), ch, cfg, zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)), WithDataSource(cfg, newNodeId, commitmentAtxId, opts.DataDir))
 		var errConfigMismatch initialization.ConfigMismatchError
 		require.ErrorAs(t, err, &errConfigMismatch)
 		require.Equal(t, "NodeId", errConfigMismatch.Param)
 	})
 
 	t.Run("invalid atxId", func(t *testing.T) {
-		log := testLogger{tb: t}
-
 		newAtxId := make([]byte, 32)
 		copy(newAtxId, commitmentAtxId)
 		newAtxId[0] = newAtxId[0] + 1
 
-		_, _, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, nodeId, newAtxId, opts.DataDir))
+		_, _, err := Generate(context.Background(), ch, cfg, zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)), WithDataSource(cfg, nodeId, newAtxId, opts.DataDir))
 		var errConfigMismatch initialization.ConfigMismatchError
 		require.ErrorAs(t, err, &errConfigMismatch)
 		require.Equal(t, "CommitmentAtxId", errConfigMismatch.Param)
 	})
 
 	t.Run("invalid LabelsPerUnit", func(t *testing.T) {
-		log := testLogger{tb: t}
-
 		newCfg := cfg
 		newCfg.LabelsPerUnit++
 
-		_, _, err := Generate(context.Background(), ch, newCfg, log, WithDataSource(newCfg, nodeId, commitmentAtxId, opts.DataDir))
+		_, _, err := Generate(context.Background(), ch, newCfg, zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)), WithDataSource(newCfg, nodeId, commitmentAtxId, opts.DataDir))
 		var errConfigMismatch initialization.ConfigMismatchError
 		require.ErrorAs(t, err, &errConfigMismatch)
 		require.Equal(t, "LabelsPerUnit", errConfigMismatch.Param)
@@ -158,7 +148,7 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 
 func Test_Generate_TestNetSettings(t *testing.T) {
 	r := require.New(t)
-	log := testLogger{tb: t}
+	log := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
 
 	nodeId := make([]byte, 32)
 	commitmentAtxId := make([]byte, 32)
@@ -206,11 +196,15 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	indexBitSize := uint(shared.BinaryRepresentationMinBits(numLabels))
 	r.Equal(shared.Size(indexBitSize, uint(cfg.K2)), uint(len(proof.Indices)))
 
-	log.Info("numLabels: %v, indices size: %v\n", numLabels, len(proof.Indices))
+	log.Info("post status",
+		zap.Uint64("numLabels", numLabels),
+		zap.Int("indices size", len(proof.Indices)),
+	)
 	r.NoError(verifying.Verify(
 		proof,
 		proofMetaData,
 		cfg,
+		zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
 		verifying.WithLabelScryptParams(opts.Scrypt)),
 	)
 }

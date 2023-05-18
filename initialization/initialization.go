@@ -3,6 +3,7 @@ package initialization
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -10,6 +11,8 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+
+	"go.uber.org/zap"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/internal/postrs"
@@ -22,7 +25,7 @@ type (
 	Config              = config.Config
 	InitOpts            = config.InitOpts
 	Proof               = shared.Proof
-	Logger              = shared.Logger
+	Logger              = zap.Logger
 	ConfigMismatchError = shared.ConfigMismatchError
 	Provider            = postrs.Provider
 )
@@ -62,7 +65,7 @@ type option struct {
 	cfg      *Config
 	initOpts *config.InitOpts
 
-	logger            Logger
+	logger            *Logger
 	powDifficultyFunc func(uint64) []byte
 }
 
@@ -131,11 +134,8 @@ func WithConfig(cfg Config) OptionFunc {
 }
 
 // WithLogger sets the logger for the initializer.
-func WithLogger(logger Logger) OptionFunc {
+func WithLogger(logger *zap.Logger) OptionFunc {
 	return func(opts *option) error {
-		if logger == nil {
-			return errors.New("logger is nil")
-		}
 		opts.logger = logger
 		return nil
 	}
@@ -171,13 +171,13 @@ type Initializer struct {
 	diskState        *DiskState
 	mtx              sync.RWMutex
 
-	logger            Logger
+	logger            *Logger
 	powDifficultyFunc func(uint64) []byte
 }
 
 func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 	options := &option{
-		logger: shared.NoopLogger{},
+		logger: zap.NewNop(),
 
 		powDifficultyFunc: shared.PowDifficulty,
 	}
@@ -236,17 +236,16 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	defer init.mtx.Unlock()
 
 	layout := deriveFilesLayout(init.cfg, init.opts)
-	init.logger.Info(
-		"initialization: datadir: %v, number of units: %v, max file size: %v, number of labels per unit: %v",
-		init.opts.DataDir,
-		init.opts.NumUnits,
-		init.opts.MaxFileSize,
-		init.cfg.LabelsPerUnit,
+	init.logger.Info("initialization started",
+		zap.String("datadir", init.opts.DataDir),
+		zap.Uint32("numUnits", init.opts.NumUnits),
+		zap.Uint64("maxFileSize", init.opts.MaxFileSize),
+		zap.Uint64("labelsPerUnit", init.cfg.LabelsPerUnit),
 	)
-	init.logger.Info("initialization: files layout: number of files: %v, number of labels per file: %v, last file number of labels: %v",
-		layout.NumFiles,
-		layout.FileNumLabels,
-		layout.LastFileNumLabels,
+	init.logger.Info("initialization file layout",
+		zap.Uint("numFiles", layout.NumFiles),
+		zap.Uint64("labelsPerFile", layout.FileNumLabels),
+		zap.Uint64("labelsLastFile", layout.LastFileNumLabels),
 	)
 	if err := init.removeRedundantFiles(layout); err != nil {
 		return err
@@ -261,6 +260,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		oracle.WithCommitment(init.commitment),
 		oracle.WithVRFDifficulty(difficulty),
 		oracle.WithScryptParams(init.opts.Scrypt),
+		oracle.WithLogger(init.logger),
 	)
 	if err != nil {
 		return err
@@ -304,14 +304,19 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 			// continue looking for a nonce
 		}
 
-		init.logger.Debug("initialization: continue looking for a nonce: start position: %v, batch size: %v", i, batchSize)
+		init.logger.Debug("initialization: continue looking for a nonce",
+			zap.Uint64("startPosition", i),
+			zap.Uint64("batchSize", batchSize),
+		)
 
 		res, err := wo.Positions(i, i+batchSize-1)
 		if err != nil {
 			return err
 		}
 		if res.Nonce != nil {
-			init.logger.Debug("initialization: found nonce: %d", *res.Nonce)
+			init.logger.Debug("initialization: found nonce",
+				zap.Uint64("nonce", *res.Nonce),
+			)
 
 			init.nonce.Store(res.Nonce)
 			return nil
@@ -329,7 +334,9 @@ func (init *Initializer) removeRedundantFiles(layout filesLayout) error {
 
 	for i := int(layout.NumFiles); i < numFiles; i++ {
 		name := shared.InitFileName(i)
-		init.logger.Info("initialization: removing redundant file: %v", name)
+		init.logger.Info("initialization: removing redundant file",
+			zap.String("fileName", name),
+		)
 		if err := init.RemoveFile(name); err != nil {
 			return err
 		}
@@ -420,14 +427,21 @@ func (init *Initializer) initFile(ctx context.Context, wo *oracle.WorkOracle, fi
 		return err
 	}
 
+	fields := []zap.Field{
+		zap.Int("fileIndex", fileIndex),
+		zap.Uint64("currentNumLabels", numLabelsWritten),
+		zap.Uint64("targetNumLabels", fileNumLabels),
+		zap.Uint64("startPosition", fileOffset),
+	}
+
 	switch {
 	case numLabelsWritten == fileNumLabels:
-		init.logger.Info("initialization: file #%v already initialized; number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileOffset)
+		init.logger.Info("initialization: file already initialized", fields...)
 		init.numLabelsWritten.Store(fileTargetPosition)
 		return nil
 
 	case numLabelsWritten > fileNumLabels:
-		init.logger.Info("initialization: truncating file #%v; current number of labels: %v, target number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileNumLabels, fileOffset)
+		init.logger.Info("initialization: truncating file")
 		if err := writer.Truncate(fileNumLabels); err != nil {
 			return err
 		}
@@ -435,10 +449,10 @@ func (init *Initializer) initFile(ctx context.Context, wo *oracle.WorkOracle, fi
 		return nil
 
 	case numLabelsWritten > 0:
-		init.logger.Info("initialization: continuing to write file #%v; current number of labels: %v, target number of labels: %v, start position: %v", fileIndex, numLabelsWritten, fileNumLabels, fileOffset)
+		init.logger.Info("initialization: continuing to write file", fields...)
 
 	default:
-		init.logger.Info("initialization: starting to write file #%v; target number of labels: %v, start position: %v", fileIndex, fileNumLabels, fileOffset)
+		init.logger.Info("initialization: starting to write file", fields...)
 	}
 
 	for currentPosition := numLabelsWritten; currentPosition < fileNumLabels; currentPosition += batchSize {
@@ -459,7 +473,11 @@ func (init *Initializer) initFile(ctx context.Context, wo *oracle.WorkOracle, fi
 			batchSize = remaining
 		}
 
-		init.logger.Debug("initialization: file #%v current position: %v, remaining: %v", fileIndex, currentPosition, remaining)
+		init.logger.Debug("initialization: status",
+			zap.Int("fileIndex", fileIndex),
+			zap.Uint64("currentPosition", currentPosition),
+			zap.Uint64("remaining", remaining),
+		)
 
 		// Calculate labels of the batch position range.
 		startPosition := fileOffset + currentPosition
@@ -473,13 +491,19 @@ func (init *Initializer) initFile(ctx context.Context, wo *oracle.WorkOracle, fi
 		if res.Nonce != nil {
 			candidate := res.Output[(*res.Nonce-startPosition)*16:]
 			candidate = candidate[:16]
-			init.logger.Info("initialization: file #%v, found nonce: %d, value: %x", fileIndex, *res.Nonce, candidate)
+
+			fields := []zap.Field{
+				zap.Int("fileIndex", fileIndex),
+				zap.Uint64("nonce", *res.Nonce),
+				zap.String("value", hex.EncodeToString(candidate)),
+			}
+			init.logger.Debug("initialization: found nonce", fields...)
 
 			if init.nonceValue == nil || bytes.Compare(candidate, init.nonceValue) < 0 {
 				nonceValue := make([]byte, 16)
 				copy(nonceValue, candidate)
 
-				init.logger.Info("initialization: file #%v, found new best nonce", fileIndex)
+				init.logger.Info("initialization: found new best nonce", fields...)
 				init.nonceValue = nonceValue
 				init.nonce.Store(res.Nonce)
 				init.saveMetadata()
@@ -503,7 +527,10 @@ func (init *Initializer) initFile(ctx context.Context, wo *oracle.WorkOracle, fi
 		return err
 	}
 
-	init.logger.Info("initialization: file #%v completed; number of labels written: %v", fileIndex, numLabelsWritten)
+	init.logger.Info("initialization: completed",
+		zap.Int("fileIndex", fileIndex),
+		zap.Uint64("numLabelsWritten", numLabelsWritten),
+	)
 	return nil
 }
 

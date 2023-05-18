@@ -7,6 +7,8 @@ import "C"
 import (
 	"errors"
 	"fmt"
+
+	"go.uber.org/zap"
 )
 
 // ErrScryptClosed is returned when calling a method on an already closed Scrypt instance.
@@ -32,6 +34,8 @@ type option struct {
 	commitment    []byte
 	n             uint32
 	vrfDifficulty []byte
+
+	logger *zap.Logger
 }
 
 func (o *option) validate() error {
@@ -90,6 +94,14 @@ func WithVRFDifficulty(difficulty []byte) OptionFunc {
 		}
 
 		opts.vrfDifficulty = difficulty
+		return nil
+	}
+}
+
+// WithLogger sets the logger to use.
+func WithLogger(logger *zap.Logger) OptionFunc {
+	return func(opts *option) error {
+		opts.logger = logger
 		return nil
 	}
 }

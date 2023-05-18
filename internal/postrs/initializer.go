@@ -80,6 +80,10 @@ func InitResultToError(retVal uint32) error {
 // cNewInitializer calls the C function from libpostrs that creates the
 // initializer.
 func cNewInitializer(opt *option) (*C.Initializer, error) {
+	if opt.logger != nil {
+		setLogCallback(opt.logger)
+	}
+
 	cProviderId := C.uint32_t(*opt.providerID)
 	cN := C.uintptr_t(opt.n)
 	cCommitment := C.CBytes(opt.commitment)
