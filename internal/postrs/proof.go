@@ -47,7 +47,6 @@ func GenerateProof(dataDir string, challenge []byte, cfg config.Config, logger *
 		k1:                C.uint32_t(cfg.K1),
 		k2:                C.uint32_t(cfg.K2),
 		k2_pow_difficulty: C.uint64_t(cfg.K2PowDifficulty),
-		k3_pow_difficulty: C.uint64_t(cfg.K3PowDifficulty),
 		pow_scrypt:        translateScryptParams(powScrypt),
 	}
 
@@ -71,7 +70,6 @@ func GenerateProof(dataDir string, challenge []byte, cfg config.Config, logger *
 		Nonce:   uint32(cProof.nonce),
 		Indices: indices,
 		K2Pow:   uint64(cProof.k2_pow),
-		K3Pow:   uint64(cProof.k3_pow),
 	}, nil
 }
 
@@ -104,7 +102,6 @@ func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config
 		k2:                C.uint32_t(cfg.K2),
 		k3:                C.uint32_t(cfg.K3),
 		k2_pow_difficulty: C.uint64_t(cfg.K2PowDifficulty),
-		k3_pow_difficulty: C.uint64_t(cfg.K3PowDifficulty),
 		pow_scrypt:        translateScryptParams(powScrypt),
 		scrypt:            translateScryptParams(labelScrypt),
 	}
@@ -113,7 +110,6 @@ func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config
 	cProof := C.Proof{
 		nonce:  C.uint32_t(proof.Nonce),
 		k2_pow: C.uint64_t(proof.K2Pow),
-		k3_pow: C.uint64_t(proof.K3Pow),
 		indices: C.ArrayU8{
 			ptr: (*C.uchar)(unsafe.Pointer(indicesSliceHdr.Data)),
 			len: C.size_t(indicesSliceHdr.Len),

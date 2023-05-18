@@ -38,10 +38,9 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		zap.Uint32("Nonce", result.Nonce),
 		zap.String("Indices", hex.EncodeToString(result.Indices)),
 		zap.Uint64("K2PoW", result.K2Pow),
-		zap.Uint64("K3PoW", result.K3Pow),
 	)
 
-	proof := &shared.Proof{Nonce: result.Nonce, Indices: result.Indices, K2Pow: result.K2Pow, K3Pow: result.K3Pow}
+	proof := &shared.Proof{Nonce: result.Nonce, Indices: result.Indices, K2Pow: result.K2Pow}
 	proofMetadata := &shared.ProofMetadata{
 		NodeId:          options.nodeId,
 		CommitmentAtxId: options.commitmentAtxId,
