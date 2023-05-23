@@ -39,12 +39,14 @@ func Test_Verify(t *testing.T) {
 	commitmentAtxId := make([]byte, 32)
 	ch := make(shared.Challenge, 32)
 
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
 	cfg, opts := getTestConfig(t)
 	init, err := initialization.NewInitializer(
 		initialization.WithNodeId(nodeId),
 		initialization.WithCommitmentAtxId(commitmentAtxId),
 		initialization.WithConfig(cfg),
 		initialization.WithInitOpts(opts),
+		initialization.WithLogger(logger),
 	)
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))
@@ -58,7 +60,7 @@ func Test_Verify(t *testing.T) {
 	)
 	r.NoError(err)
 
-	r.NoError(Verify(proof, proofMetadata, cfg, zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))))
+	r.NoError(Verify(proof, proofMetadata, cfg, logger))
 }
 
 func Test_Verify_Detects_invalid_proof(t *testing.T) {

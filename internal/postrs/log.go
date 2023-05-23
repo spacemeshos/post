@@ -21,7 +21,7 @@ var (
 	oncer sync.Once
 
 	levelMap = map[zapcore.Level]C.Level{
-		zapcore.DebugLevel:  C.Debug,
+		zapcore.DebugLevel:  C.Trace,
 		zapcore.InfoLevel:   C.Info,
 		zapcore.WarnLevel:   C.Warn,
 		zapcore.ErrorLevel:  C.Error,
