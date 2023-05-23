@@ -115,7 +115,7 @@ func TestVerifyPow(t *testing.T) {
 		NodeId:          nodeId,
 		CommitmentAtxId: commitmentAtxId,
 		NumUnits:        opts.NumUnits,
-		LabelsPerUnit:   uint64(opts.NumUnits) * cfg.LabelsPerUnit,
+		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	r.NoError(VerifyVRFNonce(init.Nonce(), m, WithLabelScryptParams(opts.Scrypt)))
 }
