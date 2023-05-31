@@ -13,9 +13,32 @@ make postcli
 # Usage
 
 ```bash
-cd build
 ./postcli --help
 ```
+
+## Get OpenCL working
+
+You need to have OpenCL support on your system. OpenCL usually comes with your graphics drivers. On Windows it should work out of the box on linux you will need to install them separately.
+
+You can always list the providers by using
+```bash
+clinfo -l
+```
+
+That's separate command NOT shipped with post implementation. Please refer to your system installation manual of clinfo for installation instructions.
+
+### Nvidia
+```bash
+apt install nvidia-opencl-icd 
+```
+
+### AMD
+
+https://amdgpu-install.readthedocs.io/en/latest/install-script.html
+
+### Intel
+
+https://github.com/intel/compute-runtime/releases
 
 ###  Print the list of compute providers
 
