@@ -157,7 +157,12 @@ func main() {
 		if err != nil {
 			log.Fatalln("proof generation error", err)
 		}
-		if err := verifying.Verify(proof, proofMetadata, cfg, zapLog); err != nil {
+		verifier, err := verifying.NewProofVerifier(nil)
+		if err != nil {
+			log.Fatalln("failed to create verifier", err)
+		}
+		defer verifier.Close()
+		if err := verifier.Verify(proof, proofMetadata, cfg, zapLog); err != nil {
 			log.Fatalln("failed to verify test proof", err)
 		}
 

@@ -59,9 +59,35 @@ func VerifyVRFNonce(nonce *uint64, m *shared.VRFNonceMetadata, opts ...OptionFun
 	return nil
 }
 
+type ProofVerifier struct {
+	inner *postrs.Verifier
+}
+
+// NewProofVerifier creates a new proof verifier.
+// If powFlags is nil, the recommended PoW flags will be used.
+// The verifier must be closed after use with Close().
+func NewProofVerifier(powFlags *config.PowFlags) (*ProofVerifier, error) {
+	var flags config.PowFlags
+	if powFlags == nil {
+		flags = config.DefaultVerifyingPowFlags()
+	} else {
+		flags = *powFlags
+	}
+	inner, err := postrs.NewVerifier(flags)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ProofVerifier{inner: inner}, nil
+}
+
+func (v *ProofVerifier) Close() error {
+	return v.inner.Close()
+}
+
 // Verify ensures the validity of a proof in respect to its metadata.
 // It returns nil if the proof is valid or an error describing the failure, otherwise.
-func Verify(p *shared.Proof, m *shared.ProofMetadata, cfg config.Config, logger *zap.Logger, opts ...OptionFunc) error {
+func (v *ProofVerifier) Verify(p *shared.Proof, m *shared.ProofMetadata, cfg config.Config, logger *zap.Logger, opts ...OptionFunc) error {
 	options := defaultOpts()
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
@@ -75,5 +101,6 @@ func Verify(p *shared.Proof, m *shared.ProofMetadata, cfg config.Config, logger 
 		return fmt.Errorf("invalid `commitmentAtxId` length; expected: 32, given: %v", len(m.CommitmentAtxId))
 	}
 
-	return postrs.VerifyProof(p, m, cfg, logger, options.powScrypt, options.labelScrypt)
+	scryptParams := postrs.TranslateScryptParams(options.labelScrypt.N, options.labelScrypt.R, options.labelScrypt.P)
+	return v.inner.VerifyProof(p, m, logger, cfg.K1, cfg.K2, cfg.K3, cfg.PowDifficulty, scryptParams)
 }

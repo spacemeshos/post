@@ -3,7 +3,7 @@ package shared
 type Proof struct {
 	Nonce   uint32
 	Indices []byte
-	K2Pow   uint64
+	Pow     uint64
 }
 
 type ProofMetadata struct {

@@ -16,9 +16,9 @@ import (
 
 func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logger *zap.Logger, opts ...OptionFunc) (*shared.Proof, *shared.ProofMetadata, error) {
 	options := option{
-		threads:   1,
-		nonces:    16,
-		powScrypt: config.DefaultPowParams(),
+		threads:  1,
+		nonces:   16,
+		powFlags: postrs.GetRecommendedPowFlags() | postrs.PowFastMode,
 	}
 	for _, opt := range opts {
 		if err := opt(&options); err != nil {
@@ -29,7 +29,7 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		return nil, nil, err
 	}
 
-	result, err := postrs.GenerateProof(options.datadir, ch, cfg, logger, options.nonces, options.threads, options.powScrypt)
+	result, err := postrs.GenerateProof(options.datadir, ch, logger, options.nonces, options.threads, cfg.K1, cfg.K2, cfg.PowDifficulty, options.powFlags)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generating proof: %w", err)
 	}
@@ -37,10 +37,10 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 	logger.Debug("proving: generated proof",
 		zap.Uint32("Nonce", result.Nonce),
 		zap.String("Indices", hex.EncodeToString(result.Indices)),
-		zap.Uint64("K2PoW", result.K2Pow),
+		zap.Uint64("PoW", result.Pow),
 	)
 
-	proof := &shared.Proof{Nonce: result.Nonce, Indices: result.Indices, K2Pow: result.K2Pow}
+	proof := &shared.Proof{Nonce: result.Nonce, Indices: result.Indices, Pow: result.Pow}
 	proofMetadata := &shared.ProofMetadata{
 		NodeId:          options.nodeId,
 		CommitmentAtxId: options.commitmentAtxId,

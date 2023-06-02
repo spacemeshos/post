@@ -32,7 +32,7 @@ type option struct {
 	providerID *uint
 
 	commitment    []byte
-	n             uint32
+	n             uint
 	vrfDifficulty []byte
 
 	logger *zap.Logger
@@ -79,7 +79,7 @@ func WithCommitment(commitment []byte) OptionFunc {
 }
 
 // WithScryptN sets the N parameter for the scrypt computation.
-func WithScryptN(n uint32) OptionFunc {
+func WithScryptN(n uint) OptionFunc {
 	return func(opts *option) error {
 		opts.n = n
 		return nil

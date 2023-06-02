@@ -13,7 +13,7 @@ type option struct {
 	nodeId          []byte
 	commitmentAtxId []byte
 	numUnits        uint32
-	powScrypt       config.ScryptParams
+	powFlags        config.PowFlags
 	// How many nonces to try in parallel.
 	nonces uint
 	// How many threads to use to generate a proof.
@@ -28,9 +28,7 @@ func (o *option) validate() error {
 	if o.nonces == 0 {
 		return errors.New("`nonces` must be greater than 0")
 	}
-	if err := o.powScrypt.Validate(); err != nil {
-		return err
-	}
+
 	return nil
 }
 
@@ -62,9 +60,9 @@ func WithDataSource(cfg config.Config, nodeId, commitmentAtxId []byte, datadir s
 	}
 }
 
-func WithPowScryptParams(params config.ScryptParams) OptionFunc {
+func WithPowFlags(flags config.PowFlags) OptionFunc {
 	return func(o *option) error {
-		o.powScrypt = params
+		o.powFlags = flags
 		return nil
 	}
 }
