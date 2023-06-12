@@ -79,17 +79,20 @@ type Config struct {
 	K2 uint32 // K2 is the number of labels below the required difficulty required for a proof.
 	K3 uint32 // K3 is the size of the subset of proof indices that is validated.
 
-	PowDifficulty [32]byte
+	// FIXME: remove support for the old scrypt-based PoW
+	K2PowDifficulty uint64
+	PowDifficulty   [32]byte
 }
 
 func DefaultConfig() Config {
 	cfg := Config{
-		LabelsPerUnit: 512, // 8kB units
-		MaxNumUnits:   defaultMaxNumUnits,
-		MinNumUnits:   defaultMinNumUnits,
-		K1:            26,
-		K2:            37,
-		K3:            37,
+		LabelsPerUnit:   512, // 8kB units
+		MaxNumUnits:     defaultMaxNumUnits,
+		MinNumUnits:     defaultMinNumUnits,
+		K1:              26,
+		K2:              37,
+		K3:              37,
+		K2PowDifficulty: 0x0FFFFFFF_FFFFFFFF,
 	}
 	for i := range cfg.PowDifficulty {
 		cfg.PowDifficulty[i] = 0xFF
@@ -124,6 +127,14 @@ func (p *ScryptParams) Validate() error {
 		return errors.New("scrypt parameter p cannot be 0")
 	}
 	return nil
+}
+
+func DefaultPowParams() ScryptParams {
+	return ScryptParams{
+		N: 128,
+		R: 1,
+		P: 1,
+	}
 }
 
 func DefaultLabelParams() ScryptParams {

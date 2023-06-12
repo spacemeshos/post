@@ -102,5 +102,8 @@ func (v *ProofVerifier) Verify(p *shared.Proof, m *shared.ProofMetadata, cfg con
 	}
 
 	scryptParams := postrs.TranslateScryptParams(options.labelScrypt.N, options.labelScrypt.R, options.labelScrypt.P)
-	return v.inner.VerifyProof(p, m, logger, cfg.K1, cfg.K2, cfg.K3, cfg.PowDifficulty, scryptParams)
+	return v.inner.VerifyProof(p, m, logger, cfg.K1, cfg.K2, cfg.K3, postrs.ScryptPowParams{
+		Difficulty: cfg.K2PowDifficulty,
+		Scrypt:     postrs.TranslateScryptParams(options.powScrypt.N, options.powScrypt.R, options.powScrypt.P),
+	}, cfg.PowDifficulty, scryptParams)
 }
