@@ -87,7 +87,7 @@ func Test_Generate(t *testing.T) {
 				zap.Uint64("numLabels", numLabels),
 				zap.Int("indices size", len(proof.Indices)),
 			)
-			verifier, err := verifying.NewProofVerifier(nil)
+			verifier, err := verifying.NewProofVerifier()
 			r.NoError(err)
 			defer verifier.Close()
 			r.NoError(verifier.Verify(
@@ -232,7 +232,7 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 		zap.Uint64("numLabels", numLabels),
 		zap.Int("indices size", len(proof.Indices)),
 	)
-	verifier, err := verifying.NewProofVerifier(nil)
+	verifier, err := verifying.NewProofVerifier()
 	r.NoError(err)
 	defer verifier.Close()
 	r.NoError(verifier.Verify(

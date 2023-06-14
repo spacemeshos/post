@@ -60,39 +60,30 @@ func VerifyVRFNonce(nonce *uint64, m *shared.VRFNonceMetadata, opts ...OptionFun
 }
 
 type ProofVerifier struct {
-	inner *postrs.Verifier
+	*postrs.Verifier
 }
 
 // NewProofVerifier creates a new proof verifier.
-// If powFlags is nil, the recommended PoW flags will be used.
 // The verifier must be closed after use with Close().
-func NewProofVerifier(powFlags *config.PowFlags) (*ProofVerifier, error) {
-	var flags config.PowFlags
-	if powFlags == nil {
-		flags = config.DefaultVerifyingPowFlags()
-	} else {
-		flags = *powFlags
+func NewProofVerifier(opts ...OptionFunc) (*ProofVerifier, error) {
+	options, err := applyOpts(opts...)
+	if err != nil {
+		return nil, err
 	}
-	inner, err := postrs.NewVerifier(flags)
+	inner, err := postrs.NewVerifier(options.powFlags)
 	if err != nil {
 		return nil, err
 	}
 
-	return &ProofVerifier{inner: inner}, nil
-}
-
-func (v *ProofVerifier) Close() error {
-	return v.inner.Close()
+	return &ProofVerifier{inner}, nil
 }
 
 // Verify ensures the validity of a proof in respect to its metadata.
 // It returns nil if the proof is valid or an error describing the failure, otherwise.
 func (v *ProofVerifier) Verify(p *shared.Proof, m *shared.ProofMetadata, cfg config.Config, logger *zap.Logger, opts ...OptionFunc) error {
-	options := defaultOpts()
-	for _, opt := range opts {
-		if err := opt(options); err != nil {
-			return err
-		}
+	options, err := applyOpts(opts...)
+	if err != nil {
+		return err
 	}
 	if len(m.NodeId) != 32 {
 		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(m.NodeId))
@@ -102,7 +93,7 @@ func (v *ProofVerifier) Verify(p *shared.Proof, m *shared.ProofMetadata, cfg con
 	}
 
 	scryptParams := postrs.TranslateScryptParams(options.labelScrypt.N, options.labelScrypt.R, options.labelScrypt.P)
-	return v.inner.VerifyProof(p, m, logger, cfg.K1, cfg.K2, cfg.K3, postrs.ScryptPowParams{
+	return v.VerifyProof(p, m, logger, cfg.K1, cfg.K2, cfg.K3, postrs.ScryptPowParams{
 		Difficulty: cfg.K2PowDifficulty,
 		Scrypt:     postrs.TranslateScryptParams(options.powScrypt.N, options.powScrypt.R, options.powScrypt.P),
 	}, cfg.PowDifficulty, scryptParams)

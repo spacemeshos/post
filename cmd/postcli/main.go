@@ -157,7 +157,7 @@ func main() {
 		if err != nil {
 			log.Fatalln("proof generation error", err)
 		}
-		verifier, err := verifying.NewProofVerifier(nil)
+		verifier, err := verifying.NewProofVerifier()
 		if err != nil {
 			log.Fatalln("failed to create verifier", err)
 		}

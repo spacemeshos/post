@@ -65,7 +65,7 @@ func Test_Verify(t *testing.T) {
 	)
 	r.NoError(err)
 
-	verifier, err := NewProofVerifier(nil)
+	verifier, err := NewProofVerifier()
 	r.NoError(err)
 	defer verifier.Close()
 
@@ -101,7 +101,7 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	for i := range proof.Indices {
 		proof.Indices[i] ^= 255 // flip bits in all indices
 	}
-	verifier, err := NewProofVerifier(nil)
+	verifier, err := NewProofVerifier()
 	r.NoError(err)
 	defer verifier.Close()
 
@@ -154,7 +154,7 @@ func BenchmarkVerifying(b *testing.B) {
 	p, m, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
 	require.NoError(b, err)
 
-	verifier, err := NewProofVerifier(nil)
+	verifier, err := NewProofVerifier()
 	require.NoError(b, err)
 	defer verifier.Close()
 
@@ -199,7 +199,7 @@ func Benchmark_Verify_Fastnet(b *testing.B) {
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))
 
-	verifier, err := NewProofVerifier(nil)
+	verifier, err := NewProofVerifier()
 	require.NoError(b, err)
 	defer verifier.Close()
 
