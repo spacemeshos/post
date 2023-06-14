@@ -18,7 +18,7 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 	options := option{
 		threads:  1,
 		nonces:   16,
-		powFlags: postrs.GetRecommendedPowFlags() | postrs.PowFastMode,
+		powFlags: config.DefaultProvingPowFlags(),
 	}
 	for _, opt := range opts {
 		if err := opt(&options); err != nil {
