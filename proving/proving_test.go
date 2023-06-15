@@ -67,6 +67,7 @@ func Test_Generate(t *testing.T) {
 				log,
 				WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
 				WithThreads(2),
+				WithPowFlags(postrs.GetRecommendedPowFlags()),
 			)
 			r.NoError(err, "numUnits: %d", opts.NumUnits)
 			r.NotNil(proof)
@@ -86,7 +87,10 @@ func Test_Generate(t *testing.T) {
 				zap.Uint64("numLabels", numLabels),
 				zap.Int("indices size", len(proof.Indices)),
 			)
-			r.NoError(verifying.Verify(
+			verifier, err := verifying.NewProofVerifier()
+			r.NoError(err)
+			defer verifier.Close()
+			r.NoError(verifier.Verify(
 				proof,
 				proofMetaData,
 				cfg,
@@ -118,7 +122,14 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 		copy(newNodeId, nodeId)
 		newNodeId[0] = newNodeId[0] + 1
 
-		_, _, err := Generate(context.Background(), ch, cfg, zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)), WithDataSource(cfg, newNodeId, commitmentAtxId, opts.DataDir))
+		_, _, err := Generate(
+			context.Background(),
+			ch,
+			cfg,
+			zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
+			WithDataSource(cfg, newNodeId, commitmentAtxId, opts.DataDir),
+			WithPowFlags(postrs.GetRecommendedPowFlags()),
+		)
 		var errConfigMismatch initialization.ConfigMismatchError
 		require.ErrorAs(t, err, &errConfigMismatch)
 		require.Equal(t, "NodeId", errConfigMismatch.Param)
@@ -129,7 +140,14 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 		copy(newAtxId, commitmentAtxId)
 		newAtxId[0] = newAtxId[0] + 1
 
-		_, _, err := Generate(context.Background(), ch, cfg, zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)), WithDataSource(cfg, nodeId, newAtxId, opts.DataDir))
+		_, _, err := Generate(
+			context.Background(),
+			ch,
+			cfg,
+			zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
+			WithDataSource(cfg, nodeId, newAtxId, opts.DataDir),
+			WithPowFlags(postrs.GetRecommendedPowFlags()),
+		)
 		var errConfigMismatch initialization.ConfigMismatchError
 		require.ErrorAs(t, err, &errConfigMismatch)
 		require.Equal(t, "CommitmentAtxId", errConfigMismatch.Param)
@@ -139,7 +157,14 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 		newCfg := cfg
 		newCfg.LabelsPerUnit++
 
-		_, _, err := Generate(context.Background(), ch, newCfg, zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)), WithDataSource(newCfg, nodeId, commitmentAtxId, opts.DataDir))
+		_, _, err := Generate(
+			context.Background(),
+			ch,
+			newCfg,
+			zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
+			WithDataSource(newCfg, nodeId, commitmentAtxId, opts.DataDir),
+			WithPowFlags(postrs.GetRecommendedPowFlags()),
+		)
 		var errConfigMismatch initialization.ConfigMismatchError
 		require.ErrorAs(t, err, &errConfigMismatch)
 		require.Equal(t, "LabelsPerUnit", errConfigMismatch.Param)
@@ -181,7 +206,14 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	r.NoError(err)
 	r.Equal(len(ch), n)
 
-	proof, proofMetaData, err := Generate(context.Background(), ch, cfg, log, WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+	proof, proofMetaData, err := Generate(
+		context.Background(),
+		ch,
+		cfg,
+		log,
+		WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
+		WithPowFlags(postrs.GetRecommendedPowFlags()),
+	)
 	r.NoError(err, "numUnits: %d", opts.NumUnits)
 	r.NotNil(proof)
 	r.NotNil(proofMetaData)
@@ -200,7 +232,10 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 		zap.Uint64("numLabels", numLabels),
 		zap.Int("indices size", len(proof.Indices)),
 	)
-	r.NoError(verifying.Verify(
+	verifier, err := verifying.NewProofVerifier()
+	r.NoError(err)
+	defer verifier.Close()
+	r.NoError(verifier.Verify(
 		proof,
 		proofMetaData,
 		cfg,

@@ -17,7 +17,7 @@ type option struct {
 	providerID *uint
 
 	commitment    []byte
-	n             uint32
+	n             uint
 	vrfDifficulty []byte
 
 	logger *zap.Logger

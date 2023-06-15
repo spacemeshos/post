@@ -10,13 +10,15 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sync"
 	"unsafe"
 
 	"go.uber.org/zap"
 
-	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/shared"
 )
+
+type ScryptParams = C.ScryptParams
 
 // Translate scrypt parameters expressed as N,R,P to Nfactor, Rfactor and Pfactor
 // that are understood by scrypt-jane.
@@ -24,15 +26,15 @@ import (
 // N = 1 << (nfactor + 1)
 // r = 1 << rfactor
 // p = 1 << pfactor
-func translateScryptParams(params config.ScryptParams) C.ScryptParams {
-	return C.ScryptParams{
-		nfactor: C.uint8_t(math.Log2(float64(params.N))) - 1,
-		rfactor: C.uint8_t(math.Log2(float64(params.R))),
-		pfactor: C.uint8_t(math.Log2(float64(params.P))),
+func TranslateScryptParams(n, r, p uint) ScryptParams {
+	return ScryptParams{
+		nfactor: C.uint8_t(math.Log2(float64(n))) - 1,
+		rfactor: C.uint8_t(math.Log2(float64(r))),
+		pfactor: C.uint8_t(math.Log2(float64(p))),
 	}
 }
 
-func GenerateProof(dataDir string, challenge []byte, cfg config.Config, logger *zap.Logger, nonces uint, threads uint, powScrypt config.ScryptParams) (*shared.Proof, error) {
+func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces uint, threads uint, K1, K2 uint32, powDifficulty [32]byte, powFlags PowFlags) (*shared.Proof, error) {
 	if logger != nil {
 		setLogCallback(logger)
 	}
@@ -44,10 +46,11 @@ func GenerateProof(dataDir string, challenge []byte, cfg config.Config, logger *
 	defer C.free(challengePtr)
 
 	config := C.Config{
-		k1:                C.uint32_t(cfg.K1),
-		k2:                C.uint32_t(cfg.K2),
-		k2_pow_difficulty: C.uint64_t(cfg.K2PowDifficulty),
-		pow_scrypt:        translateScryptParams(powScrypt),
+		k1: C.uint32_t(K1),
+		k2: C.uint32_t(K2),
+	}
+	for i, b := range powDifficulty {
+		config.pow_difficulty[i] = C.uchar(b)
 	}
 
 	cProof := C.generate_proof(
@@ -56,6 +59,7 @@ func GenerateProof(dataDir string, challenge []byte, cfg config.Config, logger *
 		config,
 		C.size_t(nonces),
 		C.size_t(threads),
+		powFlags,
 	)
 
 	if cProof == nil {
@@ -69,11 +73,78 @@ func GenerateProof(dataDir string, challenge []byte, cfg config.Config, logger *
 	return &shared.Proof{
 		Nonce:   uint32(cProof.nonce),
 		Indices: indices,
-		K2Pow:   uint64(cProof.k2_pow),
+		Pow:     uint64(cProof.pow),
 	}, nil
 }
 
-func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config.Config, logger *zap.Logger, powScrypt, labelScrypt config.ScryptParams) error {
+type PowFlags = C.RandomXFlag
+
+// Get the recommended PoW flags.
+//
+// Does not include:
+// * FLAG_LARGE_PAGES
+// * FLAG_FULL_MEM
+// * FLAG_SECURE
+//
+// The above flags need to be set manually, if required.
+func GetRecommendedPowFlags() PowFlags {
+	return C.recommended_pow_flags()
+}
+
+const (
+	// Use the full dataset. AKA "Fast mode".
+	PowFastMode = C.RandomXFlag_FLAG_FULL_MEM
+	// Allocate memory in large pages.
+	PowLargePages = C.RandomXFlag_FLAG_LARGE_PAGES
+	// Use JIT compilation support.
+	PowJIT = C.RandomXFlag_FLAG_JIT
+	// When combined with FLAG_JIT, the JIT pages are never writable and executable at the same time.
+	PowSecure = C.RandomXFlag_FLAG_SECURE
+	// Use hardware accelerated AES.
+	PowHardAES = C.RandomXFlag_FLAG_HARD_AES
+	// Optimize Argon2 for CPUs with the SSSE3 instruction set.
+	PowArgon2SSSE3 = C.RandomXFlag_FLAG_ARGON2_SSSE3
+	// Optimize Argon2 for CPUs with the SSSE3 instruction set.
+	PowArgon2AVX2 = C.RandomXFlag_FLAG_ARGON2_AVX2
+	// Optimize Argon2 for CPUs without the AVX2 or SSSE3 instruction sets.
+	PowArgon2 = C.RandomXFlag_FLAG_ARGON2
+)
+
+type Verifier struct {
+	inner     *C.Verifier
+	closeOnce sync.Once
+}
+
+// Create a new verifier.
+// The verifier must be closed after use with Close().
+func NewVerifier(powFlags PowFlags) (*Verifier, error) {
+	verifier := Verifier{}
+	result := C.new_verifier(powFlags, &verifier.inner)
+	if result != C.Ok {
+		return nil, fmt.Errorf("failed to create verifier")
+	}
+	return &verifier, nil
+}
+
+func (v *Verifier) Close() error {
+	v.closeOnce.Do(func() { C.free_verifier(v.inner) })
+	return nil
+}
+
+type ScryptPowParams struct {
+	Scrypt     ScryptParams
+	Difficulty uint64
+}
+
+func (v *Verifier) VerifyProof(
+	proof *shared.Proof,
+	metadata *shared.ProofMetadata,
+	logger *zap.Logger,
+	k1, k2, k3 uint32,
+	scryptPow ScryptPowParams,
+	powDifficulty [32]byte,
+	scryptParams ScryptParams,
+) error {
 	if logger != nil {
 		setLogCallback(logger)
 	}
@@ -98,18 +169,22 @@ func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config
 	}
 
 	config := C.Config{
-		k1:                C.uint32_t(cfg.K1),
-		k2:                C.uint32_t(cfg.K2),
-		k3:                C.uint32_t(cfg.K3),
-		k2_pow_difficulty: C.uint64_t(cfg.K2PowDifficulty),
-		pow_scrypt:        translateScryptParams(powScrypt),
-		scrypt:            translateScryptParams(labelScrypt),
+		k1:     C.uint32_t(k1),
+		k2:     C.uint32_t(k2),
+		k3:     C.uint32_t(k3),
+		scrypt: scryptParams,
+		// FIXME: remove support for old the scrypt-based PoW
+		k2_pow_difficulty: C.uint64_t(scryptPow.Difficulty),
+		pow_scrypt:        scryptPow.Scrypt,
+	}
+	for i, b := range powDifficulty {
+		config.pow_difficulty[i] = C.uchar(b)
 	}
 
 	indicesSliceHdr := (*reflect.SliceHeader)(unsafe.Pointer(&proof.Indices))
 	cProof := C.Proof{
-		nonce:  C.uint32_t(proof.Nonce),
-		k2_pow: C.uint64_t(proof.K2Pow),
+		nonce: C.uint32_t(proof.Nonce),
+		pow:   C.uint64_t(proof.Pow),
 		indices: C.ArrayU8{
 			ptr: (*C.uchar)(unsafe.Pointer(indicesSliceHdr.Data)),
 			len: C.size_t(indicesSliceHdr.Len),
@@ -125,6 +200,7 @@ func VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, cfg config
 		labels_per_unit:   C.uint64_t(metadata.LabelsPerUnit),
 	}
 	result := C.verify_proof(
+		v.inner,
 		cProof,
 		&cMetadata,
 		config,

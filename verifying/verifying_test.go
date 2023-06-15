@@ -21,6 +21,10 @@ import (
 func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
 
+	cfg.K1 = 3
+	cfg.K2 = 3
+	cfg.K3 = 3
+
 	id := postrs.CPUProviderID()
 	require.NotZero(tb, id)
 
@@ -57,10 +61,15 @@ func Test_Verify(t *testing.T) {
 		cfg,
 		zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
 		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
+		proving.WithPowFlags(postrs.GetRecommendedPowFlags()),
 	)
 	r.NoError(err)
 
-	r.NoError(Verify(proof, proofMetadata, cfg, logger))
+	verifier, err := NewProofVerifier()
+	r.NoError(err)
+	defer verifier.Close()
+
+	r.NoError(verifier.Verify(proof, proofMetadata, cfg, logger))
 }
 
 func Test_Verify_Detects_invalid_proof(t *testing.T) {
@@ -92,8 +101,11 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	for i := range proof.Indices {
 		proof.Indices[i] ^= 255 // flip bits in all indices
 	}
+	verifier, err := NewProofVerifier()
+	r.NoError(err)
+	defer verifier.Close()
 
-	r.ErrorContains(Verify(proof, proofMetadata, cfg, zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))), "invalid proof")
+	r.ErrorContains(verifier.Verify(proof, proofMetadata, cfg, zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))), "invalid proof")
 }
 
 func TestVerifyPow(t *testing.T) {
@@ -142,6 +154,10 @@ func BenchmarkVerifying(b *testing.B) {
 	p, m, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
 	require.NoError(b, err)
 
+	verifier, err := NewProofVerifier()
+	require.NoError(b, err)
+	defer verifier.Close()
+
 	for _, k3 := range []uint32{5, 25, 50, 100} {
 		testName := fmt.Sprintf("k3=%d", k3)
 
@@ -150,7 +166,7 @@ func BenchmarkVerifying(b *testing.B) {
 		b.Run(testName, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				start := time.Now()
-				err := Verify(p, m, cfg, zaptest.NewLogger(b))
+				err := verifier.Verify(p, m, cfg, zaptest.NewLogger(b))
 				require.NoError(b, err)
 				b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
 			}
@@ -183,6 +199,10 @@ func Benchmark_Verify_Fastnet(b *testing.B) {
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))
 
+	verifier, err := NewProofVerifier()
+	require.NoError(b, err)
+	defer verifier.Close()
+
 	for i := 0; i < b.N; i++ {
 		rand.Read(ch)
 		proof, proofMetadata, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
@@ -190,7 +210,7 @@ func Benchmark_Verify_Fastnet(b *testing.B) {
 
 		b.StartTimer()
 		start := time.Now()
-		r.NoError(Verify(proof, proofMetadata, cfg, zaptest.NewLogger(b)))
+		r.NoError(verifier.Verify(proof, proofMetadata, cfg, zaptest.NewLogger(b)))
 		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
 		b.StopTimer()
 	}

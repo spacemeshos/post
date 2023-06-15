@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/shared"
 )
 
@@ -36,6 +37,39 @@ func init() {
 	DefaultDataDir = filepath.Join(home, "post", DefaultDataDirName)
 }
 
+type PowFlags = postrs.PowFlags
+
+const (
+	// Use the full dataset. AKA "Fast mode".
+	PowFastMode = postrs.PowFastMode
+	// Allocate memory in large pages.
+	PowLargePages = postrs.PowLargePages
+	// Use JIT compilation support.
+	PowJIT = postrs.PowJIT
+	// When combined with FLAG_JIT, the JIT pages are never writable and executable at the same time.
+	PowSecure = postrs.PowSecure
+	// Use hardware accelerated AES.
+	PowHardAES = postrs.PowHardAES
+	// Optimize Argon2 for CPUs with the SSSE3 instruction set.
+	PowArgon2SSSE3 = postrs.PowArgon2SSSE3
+	// Optimize Argon2 for CPUs with the SSSE3 instruction set.
+	PowArgon2AVX2 = postrs.PowArgon2AVX2
+	// Optimize Argon2 for CPUs without the AVX2 or SSSE3 instruction sets.
+	PowArgon2 = postrs.PowArgon2
+)
+
+func RecommendedPowFlags() PowFlags {
+	return postrs.GetRecommendedPowFlags()
+}
+
+func DefaultProvingPowFlags() PowFlags {
+	return RecommendedPowFlags() | PowFastMode
+}
+
+func DefaultVerifyingPowFlags() PowFlags {
+	return RecommendedPowFlags()
+}
+
 type Config struct {
 	MinNumUnits   uint32
 	MaxNumUnits   uint32
@@ -45,19 +79,26 @@ type Config struct {
 	K2 uint32 // K2 is the number of labels below the required difficulty required for a proof.
 	K3 uint32 // K3 is the size of the subset of proof indices that is validated.
 
+	// FIXME: remove support for the old scrypt-based PoW
 	K2PowDifficulty uint64
+	PowDifficulty   [32]byte
 }
 
 func DefaultConfig() Config {
-	return Config{
+	cfg := Config{
 		LabelsPerUnit:   512, // 8kB units
 		MaxNumUnits:     defaultMaxNumUnits,
 		MinNumUnits:     defaultMinNumUnits,
-		K1:              273,
-		K2:              300,
-		K3:              100,
+		K1:              26,
+		K2:              37,
+		K3:              37,
 		K2PowDifficulty: 0x0FFFFFFF_FFFFFFFF,
 	}
+	for i := range cfg.PowDifficulty {
+		cfg.PowDifficulty[i] = 0xFF
+	}
+
+	return cfg
 }
 
 type InitOpts struct {
@@ -72,7 +113,7 @@ type InitOpts struct {
 }
 
 type ScryptParams struct {
-	N, R, P uint32
+	N, R, P uint
 }
 
 func (p *ScryptParams) Validate() error {
