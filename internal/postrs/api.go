@@ -1,7 +1,7 @@
 package postrs
 
 // #cgo LDFLAGS: -lpost
-// #include "prover.h"
+// #include "post.h"
 import "C"
 
 import (
