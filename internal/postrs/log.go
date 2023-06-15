@@ -2,7 +2,7 @@ package postrs
 
 // #cgo LDFLAGS: -lpost
 // #include <stdlib.h>
-// #include "prover.h"
+// #include "post.h"
 //
 // // forward declarations for callback C functions
 // void logCallback(ExternCRecord* record);
