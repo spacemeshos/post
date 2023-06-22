@@ -131,17 +131,11 @@ func (v *Verifier) Close() error {
 	return nil
 }
 
-type ScryptPowParams struct {
-	Scrypt     ScryptParams
-	Difficulty uint64
-}
-
 func (v *Verifier) VerifyProof(
 	proof *shared.Proof,
 	metadata *shared.ProofMetadata,
 	logger *zap.Logger,
 	k1, k2, k3 uint32,
-	scryptPow ScryptPowParams,
 	powDifficulty [32]byte,
 	scryptParams ScryptParams,
 ) error {
@@ -173,9 +167,6 @@ func (v *Verifier) VerifyProof(
 		k2:     C.uint32_t(k2),
 		k3:     C.uint32_t(k3),
 		scrypt: scryptParams,
-		// FIXME: remove support for old the scrypt-based PoW
-		k2_pow_difficulty: C.uint64_t(scryptPow.Difficulty),
-		pow_scrypt:        scryptPow.Scrypt,
 	}
 	for i, b := range powDifficulty {
 		config.pow_difficulty[i] = C.uchar(b)
