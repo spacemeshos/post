@@ -141,23 +141,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
           path: ./artifacts
-      - name: List artifacts
-        run: ls -R ./artifacts
-      - name: Create a draft release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
-          draft: true
-          prerelease: false
       - name: Pack artifacts
         run: >
           mkdir ./assets;
@@ -166,8 +153,9 @@ jobs:
           done
         env:
           TAG: ${{ github.ref_name }}
-      - name: Upload Release Assets
-        run: gh release upload $TAG ./assets/*.zip
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./assets/*.zip
+          prerelease: false
+          draft: true
