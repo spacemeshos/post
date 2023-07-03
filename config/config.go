@@ -178,5 +178,9 @@ func Validate(cfg Config, opts InitOpts) error {
 			numLabels, cfg.K1)
 	}
 
+	if err := opts.Scrypt.Validate(); err != nil {
+		return err
+	}
+
 	return nil
 }
