@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - develop
+    tags:
+      - 'v*'
 
 jobs:
   quicktests:
@@ -83,3 +85,77 @@ jobs:
         with:
           report_paths: "**/unit-tests.xml"
           annotate_only: true
+
+  build:
+    name: Build postcli
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    needs:
+      - unittests
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - os: ubuntu-latest
+          artifact-name: linux
+        - os: windows-latest
+          artifact-name: windows
+        - os: macos-latest
+          artifact-name: macos
+        - os: [self-hosted, linux, arm64]
+          artifact-name: linux-arm64
+        - os: [self-hosted, macos, arm64]
+          artifact-name: macos-m1
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+      - name: set up go
+        uses: actions/setup-go@v4
+        with:
+          check-latest: true
+          go-version-file: "go.mod"
+      - name: setup env
+        run: make install
+      - name: Add OpenCL support for Linux
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -qy ocl-icd-opencl-dev
+      - name: build postcli
+        run: make build
+
+      - name: Version suffix
+        id: version
+        run: echo "suffix=${{ github.ref_type == 'tag' && '-' || ''}}${{ github.ref_type == 'tag' && github.ref || ''}}" >> $GITHUB_OUTPUT
+      - name: Archive postcli artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: postcli-${{ matrix.artifact-name }}${{ steps.version.output.suffix }}
+          path: |
+            build/postcli${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./artifacts
+      - name: Pack artifacts
+        run: >
+          mkdir ./assets;
+          for dir in ./artifacts/*/; do
+            zip -o -j -r "./assets/$(basename "$dir")-$TAG.zip" "$dir";
+          done
+        env:
+          TAG: ${{ github.ref_name }}
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./assets/*.zip
+          prerelease: false
+          draft: true
