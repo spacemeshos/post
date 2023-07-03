@@ -116,6 +116,11 @@ jobs:
           go-version-file: "go.mod"
       - name: setup env
         run: make install
+      - name: Add OpenCL support for Linux
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -qy ocl-icd-opencl-dev
       - name: build postcli
         run: make build
 
