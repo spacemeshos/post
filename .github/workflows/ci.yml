@@ -97,7 +97,7 @@ jobs:
   build:
     name: Build postcli
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 15
     needs:
       - unittests
     strategy:
