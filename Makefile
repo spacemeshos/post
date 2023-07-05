@@ -20,9 +20,9 @@ endif
 
 install: get-postrs-lib
 	go mod download
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.50.0
-	go install gotest.tools/gotestsum@v1.8.2
-	go install honnef.co/go/tools/cmd/staticcheck@latest
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.53.3
+	go install gotest.tools/gotestsum@v1.10.0
+	go install honnef.co/go/tools/cmd/staticcheck@v0.4.3
 .PHONY: install
 
 tidy:

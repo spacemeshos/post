@@ -61,15 +61,6 @@ jobs:
           - [self-hosted, macos, arm64]
           - windows-latest
     steps:
-      - name: checkout
-        uses: actions/checkout@v3
-      - name: set up go
-        uses: actions/setup-go@v4
-        with:
-          check-latest: true
-          go-version-file: "go.mod"
-      - name: setup env
-        run: make install
       - name: Add OpenCL support - Ubuntu
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: sudo apt-get update -q && sudo apt-get install -qy ocl-icd-opencl-dev libpocl2
@@ -83,6 +74,15 @@ jobs:
       - name: Add OpenCL support - Windows
         if: ${{ matrix.os == 'windows-latest' }}
         run: choco install opencl-intel-cpu-runtime
+      - name: checkout
+        uses: actions/checkout@v3
+      - name: set up go
+        uses: actions/setup-go@v4
+        with:
+          check-latest: true
+          go-version-file: "go.mod"
+      - name: setup env
+        run: make install
       - name: Clear test cache
         run: make clear-test-cache
       - name: unit tests
@@ -119,15 +119,6 @@ jobs:
         - os: windows-latest
           artifact-name: windows
     steps:
-      - name: checkout
-        uses: actions/checkout@v3
-      - name: set up go
-        uses: actions/setup-go@v4
-        with:
-          check-latest: true
-          go-version-file: "go.mod"
-      - name: setup env
-        run: make install
       - name: Add OpenCL support - Ubuntu
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: sudo apt-get update -q && sudo apt-get install -qy ocl-icd-opencl-dev libpocl2
@@ -138,12 +129,17 @@ jobs:
         if: ${{ matrix.os == 'windows-latest' }}
         run: |
           Set-MpPreference -DisableRealtimeMonitoring $true
-      - name: Add OpenCL support - Windows
-        if: ${{ matrix.os == 'windows-latest' }}
-        run: choco install opencl-intel-cpu-runtime
+      - name: checkout
+        uses: actions/checkout@v3
+      - name: set up go
+        uses: actions/setup-go@v4
+        with:
+          check-latest: true
+          go-version-file: "go.mod"
+      - name: setup env
+        run: make install
       - name: build postcli
         run: make build
-
       - name: Version suffix
         id: version
         run: echo "suffix=${{ github.ref_type == 'tag' && '-' || ''}}${{ github.ref_type == 'tag' && github.ref || ''}}" >> $GITHUB_OUTPUT

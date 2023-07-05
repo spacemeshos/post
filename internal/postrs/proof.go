@@ -34,7 +34,7 @@ func TranslateScryptParams(n, r, p uint) ScryptParams {
 	}
 }
 
-func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces uint, threads uint, K1, K2 uint32, powDifficulty [32]byte, powFlags PowFlags) (*shared.Proof, error) {
+func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces, threads uint, K1, K2 uint32, powDifficulty [32]byte, powFlags PowFlags) (*shared.Proof, error) {
 	if logger != nil {
 		setLogCallback(logger)
 	}
