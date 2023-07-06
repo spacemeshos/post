@@ -12,6 +12,7 @@ require (
 
 require (
 	github.com/benbjohnson/clock v1.3.5 // indirect
+	github.com/golang/mock v1.6.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.1 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

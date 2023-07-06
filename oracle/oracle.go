@@ -3,6 +3,7 @@ package oracle
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -21,6 +22,11 @@ type option struct {
 	vrfDifficulty []byte
 
 	logger *zap.Logger
+
+	maxRetries int
+	retryDelay time.Duration
+
+	scrypter postrs.Scrypter
 }
 
 func (o *option) validate() error {
@@ -101,15 +107,42 @@ func WithLogger(logger *zap.Logger) OptionFunc {
 	}
 }
 
+// WithRetryDelay sets the delay between retries for a single initialization invocation.
+func WithRetryDelay(retryDelay time.Duration) OptionFunc {
+	return func(opts *option) error {
+		opts.retryDelay = retryDelay
+		return nil
+	}
+}
+
+// WithMaxRetries sets the maximum number of retries for a single initialization invocation.
+func WithMaxRetries(maxRetries int) OptionFunc {
+	return func(opts *option) error {
+		opts.maxRetries = maxRetries
+		return nil
+	}
+}
+
+func WithScrypter(scrypter postrs.Scrypter) OptionFunc {
+	return func(opts *option) error {
+		opts.scrypter = scrypter
+		return nil
+	}
+}
+
 // WorkOracle is a service that can compute labels for a given Node ID and CommitmentATX ID.
 type WorkOracle struct {
 	options *option
-	scrypt  *postrs.Scrypt
+	scrypt  postrs.Scrypter
 }
 
 // New returns a WorkOracle. If not specified, the labels are computed using the default (CPU) provider.
 func New(opts ...OptionFunc) (*WorkOracle, error) {
-	options := &option{}
+	options := &option{
+		maxRetries: 10,
+		retryDelay: time.Second,
+		logger:     zap.NewNop(),
+	}
 	options.providerID = new(uint)
 	*options.providerID = postrs.CPUProviderID()
 
@@ -123,15 +156,19 @@ func New(opts ...OptionFunc) (*WorkOracle, error) {
 		return nil, err
 	}
 
-	scrypt, err := postrs.NewScrypt(
-		postrs.WithProviderID(*options.providerID),
-		postrs.WithCommitment(options.commitment),
-		postrs.WithScryptN(options.n),
-		postrs.WithVRFDifficulty(options.vrfDifficulty),
-		postrs.WithLogger(options.logger),
-	)
-	if err != nil {
-		return nil, err
+	scrypt := options.scrypter
+	if scrypt == nil {
+		s, err := postrs.NewScrypt(
+			postrs.WithProviderID(*options.providerID),
+			postrs.WithCommitment(options.commitment),
+			postrs.WithScryptN(options.n),
+			postrs.WithVRFDifficulty(options.vrfDifficulty),
+			postrs.WithLogger(options.logger),
+		)
+		if err != nil {
+			return nil, err
+		}
+		scrypt = s
 	}
 
 	return &WorkOracle{
@@ -174,13 +211,27 @@ func (w *WorkOracle) Positions(start, end uint64) (WorkOracleResult, error) {
 		return WorkOracleResult{}, fmt.Errorf("invalid `start` and `end`; expected: start <= end, given: %v > %v", start, end)
 	}
 
-	res, err := w.scrypt.Positions(start, end)
-	if err != nil {
-		return WorkOracleResult{}, err
+	tries := 0
+	for {
+		res, err := w.scrypt.Positions(start, end)
+		tries += 1
+		switch err {
+		case postrs.ErrInitializationFailed:
+			w.options.logger.With().Warn("failure during initialization", zap.Error(err))
+			if tries < 1+w.options.maxRetries {
+				w.options.logger.With().Warn("retrying initialization", zap.Int("tries", tries))
+				time.Sleep(w.options.retryDelay)
+			} else {
+				return WorkOracleResult{}, fmt.Errorf("failed to initialize scrypt after %v tries", tries)
+			}
+		case nil:
+			return WorkOracleResult{
+				Output: res.Output,
+				Nonce:  res.IdxSolution,
+			}, nil
+		default:
+			return WorkOracleResult{}, err
+		}
 	}
 
-	return WorkOracleResult{
-		Output: res.Output,
-		Nonce:  res.IdxSolution,
-	}, nil
 }

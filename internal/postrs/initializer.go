@@ -43,13 +43,12 @@ func (c DeviceClass) String() string {
 }
 
 var (
-	ErrInvalidProviderID = errors.New("invalid provider ID")
-
-	ErrInvalidLabelsRange = errors.New("invalid labels range")
-	ErrOpenCL             = errors.New("OpenCL error")
-	ErrInvalidArgument    = errors.New("invalid argument")
-	ErrFetchProviders     = errors.New("failed to fetch providers")
-	ErrUnknown            = errors.New("unknown error")
+	ErrInvalidProviderID    = errors.New("invalid provider ID")
+	ErrInvalidLabelsRange   = errors.New("invalid labels range")
+	ErrInitializationFailed = errors.New("initialization failed")
+	ErrInvalidArgument      = errors.New("invalid argument")
+	ErrFetchProviders       = errors.New("failed to fetch providers")
+	ErrUnknown              = errors.New("unknown error")
 )
 
 const (
@@ -66,8 +65,8 @@ func InitResultToError(retVal uint32) error {
 		return nil
 	case C.InitializeInvalidLabelsRange:
 		return ErrInvalidLabelsRange
-	case C.InitializeOclError:
-		return ErrOpenCL
+	case C.InitializeError:
+		return ErrInitializationFailed
 	case C.InitializeInvalidArgument:
 		return ErrInvalidArgument
 	case C.InitializeFailedToGetProviders:
