@@ -20,6 +20,8 @@ jobs:
         with:
           check-latest: true
           go-version-file: "go.mod"
+      - name: Install OpenCL dev
+        run: sudo apt-get update -q && sudo apt-get install -qy ocl-icd-opencl-dev
       - name: fmt, tidy, generate
         run: |
           make install
