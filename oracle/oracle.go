@@ -123,7 +123,7 @@ func WithMaxRetries(maxRetries int) OptionFunc {
 	}
 }
 
-func WithScrypter(scrypter postrs.Scrypter) OptionFunc {
+func withScrypter(scrypter postrs.Scrypter) OptionFunc {
 	return func(opts *option) error {
 		opts.scrypter = scrypter
 		return nil
@@ -215,22 +215,21 @@ func (w *WorkOracle) Positions(start, end uint64) (WorkOracleResult, error) {
 	for {
 		res, err := w.scrypt.Positions(start, end)
 		tries += 1
-		switch err {
-		case postrs.ErrInitializationFailed:
+		switch {
+		case errors.Is(err, postrs.ErrInitializationFailed):
 			w.options.logger.With().Warn("failure during initialization", zap.Error(err))
-			if tries < 1+w.options.maxRetries {
-				w.options.logger.With().Warn("retrying initialization", zap.Int("tries", tries))
-				time.Sleep(w.options.retryDelay)
-			} else {
+			if tries > w.options.maxRetries {
 				return WorkOracleResult{}, fmt.Errorf("failed to initialize scrypt after %v tries", tries)
 			}
-		case nil:
+			w.options.logger.With().Warn("retrying initialization", zap.Int("tries", tries))
+			time.Sleep(w.options.retryDelay)
+		case err != nil:
+			return WorkOracleResult{}, err
+		default:
 			return WorkOracleResult{
 				Output: res.Output,
 				Nonce:  res.IdxSolution,
 			}, nil
-		default:
-			return WorkOracleResult{}, err
 		}
 	}
 }
