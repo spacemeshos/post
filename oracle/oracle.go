@@ -233,5 +233,4 @@ func (w *WorkOracle) Positions(start, end uint64) (WorkOracleResult, error) {
 			return WorkOracleResult{}, err
 		}
 	}
-
 }

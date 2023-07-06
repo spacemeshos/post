@@ -5,9 +5,10 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/internal/postrs/mocks"
-	"github.com/stretchr/testify/require"
 )
 
 func TestOracleRetryPositions(t *testing.T) {
