@@ -2,7 +2,9 @@
 
 CLI tool for PoST initialization
 
-# Build
+# Getting it
+
+Go to the https://github.com/spacemeshos/post/releases and take the most recent release for your platform. In case if you want to build it from source, follow the instructions below.
 
 ```bash
 git clone https://github.com/spacemeshos/post
@@ -52,16 +54,22 @@ https://github.com/intel/compute-runtime/releases
 ./postcli -printConfig
 ```
 
-### Initialize 
+### Initialize
 
 Example
 
 ```bash
 ./postcli -provider=2 -id=c230c51669d1fcd35860131e438e234726b2bd5f9adbbd91bd88a718e7e98ecb -commitmentAtxId=c230c51669d1fcd35860131e438e234726b2bd5f9adbbd91bd88a718e7e98ecb -genproof
- 
+
 ```
 
 ### Remarks
 * `-id` and `-commitmentAtxId` are required because they are committed to the generated data.
 * If `-id` isn't provided, the id (public key) will be auto-generated, while saving `key.bin` in `-datadir`.
-* If `postcli` is called multiple times on a given `-datadir`, config mismatch error is likely to occur. In this case, the `-reset` flag can be used to easily clean the previous instance. 
+* If `postcli` is called multiple times on a given `-datadir`, config mismatch error is likely to occur. In this case, the `-reset` flag can be used to easily clean the previous instance.
+
+
+### How to set the required options
+
+* `-commitmentAtxId`: At the moment, there is no easy way to get that programaticaly. If you start to initialize before first 2 epochs finish then it's safe to use `goldenATX` value here. Later the best way to get it is to use grpc api of the node and call `ActivationService::Highest()` to get that value.
+* `-id`: There are two options there, you can autogenerate it (do not provide it as an option) then there will be `key.bin` file in the `-datadir` folder which will have private key *REMEMBER* to copy it also. The other option is to provide the `-id` flag with the public key you want to use. In this case, the `key.bin` file will be NOT craeted. Make sure that you put the binary representation of the key there.
