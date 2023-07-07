@@ -6,6 +6,7 @@ package postrs
 import "C"
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -34,7 +35,26 @@ func TranslateScryptParams(n, r, p uint) ScryptParams {
 	}
 }
 
-func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces, threads uint, K1, K2 uint32, powDifficulty [32]byte, powFlags PowFlags) (*shared.Proof, error) {
+type postOptions struct {
+	powCreatorId []byte
+}
+
+type PostOptionFunc func(*postOptions) error
+
+func WithPowCreator(id []byte) PostOptionFunc {
+	return func(opts *postOptions) error {
+		opts.powCreatorId = id
+		return nil
+	}
+}
+
+func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces, threads uint, K1, K2 uint32, powDifficulty [32]byte, powFlags PowFlags, options ...PostOptionFunc) (*shared.Proof, error) {
+	opts := postOptions{}
+	for _, o := range options {
+		if err := o(&opts); err != nil {
+			return nil, err
+		}
+	}
 	if logger != nil {
 		setLogCallback(logger)
 	}
@@ -44,6 +64,13 @@ func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces,
 
 	challengePtr := C.CBytes(challenge)
 	defer C.free(challengePtr)
+
+	var powCreatorId unsafe.Pointer
+	if opts.powCreatorId != nil {
+		logger.With().Info("Proving with PoW creator ID", zap.String("id", hex.EncodeToString(opts.powCreatorId)))
+		powCreatorId = C.CBytes(opts.powCreatorId)
+		defer C.free(powCreatorId)
+	}
 
 	config := C.Config{
 		k1: C.uint32_t(K1),
@@ -60,6 +87,7 @@ func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces,
 		C.size_t(nonces),
 		C.size_t(threads),
 		powFlags,
+		(*C.uchar)(powCreatorId),
 	)
 
 	if cProof == nil {
@@ -138,7 +166,14 @@ func (v *Verifier) VerifyProof(
 	k1, k2, k3 uint32,
 	powDifficulty [32]byte,
 	scryptParams ScryptParams,
+	options ...PostOptionFunc,
 ) error {
+	opts := postOptions{}
+	for _, o := range options {
+		if err := o(&opts); err != nil {
+			return err
+		}
+	}
 	if logger != nil {
 		setLogCallback(logger)
 	}
@@ -181,6 +216,16 @@ func (v *Verifier) VerifyProof(
 			len: C.size_t(indicesSliceHdr.Len),
 			cap: C.size_t(indicesSliceHdr.Cap),
 		},
+	}
+
+	if opts.powCreatorId != nil {
+		logger.With().Info("Verifying with PoW creator ID", zap.String("id", hex.EncodeToString(opts.powCreatorId)))
+		minerIdSliceHdr := (*reflect.SliceHeader)(unsafe.Pointer(&opts.powCreatorId))
+		cProof.pow_creator = C.ArrayU8{
+			ptr: (*C.uchar)(unsafe.Pointer(minerIdSliceHdr.Data)),
+			len: C.size_t(minerIdSliceHdr.Len),
+			cap: C.size_t(minerIdSliceHdr.Cap),
+		}
 	}
 
 	cMetadata := C.ProofMetadata{
