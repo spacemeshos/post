@@ -24,7 +24,6 @@ import (
 type (
 	Config              = config.Config
 	InitOpts            = config.InitOpts
-	Proof               = shared.Proof
 	Logger              = zap.Logger
 	ConfigMismatchError = shared.ConfigMismatchError
 	Provider            = postrs.Provider
