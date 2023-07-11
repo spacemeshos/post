@@ -23,6 +23,8 @@ import (
 	"github.com/spacemeshos/post/verifying"
 )
 
+const edKeyFileName = "key.bin"
+
 var (
 	cfg                = config.DefaultConfig()
 	opts               = config.DefaultInitOpts()
@@ -74,15 +76,12 @@ func processFlags() error {
 		}
 		id = pub
 		log.Printf("cli: generated id %x\n", id)
-		saveKey(priv) // The key will need to be loaded in clients for the PoST data to be usable.
-	} else {
-		var err error
-		id, err = hex.DecodeString(idHex)
-		if err != nil {
-			return fmt.Errorf("invalid id: %w", err)
-		}
+		return saveKey(priv)
 	}
-
+	id, err = hex.DecodeString(idHex)
+	if err != nil {
+		return fmt.Errorf("invalid id: %w", err)
+	}
 	return nil
 }
 
@@ -170,12 +169,13 @@ func main() {
 	}
 }
 
-func saveKey(key []byte) error {
-	if err := os.MkdirAll(opts.DataDir, shared.OwnerReadWriteExec); err != nil && !os.IsExist(err) {
+func saveKey(key ed25519.PrivateKey) error {
+	if err := os.MkdirAll(opts.DataDir, 0o700); err != nil && !os.IsExist(err) {
 		return fmt.Errorf("mkdir error: %w", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(opts.DataDir, "key.bin"), key, shared.OwnerReadWrite); err != nil {
+	filename := filepath.Join(opts.DataDir, edKeyFileName)
+	if err := os.WriteFile(filename, []byte(hex.EncodeToString(key)), 0o600); err != nil {
 		return fmt.Errorf("key write to disk error: %w", err)
 	}
 	return nil
