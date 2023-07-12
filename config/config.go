@@ -84,6 +84,7 @@ type Config struct {
 func MainnetConfig() Config {
 	cfg := Config{
 		MinNumUnits:   4,
+		MaxNumUnits:   1048576,    // max post size 64 PiB
 		LabelsPerUnit: 4294967296, // 64GiB units
 		K1:            26,
 		K2:            37,
