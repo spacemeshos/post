@@ -259,7 +259,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		zap.Int("firstFileIndex", firstFileIndex),
 		zap.Int("lastFileIndex", lastFileIndex),
 	)
-	if err := init.removeRedundantFiles(*layout); err != nil {
+	if err := init.removeRedundantFiles(layout); err != nil {
 		return err
 	}
 

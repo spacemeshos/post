@@ -15,7 +15,7 @@ type filesLayout struct {
 	LastFileNumLabels uint64
 }
 
-func deriveFilesLayout(cfg config.Config, opts config.InitOpts) (*filesLayout, error) {
+func deriveFilesLayout(cfg config.Config, opts config.InitOpts) (filesLayout, error) {
 	maxFileSizeBits := opts.MaxFileSize * 8
 	maxFileNumLabels := maxFileSizeBits / uint64(config.BitsPerLabel)
 	totalLabels := uint64(opts.NumUnits) * uint64(cfg.LabelsPerUnit)
@@ -28,11 +28,11 @@ func deriveFilesLayout(cfg config.Config, opts config.InitOpts) (*filesLayout, e
 	}
 
 	if start >= end {
-		return nil, fmt.Errorf("invalid range: start (%v) must be less then end (%v)", start, end)
+		return filesLayout{}, fmt.Errorf("invalid range: start (%v) must be less then end (%v)", start, end)
 	}
 	// Avoid starting in the middle of a file
 	if start%maxFileNumLabels != 0 {
-		return nil, fmt.Errorf("invalid range: start (%v) must be a multiple of: %v", start, maxFileNumLabels)
+		return filesLayout{}, fmt.Errorf("invalid range: start (%v) must be a multiple of: %v", start, maxFileNumLabels)
 	}
 
 	numLabels := end - start
@@ -45,7 +45,7 @@ func deriveFilesLayout(cfg config.Config, opts config.InitOpts) (*filesLayout, e
 		lastFileNumLabels = remainder
 	}
 
-	return &filesLayout{
+	return filesLayout{
 		From:              start,
 		To:                end,
 		NumFiles:          uint(numFiles),
