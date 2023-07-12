@@ -234,19 +234,32 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 	defer init.mtx.Unlock()
 
-	layout := deriveFilesLayout(init.cfg, init.opts)
+	layout, err := deriveFilesLayout(init.cfg, init.opts)
+	if err != nil {
+		return err
+	}
+
 	init.logger.Info("initialization started",
 		zap.String("datadir", init.opts.DataDir),
 		zap.Uint32("numUnits", init.opts.NumUnits),
 		zap.Uint64("maxFileSize", init.opts.MaxFileSize),
 		zap.Uint64("labelsPerUnit", init.cfg.LabelsPerUnit),
+		zap.Uint64("from", layout.From),
+		zap.Uint64("to", layout.To),
+		zap.Uint64("total", layout.To-layout.From),
 	)
+
+	firstFileIndex := int(layout.From / layout.FileNumLabels)
+	lastFileIndex := firstFileIndex + int(layout.NumFiles)
+
 	init.logger.Info("initialization file layout",
 		zap.Uint("numFiles", layout.NumFiles),
 		zap.Uint64("labelsPerFile", layout.FileNumLabels),
 		zap.Uint64("labelsLastFile", layout.LastFileNumLabels),
+		zap.Int("firstFileIndex", firstFileIndex),
+		zap.Int("lastFileIndex", lastFileIndex),
 	)
-	if err := init.removeRedundantFiles(layout); err != nil {
+	if err := init.removeRedundantFiles(*layout); err != nil {
 		return err
 	}
 
@@ -266,7 +279,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 	defer wo.Close()
 
-	for i := 0; i < int(layout.NumFiles); i++ {
+	for i := firstFileIndex; i < lastFileIndex; i++ {
 		fileOffset := uint64(i) * layout.FileNumLabels
 		fileNumLabels := layout.FileNumLabels
 		if i == int(layout.NumFiles)-1 {
@@ -590,6 +603,7 @@ func (init *Initializer) saveMetadata() error {
 		NumUnits:        init.opts.NumUnits,
 		MaxFileSize:     init.opts.MaxFileSize,
 		Nonce:           init.nonce.Load(),
+		NonceValue:      init.nonceValue,
 		LastPosition:    init.lastPosition.Load(),
 	}
 	return SaveMetadata(init.opts.DataDir, &v)

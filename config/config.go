@@ -121,6 +121,9 @@ type InitOpts struct {
 	Scrypt      ScryptParams
 	// ComputeBatchSize must be greater than 0
 	ComputeBatchSize uint64
+
+	From uint64
+	To   *uint64
 }
 
 type ScryptParams struct {

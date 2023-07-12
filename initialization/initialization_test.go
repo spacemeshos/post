@@ -77,18 +77,85 @@ func TestMaxFileSize(t *testing.T) {
 		MaxFileSize: 2048,
 	}
 
-	layout := deriveFilesLayout(cfg, opts)
+	layout, err := deriveFilesLayout(cfg, opts)
+	r.NoError(err)
 	r.Equal(10, int(layout.NumFiles))
 	r.Equal(128, int(layout.FileNumLabels))
 	r.Equal(128, int(layout.LastFileNumLabels))
 
 	opts.MaxFileSize = 2000
 
-	layout = deriveFilesLayout(cfg, opts)
+	layout, err = deriveFilesLayout(cfg, opts)
+	r.NoError(err)
 	r.Equal(10*128, 10*125+30)
 	r.Equal(11, int(layout.NumFiles))
 	r.Equal(125, int(layout.FileNumLabels))
 	r.Equal(30, int(layout.LastFileNumLabels))
+}
+
+func TestCustomStart(t *testing.T) {
+	r := require.New(t)
+
+	cfg := Config{
+		LabelsPerUnit: 128,
+	}
+	opts := InitOpts{
+		NumUnits:    100,
+		MaxFileSize: 2048,
+		From:        2048 / 16,
+	}
+
+	layout, err := deriveFilesLayout(cfg, opts)
+	r.NoError(err)
+	r.EqualValues(opts.From, layout.From)
+	r.EqualValues(12800, layout.To)
+	r.Equal(99, int(layout.NumFiles)) // should skip the first file
+	r.Equal(128, int(layout.FileNumLabels))
+	r.Equal(128, int(layout.LastFileNumLabels))
+}
+
+func TestCustomEnd(t *testing.T) {
+	r := require.New(t)
+
+	cfg := Config{
+		LabelsPerUnit: 128,
+	}
+	to := uint64(256) // two units
+	opts := InitOpts{
+		NumUnits:    100,
+		MaxFileSize: 2048,
+		To:          &to,
+	}
+
+	layout, err := deriveFilesLayout(cfg, opts)
+	r.NoError(err)
+	r.EqualValues(0, layout.From)
+	r.EqualValues(to, layout.To)
+	r.Equal(2, int(layout.NumFiles))
+	r.Equal(128, int(layout.FileNumLabels))
+	r.Equal(128, int(layout.LastFileNumLabels))
+}
+
+func TestCustomEndPartialLastFile(t *testing.T) {
+	r := require.New(t)
+
+	cfg := Config{
+		LabelsPerUnit: 128,
+	}
+	to := uint64(cfg.LabelsPerUnit * 99)
+	opts := InitOpts{
+		NumUnits:    100,
+		MaxFileSize: 4096,
+		To:          &to,
+	}
+
+	layout, err := deriveFilesLayout(cfg, opts)
+	r.NoError(err)
+	r.EqualValues(0, layout.From)
+	r.EqualValues(to, layout.To)
+	r.Equal(50, int(layout.NumFiles))
+	r.Equal(256, int(layout.FileNumLabels))
+	r.Equal(128, int(layout.LastFileNumLabels))
 }
 
 func TestInitialize_PowOutOfRange(t *testing.T) {
@@ -533,14 +600,16 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 
 		numFiles, err := init.diskState.NumFilesWritten()
 		r.NoError(err)
-		layout := deriveFilesLayout(cfg, opts)
+		layout, err := deriveFilesLayout(cfg, opts)
+		r.NoError(err)
 		r.Equal(int(layout.NumFiles), numFiles)
 
 		r.NoError(newInit.Initialize(ctx))
 
 		numFiles, err = newInit.diskState.NumFilesWritten()
 		r.NoError(err)
-		newLayout := deriveFilesLayout(cfg, newOpts)
+		newLayout, err := deriveFilesLayout(cfg, newOpts)
+		r.NoError(err)
 		r.Equal(int(newLayout.NumFiles), numFiles)
 		r.Less(newLayout.NumFiles, layout.NumFiles)
 
@@ -593,7 +662,8 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			opts.MaxFileSize /= uint64(numFiles)
 			opts.DataDir = t.TempDir()
 
-			layout := deriveFilesLayout(cfg, opts)
+			layout, err := deriveFilesLayout(cfg, opts)
+			require.NoError(t, err)
 			require.Equal(t, numFiles, int(layout.NumFiles))
 
 			init, err := NewInitializer(

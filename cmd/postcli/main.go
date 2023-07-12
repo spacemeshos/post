@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -50,8 +51,17 @@ func parseFlags() {
 	flag.StringVar(&idHex, "id", "", "miner's id (public key), in hex (will be auto-generated if not provided)")
 	flag.StringVar(&commitmentAtxIdHex, "commitmentAtxId", "", "commitment atx id, in hex (required)")
 	numUnits := flag.Uint64("numUnits", uint64(opts.NumUnits), "number of units")
+
+	flag.Uint64Var(&opts.From, "from", 0, "first label to initialize. Will init from 0 if not provided")
+	var to uint64
+	flag.Uint64Var(&to, "to", math.MaxUint64, "end of the range of labels to initialize (exclusive). Will init to the end of declared space if not provided.")
 	flag.Parse()
 
+	// A workaround to simulate an optional value w/o a default ¯\_(ツ)_/¯
+	// The default will be known later, after parsing the flags.
+	if to != math.MaxUint64 {
+		opts.To = &to
+	}
 	opts.NumUnits = uint32(*numUnits) // workaround the missing type support for uint32
 }
 
