@@ -26,8 +26,8 @@ import (
 const edKeyFileName = "key.bin"
 
 var (
-	cfg                = config.DefaultConfig()
-	opts               = config.DefaultInitOpts()
+	cfg                = config.MainnetConfig()
+	opts               = config.MainnetInitOpts()
 	printProviders     bool
 	printConfig        bool
 	genProof           bool
