@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -18,9 +19,6 @@ const (
 	MinBitsPerLabel = 1
 	MaxBitsPerLabel = 256
 	BitsPerLabel    = 8 * 16
-
-	defaultMaxNumUnits = 100
-	defaultMinNumUnits = 1
 
 	KiB = 1024
 	MiB = 1024 * KiB
@@ -82,11 +80,28 @@ type Config struct {
 	PowDifficulty [32]byte
 }
 
+// MainnetConfig returns the default config for mainnet.
+func MainnetConfig() Config {
+	cfg := Config{
+		MinNumUnits:   4,
+		LabelsPerUnit: 4294967296, // 64GiB units
+		K1:            26,
+		K2:            37,
+		K3:            37,
+	}
+	_, err := hex.Decode(cfg.PowDifficulty[:], []byte("00037ec8ec25e6d2c00000000000000000000000000000000000000000000000"))
+	if err != nil {
+		panic(err)
+	}
+	return cfg
+}
+
+// DefaultConfig returns the default config. These are intended for testing.
 func DefaultConfig() Config {
 	cfg := Config{
+		MinNumUnits:   1,
+		MaxNumUnits:   100,
 		LabelsPerUnit: 512, // 8kB units
-		MaxNumUnits:   defaultMaxNumUnits,
-		MinNumUnits:   defaultMinNumUnits,
 		K1:            26,
 		K2:            37,
 		K3:            37,
@@ -94,7 +109,6 @@ func DefaultConfig() Config {
 	for i := range cfg.PowDifficulty {
 		cfg.PowDifficulty[i] = 0xFF
 	}
-
 	return cfg
 }
 
@@ -138,10 +152,24 @@ func DefaultLabelParams() ScryptParams {
 // based on a short benchmarking session.
 const BestProviderID = -1
 
+// MainnetInitOpts returns the default InitOpts for mainnet.
+func MainnetInitOpts() InitOpts {
+	return InitOpts{
+		DataDir:          DefaultDataDir,
+		NumUnits:         4,
+		MaxFileSize:      defaultMaxFileSize,
+		ProviderID:       BestProviderID,
+		Throttle:         false,
+		Scrypt:           DefaultLabelParams(),
+		ComputeBatchSize: DefaultComputeBatchSize,
+	}
+}
+
+// DefaultInitOpts returns the default InitOpts. These are intended for testing.
 func DefaultInitOpts() InitOpts {
 	return InitOpts{
 		DataDir:          DefaultDataDir,
-		NumUnits:         defaultMinNumUnits + 1,
+		NumUnits:         2,
 		MaxFileSize:      defaultMaxFileSize,
 		ProviderID:       BestProviderID,
 		Throttle:         false,
