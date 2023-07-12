@@ -20,7 +20,7 @@ type PostMetadata struct {
 
 type NonceValue []byte
 
-// UnmarshalJSON from hex
+// Unmarshal JSON from hex format.
 func (n *NonceValue) UnmarshalJSON(data []byte) error {
 	if len(data) == 0 {
 		return nil
@@ -32,7 +32,7 @@ func (n *NonceValue) UnmarshalJSON(data []byte) error {
 	return err
 }
 
-// MarshalJSON to hex
+// Marshal to JSON in hex format.
 func (n NonceValue) MarshalJSON() ([]byte, error) {
 	if n == nil {
 		return []byte{}, nil

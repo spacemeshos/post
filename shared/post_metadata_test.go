@@ -3,8 +3,9 @@ package shared_test
 import (
 	"testing"
 
-	"github.com/spacemeshos/post/shared"
 	"github.com/stretchr/testify/require"
+
+	"github.com/spacemeshos/post/shared"
 )
 
 func TestMarshalNonceValue(t *testing.T) {
