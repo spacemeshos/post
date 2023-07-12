@@ -23,6 +23,7 @@ type NonceValue []byte
 func (n NonceValue) MarshalJSON() ([]byte, error) {
 	return json.Marshal(hex.EncodeToString(n))
 }
+
 func (n *NonceValue) UnmarshalJSON(data []byte) (err error) {
 	var hexString string
 	if err = json.Unmarshal(data, &hexString); err != nil {
