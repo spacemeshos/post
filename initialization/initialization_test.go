@@ -1,11 +1,14 @@
 package initialization
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"math/big"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -64,31 +67,6 @@ func TestInitialize(t *testing.T) {
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	require.NoError(t, verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
-}
-
-func TestMaxFileSize(t *testing.T) {
-	r := require.New(t)
-
-	cfg := Config{
-		LabelsPerUnit: 128,
-	}
-	opts := InitOpts{
-		NumUnits:    10,
-		MaxFileSize: 2048,
-	}
-
-	layout := deriveFilesLayout(cfg, opts)
-	r.Equal(10, int(layout.NumFiles))
-	r.Equal(128, int(layout.FileNumLabels))
-	r.Equal(128, int(layout.LastFileNumLabels))
-
-	opts.MaxFileSize = 2000
-
-	layout = deriveFilesLayout(cfg, opts)
-	r.Equal(10*128, 10*125+30)
-	r.Equal(11, int(layout.NumFiles))
-	r.Equal(125, int(layout.FileNumLabels))
-	r.Equal(30, int(layout.LastFileNumLabels))
 }
 
 func TestInitialize_PowOutOfRange(t *testing.T) {
@@ -533,14 +511,16 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 
 		numFiles, err := init.diskState.NumFilesWritten()
 		r.NoError(err)
-		layout := deriveFilesLayout(cfg, opts)
+		layout, err := deriveFilesLayout(cfg, opts)
+		r.NoError(err)
 		r.Equal(int(layout.NumFiles), numFiles)
 
 		r.NoError(newInit.Initialize(ctx))
 
 		numFiles, err = newInit.diskState.NumFilesWritten()
 		r.NoError(err)
-		newLayout := deriveFilesLayout(cfg, newOpts)
+		newLayout, err := deriveFilesLayout(cfg, newOpts)
+		r.NoError(err)
 		r.Equal(int(newLayout.NumFiles), numFiles)
 		r.Less(newLayout.NumFiles, layout.NumFiles)
 
@@ -593,7 +573,8 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			opts.MaxFileSize /= uint64(numFiles)
 			opts.DataDir = t.TempDir()
 
-			layout := deriveFilesLayout(cfg, opts)
+			layout, err := deriveFilesLayout(cfg, opts)
+			require.NoError(t, err)
 			require.Equal(t, numFiles, int(layout.NumFiles))
 
 			init, err := NewInitializer(
@@ -867,4 +848,147 @@ func initData(datadir string) ([]byte, error) {
 	defer reader.Close()
 
 	return io.ReadAll(reader)
+}
+
+func TestInitializeSubset(t *testing.T) {
+	r := require.New(t)
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 128
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = 20
+	opts.MaxFileSize = cfg.LabelsPerUnit * 2 * uint64(config.BytesPerLabel()) // 2 units per file
+	opts.ProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 2
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+	)
+	require.NoError(t, err)
+	err = init.Initialize(context.Background())
+	require.NoError(t, err)
+
+	optsSubset := opts
+	optsSubset.DataDir = t.TempDir()
+	optsSubset.FromFileIdx = 3
+	optsSubset.ToFileIdx = new(int)
+	*optsSubset.ToFileIdx = 4
+
+	initSubset, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(optsSubset),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+	)
+	r.NoError(err)
+	err = initSubset.Initialize(context.Background())
+	r.NoError(err)
+
+	// Verify that the subset is a subset of the full set
+	fullData, err := initData(opts.DataDir)
+	r.NoError(err)
+	subsetData, err := initData(optsSubset.DataDir)
+	r.NoError(err)
+	r.True(bytes.Contains(fullData, subsetData))
+
+	// Verify that the subset contains files 3 and 4, but not 0-2 and 5
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_0.bin"))
+	r.ErrorIs(err, os.ErrNotExist)
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_1.bin"))
+	r.ErrorIs(err, os.ErrNotExist)
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_2.bin"))
+	r.ErrorIs(err, os.ErrNotExist)
+
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_3.bin"))
+	r.NoError(err)
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_4.bin"))
+	r.NoError(err)
+
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_5.bin"))
+	r.ErrorIs(err, os.ErrNotExist)
+
+	// Verify that postdata_3.bin from both initializations contain the same data
+	fullPostdata3, err := os.ReadFile(filepath.Join(opts.DataDir, "postdata_3.bin"))
+	r.NoError(err)
+	subsetPostdata3, err := os.ReadFile(filepath.Join(optsSubset.DataDir, "postdata_3.bin"))
+	r.NoError(err)
+	r.Equal(fullPostdata3, subsetPostdata3)
+
+	// Verify that postdata_4.bin from both initializations contain the same data
+	fullPostdata4, err := os.ReadFile(filepath.Join(opts.DataDir, "postdata_4.bin"))
+	r.NoError(err)
+	subsetPostdata4, err := os.ReadFile(filepath.Join(optsSubset.DataDir, "postdata_4.bin"))
+	r.NoError(err)
+	r.Equal(fullPostdata4, subsetPostdata4)
+}
+
+func TestInitializeLastFileIsSmaller(t *testing.T) {
+	r := require.New(t)
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 128
+
+	opts := config.DefaultInitOpts()
+	opts.FromFileIdx = 1
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = 5 // the last file will have 1 unit
+	opts.MaxFileSize = 2 * cfg.UnitSize()
+	opts.ProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 2
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+	)
+	require.NoError(t, err)
+	err = init.Initialize(context.Background())
+	require.NoError(t, err)
+
+	// Verify that the first file contains 2 units
+	file, err := os.Stat(filepath.Join(opts.DataDir, "postdata_1.bin"))
+	r.NoError(err)
+	r.Equal(2*cfg.UnitSize(), uint64(file.Size()))
+
+	// Verify that the last file contains only 1 unit
+	file, err = os.Stat(filepath.Join(opts.DataDir, "postdata_2.bin"))
+	r.NoError(err)
+	r.Equal(cfg.UnitSize(), uint64(file.Size()))
+}
+
+func TestRemoveRedundantFiles(t *testing.T) {
+	cfg := config.DefaultConfig()
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = 3
+	opts.MaxFileSize = 2 * cfg.UnitSize()
+
+	expectedFilesCount := opts.TotalFiles(cfg.LabelsPerUnit)
+	// Create 2 redundant files
+	for i := 0; i < expectedFilesCount+2; i++ {
+		f, err := os.Create(filepath.Join(opts.DataDir, shared.InitFileName(i)))
+		require.NoError(t, err)
+		_, err = f.Write([]byte("test"))
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+	}
+
+	removeRedundantFiles(cfg, opts, zap.NewNop())
+
+	files, err := os.ReadDir(opts.DataDir)
+	require.NoError(t, err)
+	require.Len(t, files, expectedFilesCount)
+
+	for i := 0; i < expectedFilesCount; i++ {
+		_, err := os.Stat(filepath.Join(opts.DataDir, shared.InitFileName(i)))
+		require.NoError(t, err)
+	}
 }

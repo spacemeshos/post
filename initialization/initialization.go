@@ -234,19 +234,28 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 	defer init.mtx.Unlock()
 
-	layout := deriveFilesLayout(init.cfg, init.opts)
+	layout, err := deriveFilesLayout(init.cfg, init.opts)
+	if err != nil {
+		return err
+	}
+
 	init.logger.Info("initialization started",
 		zap.String("datadir", init.opts.DataDir),
 		zap.Uint32("numUnits", init.opts.NumUnits),
 		zap.Uint64("maxFileSize", init.opts.MaxFileSize),
 		zap.Uint64("labelsPerUnit", init.cfg.LabelsPerUnit),
 	)
+
+	lastFileIndex := layout.FirstFileIdx + int(layout.NumFiles) - 1
+
 	init.logger.Info("initialization file layout",
 		zap.Uint("numFiles", layout.NumFiles),
 		zap.Uint64("labelsPerFile", layout.FileNumLabels),
 		zap.Uint64("labelsLastFile", layout.LastFileNumLabels),
+		zap.Int("firstFileIndex", layout.FirstFileIdx),
+		zap.Int("lastFileIndex", lastFileIndex),
 	)
-	if err := init.removeRedundantFiles(layout); err != nil {
+	if err := removeRedundantFiles(init.cfg, init.opts, init.logger); err != nil {
 		return err
 	}
 
@@ -266,10 +275,10 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 	defer wo.Close()
 
-	for i := 0; i < int(layout.NumFiles); i++ {
+	for i := layout.FirstFileIdx; i <= lastFileIndex; i++ {
 		fileOffset := uint64(i) * layout.FileNumLabels
 		fileNumLabels := layout.FileNumLabels
-		if i == int(layout.NumFiles)-1 {
+		if i == lastFileIndex {
 			fileNumLabels = layout.LastFileNumLabels
 		}
 
@@ -325,22 +334,32 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	return fmt.Errorf("no nonce found")
 }
 
-func (init *Initializer) removeRedundantFiles(layout filesLayout) error {
-	numFiles, err := init.diskState.NumFilesWritten()
+func removeRedundantFiles(cfg config.Config, opts config.InitOpts, logger *zap.Logger) error {
+	// Go over all postdata_N.bin files in the data directory and remove the ones that are not needed.
+	// The files with indices from 0 to init.opts.TotalFiles(init.cfg.LabelsPerUnit) - 1 are preserved.
+	// The rest are redundant and can be removed.
+	maxFileIndex := opts.TotalFiles(cfg.LabelsPerUnit) - 1
+	logger.Debug("attempting to remove redundant files above index", zap.Int("maxFileIndex", maxFileIndex))
+
+	files, err := os.ReadDir(opts.DataDir)
 	if err != nil {
 		return err
 	}
-
-	for i := int(layout.NumFiles); i < numFiles; i++ {
-		name := shared.InitFileName(i)
-		init.logger.Info("initialization: removing redundant file",
-			zap.String("fileName", name),
-		)
-		if err := init.RemoveFile(name); err != nil {
-			return err
+	for _, file := range files {
+		name := file.Name()
+		fileIndex, err := shared.ParseFileIndex(name)
+		if err != nil && name != metadataFileName {
+			logger.Warn("found unrecognized file", zap.String("fileName", name))
+			continue
+		}
+		if fileIndex > maxFileIndex {
+			logger.Info("removing redundant file", zap.String("fileName", name))
+			path := filepath.Join(opts.DataDir, name)
+			if err := os.Remove(path); err != nil {
+				return fmt.Errorf("failed to delete file (%v): %w", path, err)
+			}
 		}
 	}
-
 	return nil
 }
 
@@ -370,19 +389,11 @@ func (init *Initializer) Reset() error {
 		}
 		name := file.Name()
 		if shared.IsInitFile(info) || name == metadataFileName {
-			if err := init.RemoveFile(name); err != nil {
-				return err
+			path := filepath.Join(init.opts.DataDir, name)
+			if err := os.Remove(path); err != nil {
+				return fmt.Errorf("failed to delete file (%v): %w", path, err)
 			}
 		}
-	}
-
-	return nil
-}
-
-func (init *Initializer) RemoveFile(name string) error {
-	path := filepath.Join(init.opts.DataDir, name)
-	if err := os.Remove(path); err != nil {
-		return fmt.Errorf("failed to delete file (%v): %w", path, err)
 	}
 
 	return nil
@@ -590,6 +601,7 @@ func (init *Initializer) saveMetadata() error {
 		NumUnits:        init.opts.NumUnits,
 		MaxFileSize:     init.opts.MaxFileSize,
 		Nonce:           init.nonce.Load(),
+		NonceValue:      init.nonceValue,
 		LastPosition:    init.lastPosition.Load(),
 	}
 	return SaveMetadata(init.opts.DataDir, &v)

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -33,6 +34,10 @@ var DefaultDataDir string
 func init() {
 	home, _ := os.UserHomeDir()
 	DefaultDataDir = filepath.Join(home, "post", DefaultDataDirName)
+}
+
+func BytesPerLabel() int {
+	return BitsPerLabel / 8
 }
 
 type PowFlags = postrs.PowFlags
@@ -113,6 +118,10 @@ func DefaultConfig() Config {
 	return cfg
 }
 
+func (c *Config) UnitSize() uint64 {
+	return c.LabelsPerUnit * uint64(BytesPerLabel())
+}
+
 type InitOpts struct {
 	DataDir     string
 	NumUnits    uint32
@@ -122,6 +131,23 @@ type InitOpts struct {
 	Scrypt      ScryptParams
 	// ComputeBatchSize must be greater than 0
 	ComputeBatchSize uint64
+
+	// Index of the first file to init (inclusive)
+	FromFileIdx int
+	// Index of the last file to init (inclusive). Will init to the end of declared space if not provided.
+	ToFileIdx *int
+}
+
+func (o *InitOpts) MaxFileNumLabels() uint64 {
+	return o.MaxFileSize / uint64(BytesPerLabel())
+}
+
+func (o *InitOpts) TotalLabels(labelsPerUnit uint64) uint64 {
+	return uint64(o.NumUnits) * labelsPerUnit
+}
+
+func (o *InitOpts) TotalFiles(labelsPerUnit uint64) int {
+	return int(math.Ceil(float64(o.TotalLabels(labelsPerUnit)) / float64(o.MaxFileNumLabels())))
 }
 
 type ScryptParams struct {

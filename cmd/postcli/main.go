@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -29,6 +30,7 @@ var (
 	cfg                = config.MainnetConfig()
 	opts               = config.MainnetInitOpts()
 	printProviders     bool
+	printNumFiles      bool
 	printConfig        bool
 	genProof           bool
 	idHex              string
@@ -40,6 +42,7 @@ var (
 
 func parseFlags() {
 	flag.BoolVar(&printProviders, "printProviders", false, "print the list of compute providers")
+	flag.BoolVar(&printNumFiles, "printNumFiles", false, "print the total number of files that would be initialized")
 	flag.BoolVar(&printConfig, "printConfig", false, "print the used config and options")
 	flag.BoolVar(&genProof, "genproof", false, "generate proof as a sanity test, after initialization")
 	flag.StringVar(&opts.DataDir, "datadir", opts.DataDir, "filesystem datadir path")
@@ -50,8 +53,17 @@ func parseFlags() {
 	flag.StringVar(&idHex, "id", "", "miner's id (public key), in hex (will be auto-generated if not provided)")
 	flag.StringVar(&commitmentAtxIdHex, "commitmentAtxId", "", "commitment atx id, in hex (required)")
 	numUnits := flag.Uint64("numUnits", uint64(opts.NumUnits), "number of units")
+
+	flag.IntVar(&opts.FromFileIdx, "fromFile", 0, "index of the first file to init (inclusive)")
+	var to int
+	flag.IntVar(&to, "toFile", math.MaxInt, "index of the last file to init (inclusive). Will init to the end of declared space if not provided.")
 	flag.Parse()
 
+	// A workaround to simulate an optional value w/o a default ¯\_(ツ)_/¯
+	// The default will be known later, after parsing the flags.
+	if to != math.MaxInt {
+		opts.ToFileIdx = &to
+	}
 	opts.NumUnits = uint32(*numUnits) // workaround the missing type support for uint32
 }
 
@@ -94,6 +106,12 @@ func main() {
 			log.Fatalln("failed to get OpenCL providers", err)
 		}
 		spew.Dump(providers)
+		return
+	}
+
+	if printNumFiles {
+		totalFiles := opts.TotalFiles(cfg.LabelsPerUnit)
+		fmt.Println(totalFiles)
 		return
 	}
 

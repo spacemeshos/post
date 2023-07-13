@@ -11,19 +11,20 @@ func InitFileName(index int) string {
 	return fmt.Sprintf("postdata_%d.bin", index)
 }
 
+func ParseFileIndex(fileName string) (int, error) {
+	re := regexp.MustCompile(`^postdata_(\d*).bin$`)
+	matches := re.FindStringSubmatch(fileName)
+	if len(matches) != 2 {
+		return 0, fmt.Errorf("invalid file name: %s", fileName)
+	}
+	return strconv.Atoi(matches[1])
+}
+
 func IsInitFile(file os.FileInfo) bool {
 	if file.IsDir() {
 		return false
 	}
 
-	re := regexp.MustCompile("postdata_(.*).bin")
-	matches := re.FindStringSubmatch(file.Name())
-	if len(matches) != 2 {
-		return false
-	}
-	if _, err := strconv.Atoi(matches[1]); err != nil {
-		return false
-	}
-
-	return true
+	_, err := ParseFileIndex(file.Name())
+	return err == nil
 }
