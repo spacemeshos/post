@@ -145,6 +145,7 @@ func (o *InitOpts) MaxFileNumLabels() uint64 {
 func (o *InitOpts) TotalLabels(labelsPerUnit uint64) uint64 {
 	return uint64(o.NumUnits) * labelsPerUnit
 }
+
 func (o *InitOpts) TotalFiles(labelsPerUnit uint64) int {
 	return int(math.Ceil(float64(o.TotalLabels(labelsPerUnit)) / float64(o.MaxFileNumLabels())))
 }
