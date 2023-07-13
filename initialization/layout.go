@@ -2,6 +2,7 @@ package initialization
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/spacemeshos/post/config"
 )
@@ -18,10 +19,7 @@ func deriveFilesLayout(cfg config.Config, opts config.InitOpts) (filesLayout, er
 	totalLabels := uint64(opts.NumUnits) * uint64(cfg.LabelsPerUnit)
 
 	firstFileIdx := opts.FromFileIdx
-	lastFileIdx := int(totalLabels/maxFileNumLabels) - 1
-	if totalLabels%maxFileNumLabels > 0 {
-		lastFileIdx++
-	}
+	lastFileIdx := TotalFiles(cfg, opts) - 1
 
 	if opts.ToFileIdx != nil {
 		if *opts.ToFileIdx < 0 {
@@ -55,4 +53,9 @@ func deriveFilesLayout(cfg config.Config, opts config.InitOpts) (filesLayout, er
 
 func firstLabelInFile(fileIdx int, opts config.InitOpts) uint64 {
 	return uint64(fileIdx) * opts.MaxFileNumLabels()
+}
+
+func TotalFiles(cfg config.Config, opts config.InitOpts) int {
+	totalLabels := uint64(opts.NumUnits) * uint64(cfg.LabelsPerUnit)
+	return int(math.Ceil(float64(totalLabels) / float64(opts.MaxFileNumLabels())))
 }

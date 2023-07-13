@@ -30,6 +30,7 @@ var (
 	cfg                = config.MainnetConfig()
 	opts               = config.MainnetInitOpts()
 	printProviders     bool
+	printNumFiles      bool
 	printConfig        bool
 	genProof           bool
 	idHex              string
@@ -41,6 +42,7 @@ var (
 
 func parseFlags() {
 	flag.BoolVar(&printProviders, "printProviders", false, "print the list of compute providers")
+	flag.BoolVar(&printNumFiles, "printNumFiles", false, "print the total number of files that would be initialized")
 	flag.BoolVar(&printConfig, "printConfig", false, "print the used config and options")
 	flag.BoolVar(&genProof, "genproof", false, "generate proof as a sanity test, after initialization")
 	flag.StringVar(&opts.DataDir, "datadir", opts.DataDir, "filesystem datadir path")
@@ -104,6 +106,12 @@ func main() {
 			log.Fatalln("failed to get OpenCL providers", err)
 		}
 		spew.Dump(providers)
+		return
+	}
+
+	if printNumFiles {
+		totalFiles := initialization.TotalFiles(cfg, opts)
+		fmt.Println(totalFiles)
 		return
 	}
 

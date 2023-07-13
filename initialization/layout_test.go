@@ -162,3 +162,30 @@ func TestCustomToPartialLastFile(t *testing.T) {
 	r.Equal(256, int(layout.FileNumLabels))
 	r.Equal(128, int(layout.LastFileNumLabels))
 }
+
+func TestTotalFiles(t *testing.T) {
+	r := require.New(t)
+	cfg := Config{
+		LabelsPerUnit: 128,
+	}
+
+	r.Equal(100, TotalFiles(cfg, InitOpts{
+		NumUnits:    100,
+		MaxFileSize: 2048,
+	}))
+
+	r.Equal(1, TotalFiles(cfg, InitOpts{
+		NumUnits:    1,
+		MaxFileSize: 2048,
+	}))
+
+	r.Equal(1, TotalFiles(cfg, InitOpts{
+		NumUnits:    1,
+		MaxFileSize: 10000000,
+	}))
+
+	r.Equal(0, TotalFiles(cfg, InitOpts{
+		NumUnits:    0,
+		MaxFileSize: 10000000,
+	}))
+}
