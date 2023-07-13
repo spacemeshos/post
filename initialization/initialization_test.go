@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -911,9 +910,9 @@ func TestInitializeSubset(t *testing.T) {
 	r.NoError(err)
 
 	// Verify that postdata_3.bin from both initializations contain the same data
-	fullPostdata3, err := ioutil.ReadFile(filepath.Join(opts.DataDir, "postdata_3.bin"))
+	fullPostdata3, err := os.ReadFile(filepath.Join(opts.DataDir, "postdata_3.bin"))
 	r.NoError(err)
-	subsetPostdata3, err := ioutil.ReadFile(filepath.Join(optsSubset.DataDir, "postdata_3.bin"))
+	subsetPostdata3, err := os.ReadFile(filepath.Join(optsSubset.DataDir, "postdata_3.bin"))
 	r.NoError(err)
 	r.Equal(fullPostdata3, subsetPostdata3)
 }
