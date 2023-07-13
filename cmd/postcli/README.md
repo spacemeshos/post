@@ -48,6 +48,13 @@ https://github.com/intel/compute-runtime/releases
 ./postcli -printProviders
 ```
 
+###  Print the number of files that would be initialized
+
+```bash
+./postcli -numUnits 100 -printNumFiles
+1600
+```
+
 ### Print the used config and options
 
 ```bash
@@ -62,6 +69,59 @@ Example
 ./postcli -provider=2 -id=c230c51669d1fcd35860131e438e234726b2bd5f9adbbd91bd88a718e7e98ecb -commitmentAtxId=c230c51669d1fcd35860131e438e234726b2bd5f9adbbd91bd88a718e7e98ecb -genproof
 
 ```
+
+### Initialize subset
+It is possible to initialize only subset of the files. It's useful if one wants to split initialization between many machines.
+#### Example - split initialization between 2 machines
+Let's assume one wants to initialize 100 units and split the process of initialization to machine A and B.
+
+First let's see how many files it would be:
+```bash
+./postcli -numUnits 100 -printNumFiles
+1600
+```
+
+Next, on machine A:
+```bash
+./postcli -numUnits 100 -id <id> -commitmentAtxId <id> -toFile 799 -datadir ./dataA
+```
+We get the first half - 800 binary files
+```bash
+ls -la ./dataA/*.bin | wc -l
+800
+```
+
+Next, on machine B:
+```bash
+./postcli -numUnits 100 -id <id> -commitmentAtxId <id> -fromFile 800 -datadir ./dataB
+```
+We get the first half - 800 binary files
+```bash
+ls -la ./dataB/*.bin | wc -l
+800
+```
+
+Finally we can combine both sets together. A dummy example to get the feeling. Realisticly it would probably be copying over the network
+```bash
+cp ./dataA/* ./data/
+cp ./dataB/* ./data/
+ls -la ./data/*.bin | wc -l
+1600
+```
+
+**An optional step to select best possible VRF nonce**
+Normally, when `postcli`initializates from the start to the end it will automatically pick the best vrf nonce. The best means pointing to **the label with the smallest value**. It might be important in the future if we allow increasing POS data size, but it is not critical at the moment.
+
+Now, when `postcli` initializes in chunks, each subset will find a valid vrf nonce, which represents the local minimum in the inititalized subset. It's optimal to select the best one (the global minimum), but it's not critical.
+
+The values of nonces are 128bit, represented as a 16B binary array in big endian. Given two nonces:
+```
+nonceA = 0000ffda94993723a980bf557509773e
+nonceB = 0000488e171389cce69344d68b66f6b4
+```
+`nonceB` represents the smaller value.
+
+The nonce and the label it points to is included in the post_metadata.json. It's currently up to the operator to find the best VRF nonce manually and copy the `Nonce` and `NonceValue` to the postdata_metadata.json on the target machine.
 
 ### Remarks
 * `-id` and `-commitmentAtxId` are required because they are committed to the generated data.
