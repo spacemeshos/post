@@ -927,3 +927,38 @@ func TestInitializeSubset(t *testing.T) {
 	r.NoError(err)
 	r.Equal(fullPostdata4, subsetPostdata4)
 }
+
+func TestInitializeLastFileIsSmaller(t *testing.T) {
+	r := require.New(t)
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 128
+
+	opts := config.DefaultInitOpts()
+	opts.FromFileIdx = 1
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = 5 // the last file will have 1 unit
+	opts.MaxFileSize = 2 * cfg.UnitSize()
+	opts.ProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 2
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+	)
+	require.NoError(t, err)
+	err = init.Initialize(context.Background())
+	require.NoError(t, err)
+
+	// Verify that the first file contains 2 units
+	file, err := os.Stat(filepath.Join(opts.DataDir, "postdata_1.bin"))
+	r.NoError(err)
+	r.Equal(2*cfg.UnitSize(), uint64(file.Size()))
+
+	// Verify that the last file contains only 1 unit
+	file, err = os.Stat(filepath.Join(opts.DataDir, "postdata_2.bin"))
+	r.NoError(err)
+	r.Equal(cfg.UnitSize(), uint64(file.Size()))
+}

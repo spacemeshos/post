@@ -246,7 +246,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		zap.Uint64("labelsPerUnit", init.cfg.LabelsPerUnit),
 	)
 
-	lastFileIndex := layout.FirstFileIdx + int(layout.NumFiles)
+	lastFileIndex := layout.FirstFileIdx + int(layout.NumFiles) - 1
 
 	init.logger.Info("initialization file layout",
 		zap.Uint("numFiles", layout.NumFiles),
@@ -275,10 +275,10 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 	defer wo.Close()
 
-	for i := layout.FirstFileIdx; i < lastFileIndex; i++ {
+	for i := layout.FirstFileIdx; i <= lastFileIndex; i++ {
 		fileOffset := uint64(i) * layout.FileNumLabels
 		fileNumLabels := layout.FileNumLabels
-		if i == int(layout.NumFiles)-1 {
+		if i == lastFileIndex {
 			fileNumLabels = layout.LastFileNumLabels
 		}
 

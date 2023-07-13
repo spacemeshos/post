@@ -117,6 +117,10 @@ func DefaultConfig() Config {
 	return cfg
 }
 
+func (c *Config) UnitSize() uint64 {
+	return c.LabelsPerUnit * uint64(BytesPerLabel())
+}
+
 type InitOpts struct {
 	DataDir     string
 	NumUnits    uint32
