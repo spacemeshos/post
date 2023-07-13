@@ -857,7 +857,7 @@ func TestInitializeSubset(t *testing.T) {
 
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
-	opts.NumUnits = 10
+	opts.NumUnits = 20
 	opts.MaxFileSize = cfg.LabelsPerUnit * 2 * uint64(config.BytesPerLabel()) // 2 units per file
 	opts.ProviderID = int(CPUProviderID())
 	opts.Scrypt.N = 2
@@ -897,17 +897,21 @@ func TestInitializeSubset(t *testing.T) {
 	r.NoError(err)
 	r.True(bytes.Contains(fullData, subsetData))
 
-	// Verify that the subset contains file postdata_3.bin, but not postdata_0.bin, postdata_1.bin, postdata_2.bin and postdata_4.bin
+	// Verify that the subset contains files 3 and 4, but not 0-2 and 5
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_0.bin"))
 	r.ErrorIs(err, os.ErrNotExist)
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_1.bin"))
 	r.ErrorIs(err, os.ErrNotExist)
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_2.bin"))
 	r.ErrorIs(err, os.ErrNotExist)
-	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_4.bin"))
-	r.ErrorIs(err, os.ErrNotExist)
+
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_3.bin"))
 	r.NoError(err)
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_4.bin"))
+	r.NoError(err)
+
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_5.bin"))
+	r.ErrorIs(err, os.ErrNotExist)
 
 	// Verify that postdata_3.bin from both initializations contain the same data
 	fullPostdata3, err := os.ReadFile(filepath.Join(opts.DataDir, "postdata_3.bin"))
@@ -915,4 +919,11 @@ func TestInitializeSubset(t *testing.T) {
 	subsetPostdata3, err := os.ReadFile(filepath.Join(optsSubset.DataDir, "postdata_3.bin"))
 	r.NoError(err)
 	r.Equal(fullPostdata3, subsetPostdata3)
+
+	// Verify that postdata_4.bin from both initializations contain the same data
+	fullPostdata4, err := os.ReadFile(filepath.Join(opts.DataDir, "postdata_4.bin"))
+	r.NoError(err)
+	subsetPostdata4, err := os.ReadFile(filepath.Join(optsSubset.DataDir, "postdata_4.bin"))
+	r.NoError(err)
+	r.Equal(fullPostdata4, subsetPostdata4)
 }

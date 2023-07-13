@@ -24,10 +24,13 @@ func deriveFilesLayout(cfg config.Config, opts config.InitOpts) (filesLayout, er
 	}
 
 	if opts.ToFileIdx != nil {
-		if *opts.ToFileIdx <= 0 {
+		if *opts.ToFileIdx < 0 {
 			return filesLayout{}, fmt.Errorf("invalid range: opts.ToFileIdx (%v) must be greater then 0", *opts.ToFileIdx)
 		}
-		lastFileIdx = *opts.ToFileIdx - 1
+		if *opts.ToFileIdx > lastFileIdx {
+			return filesLayout{}, fmt.Errorf("invalid range: opts.ToFileIdx (%v) cannot be greater then %v", *opts.ToFileIdx, lastFileIdx)
+		}
+		lastFileIdx = *opts.ToFileIdx
 	}
 
 	lastFileNumLabels := maxFileNumLabels

@@ -52,9 +52,9 @@ func parseFlags() {
 	flag.StringVar(&commitmentAtxIdHex, "commitmentAtxId", "", "commitment atx id, in hex (required)")
 	numUnits := flag.Uint64("numUnits", uint64(opts.NumUnits), "number of units")
 
-	flag.IntVar(&opts.FromFileIdx, "from-file", 0, "index of file to begin init from")
+	flag.IntVar(&opts.FromFileIdx, "fromFile", 0, "index of the first file to init (inclusive)")
 	var to int
-	flag.IntVar(&to, "to-file", math.MaxInt, "index of file to init to (exclusive). Will init to the end of declared space if not provided.")
+	flag.IntVar(&to, "toFile", math.MaxInt, "index of the last file to init (inclusive). Will init to the end of declared space if not provided.")
 	flag.Parse()
 
 	// A workaround to simulate an optional value w/o a default ¯\_(ツ)_/¯

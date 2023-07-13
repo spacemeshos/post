@@ -69,7 +69,7 @@ func TestCustomTo(t *testing.T) {
 	layout, err := deriveFilesLayout(cfg, opts)
 	r.NoError(err)
 	r.EqualValues(0, layout.FirstFileIdx)
-	r.Equal(2, int(layout.NumFiles))
+	r.Equal(3, int(layout.NumFiles))
 	r.Equal(128, int(layout.FileNumLabels))
 	r.Equal(128, int(layout.LastFileNumLabels))
 }
@@ -91,7 +91,7 @@ func TestCustomFromAndTo(t *testing.T) {
 	layout, err := deriveFilesLayout(cfg, opts)
 	r.NoError(err)
 	r.EqualValues(1, layout.FirstFileIdx)
-	r.Equal(1, int(layout.NumFiles))
+	r.Equal(2, int(layout.NumFiles))
 	r.Equal(128, int(layout.FileNumLabels))
 	r.Equal(128, int(layout.LastFileNumLabels))
 }
@@ -100,7 +100,7 @@ func TestInvalidRange(t *testing.T) {
 	cfg := Config{
 		LabelsPerUnit: 128,
 	}
-	to := 1
+	to := 0
 	opts := InitOpts{
 		NumUnits:    100,
 		MaxFileSize: 2048,
@@ -112,11 +112,26 @@ func TestInvalidRange(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestToCannotBeZero(t *testing.T) {
+func TestToCannotBeNegative(t *testing.T) {
 	cfg := Config{
 		LabelsPerUnit: 128,
 	}
-	to := 0
+	to := -1
+	opts := InitOpts{
+		NumUnits:    100,
+		MaxFileSize: 2048,
+		ToFileIdx:   &to,
+	}
+
+	_, err := deriveFilesLayout(cfg, opts)
+	require.Error(t, err)
+}
+
+func TestToOutOfRange(t *testing.T) {
+	cfg := Config{
+		LabelsPerUnit: 128,
+	}
+	to := 1000000
 	opts := InitOpts{
 		NumUnits:    100,
 		MaxFileSize: 2048,
@@ -133,7 +148,7 @@ func TestCustomToPartialLastFile(t *testing.T) {
 	cfg := Config{
 		LabelsPerUnit: 128,
 	}
-	to := 50
+	to := 49
 	opts := InitOpts{
 		MaxFileSize: 4096, // 2 units per file
 		NumUnits:    99,   // last file will be partial

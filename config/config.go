@@ -127,9 +127,9 @@ type InitOpts struct {
 	// ComputeBatchSize must be greater than 0
 	ComputeBatchSize uint64
 
-	// Index of file to start from
+	// Index of the first file to init (inclusive)
 	FromFileIdx int
-	// Index of file to init to (exclusive). Will init to the end of declared space if not provided.
+	// Index of the last file to init (inclusive). Will init to the end of declared space if not provided.
 	ToFileIdx *int
 }
 
