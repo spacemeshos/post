@@ -110,7 +110,7 @@ func main() {
 	}
 
 	if printNumFiles {
-		totalFiles := initialization.TotalFiles(cfg, opts)
+		totalFiles := opts.TotalFiles(cfg.LabelsPerUnit)
 		fmt.Println(totalFiles)
 		return
 	}

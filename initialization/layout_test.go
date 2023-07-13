@@ -7,6 +7,7 @@ import (
 )
 
 func TestMaxFileSize(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	cfg := Config{
@@ -34,6 +35,7 @@ func TestMaxFileSize(t *testing.T) {
 }
 
 func TestCustomFrom(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	cfg := Config{
@@ -54,6 +56,7 @@ func TestCustomFrom(t *testing.T) {
 }
 
 func TestCustomTo(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	cfg := Config{
@@ -75,6 +78,7 @@ func TestCustomTo(t *testing.T) {
 }
 
 func TestCustomFromAndTo(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	cfg := Config{
@@ -97,6 +101,7 @@ func TestCustomFromAndTo(t *testing.T) {
 }
 
 func TestInvalidRange(t *testing.T) {
+	t.Parallel()
 	cfg := Config{
 		LabelsPerUnit: 128,
 	}
@@ -113,6 +118,7 @@ func TestInvalidRange(t *testing.T) {
 }
 
 func TestToCannotBeNegative(t *testing.T) {
+	t.Parallel()
 	cfg := Config{
 		LabelsPerUnit: 128,
 	}
@@ -128,6 +134,7 @@ func TestToCannotBeNegative(t *testing.T) {
 }
 
 func TestToOutOfRange(t *testing.T) {
+	t.Parallel()
 	cfg := Config{
 		LabelsPerUnit: 128,
 	}
@@ -143,6 +150,7 @@ func TestToOutOfRange(t *testing.T) {
 }
 
 func TestCustomToPartialLastFile(t *testing.T) {
+	t.Parallel()
 	r := require.New(t)
 
 	cfg := Config{
@@ -161,31 +169,4 @@ func TestCustomToPartialLastFile(t *testing.T) {
 	r.Equal(50, int(layout.NumFiles))
 	r.Equal(256, int(layout.FileNumLabels))
 	r.Equal(128, int(layout.LastFileNumLabels))
-}
-
-func TestTotalFiles(t *testing.T) {
-	r := require.New(t)
-	cfg := Config{
-		LabelsPerUnit: 128,
-	}
-
-	r.Equal(100, TotalFiles(cfg, InitOpts{
-		NumUnits:    100,
-		MaxFileSize: 2048,
-	}))
-
-	r.Equal(1, TotalFiles(cfg, InitOpts{
-		NumUnits:    1,
-		MaxFileSize: 2048,
-	}))
-
-	r.Equal(1, TotalFiles(cfg, InitOpts{
-		NumUnits:    1,
-		MaxFileSize: 10000000,
-	}))
-
-	r.Equal(0, TotalFiles(cfg, InitOpts{
-		NumUnits:    0,
-		MaxFileSize: 10000000,
-	}))
 }

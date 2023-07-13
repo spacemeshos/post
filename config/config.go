@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -139,6 +140,13 @@ type InitOpts struct {
 
 func (o *InitOpts) MaxFileNumLabels() uint64 {
 	return o.MaxFileSize / uint64(BytesPerLabel())
+}
+
+func (o *InitOpts) TotalLabels(labelsPerUnit uint64) uint64 {
+	return uint64(o.NumUnits) * labelsPerUnit
+}
+func (o *InitOpts) TotalFiles(labelsPerUnit uint64) int {
+	return int(math.Ceil(float64(o.TotalLabels(labelsPerUnit)) / float64(o.MaxFileNumLabels())))
 }
 
 type ScryptParams struct {
