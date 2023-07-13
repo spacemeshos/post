@@ -95,7 +95,7 @@ Next, on machine B:
 ```bash
 ./postcli -numUnits 100 -id <id> -commitmentAtxId <id> -fromFile 800 -datadir ./dataB
 ```
-We get the first half - 800 binary files
+We get the second half - 800 binary files
 ```bash
 ls -la ./dataB/*.bin | wc -l
 800
@@ -110,18 +110,20 @@ ls -la ./data/*.bin | wc -l
 ```
 
 **An optional step to select best possible VRF nonce**
-Normally, when `postcli`initializates from the start to the end it will automatically pick the best vrf nonce. The best means pointing to **the label with the smallest value**. It might be important in the future if we allow increasing POS data size, but it is not critical at the moment.
+Normally, when `postcli`initializates from the start to the end it will automatically pick the best VRF nonce. The best means pointing to **the label with the smallest value**. This will avoid a longer initialization time when a node increases their PoST size in the future (not supported yet).
 
-Now, when `postcli` initializes in chunks, each subset will find a valid vrf nonce, which represents the local minimum in the inititalized subset. It's optimal to select the best one (the global minimum), but it's not critical.
+Now, when `postcli` initializes in chunks, each subset will find a valid vrf nonce, which represents the local minimum in the inititalized subset. It is recommended to select the best one (the global minimum).
 
 The values of nonces are 128bit, represented as a 16B binary array in big endian. Given two nonces:
 ```
-nonceA = 0000ffda94993723a980bf557509773e
-nonceB = 0000488e171389cce69344d68b66f6b4
+NonceA = 12345
+NonceValueA = 0000ffda94993723a980bf557509773e
+NonceB = 98765
+NonceValueB = 0000488e171389cce69344d68b66f6b4
 ```
-`nonceB` represents the smaller value.
+`NonceB` is the global minimum since its value is smaller than the one of `NonceA`.
 
-The nonce and the label it points to is included in the post_metadata.json. It's currently up to the operator to find the best VRF nonce manually and copy the `Nonce` and `NonceValue` to the postdata_metadata.json on the target machine.
+The nonce (index) and noncevalue (the label) is included in the post_metadata.json. It is up to the operator to find the best VRF nonce manually and copy the `Nonce` and `NonceValue` to the postdata_metadata.json on the target machine.
 
 ### Remarks
 * `-id` and `-commitmentAtxId` are required because they are committed to the generated data.
