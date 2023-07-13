@@ -7,49 +7,49 @@ import (
 )
 
 type filesLayout struct {
-	From uint64
-	To   uint64
-
+	FirstFileIdx      int
 	NumFiles          uint
 	FileNumLabels     uint64
 	LastFileNumLabels uint64
 }
 
 func deriveFilesLayout(cfg config.Config, opts config.InitOpts) (filesLayout, error) {
-	maxFileSizeBits := opts.MaxFileSize * 8
-	maxFileNumLabels := maxFileSizeBits / uint64(config.BitsPerLabel)
+	maxFileNumLabels := opts.MaxFileNumLabels()
 	totalLabels := uint64(opts.NumUnits) * uint64(cfg.LabelsPerUnit)
 
-	start := opts.From
-	end := totalLabels
-
-	if opts.To != nil {
-		end = *opts.To
+	firstFileIdx := opts.FromFileIdx
+	lastFileIdx := int(totalLabels/maxFileNumLabels) - 1
+	if totalLabels%maxFileNumLabels > 0 {
+		lastFileIdx++
 	}
 
-	if start >= end {
-		return filesLayout{}, fmt.Errorf("invalid range: start (%v) must be less then end (%v)", start, end)
+	if opts.ToFileIdx != nil {
+		if *opts.ToFileIdx <= 0 {
+			return filesLayout{}, fmt.Errorf("invalid range: opts.ToFileIdx (%v) must be greater then 0", *opts.ToFileIdx)
+		}
+		lastFileIdx = *opts.ToFileIdx - 1
 	}
-	// Avoid starting in the middle of a file
-	if start%maxFileNumLabels != 0 {
-		return filesLayout{}, fmt.Errorf("invalid range: start (%v) must be a multiple of: %v", start, maxFileNumLabels)
-	}
-
-	numLabels := end - start
-	numFiles := numLabels / maxFileNumLabels
 
 	lastFileNumLabels := maxFileNumLabels
-	remainder := numLabels % maxFileNumLabels
-	if remainder > 0 {
-		numFiles++
-		lastFileNumLabels = remainder
+	labelsLeft := totalLabels - firstLabelInFile(lastFileIdx, opts)
+	if labelsLeft < maxFileNumLabels {
+		lastFileNumLabels = labelsLeft
 	}
 
+	if firstFileIdx > lastFileIdx {
+		return filesLayout{}, fmt.Errorf("invalid range: last file index (%v) must be greater then first (%v)", lastFileIdx, firstFileIdx)
+	}
+
+	numFiles := lastFileIdx - firstFileIdx + 1
+
 	return filesLayout{
-		From:              start,
-		To:                end,
+		FirstFileIdx:      firstFileIdx,
 		NumFiles:          uint(numFiles),
 		FileNumLabels:     maxFileNumLabels,
 		LastFileNumLabels: lastFileNumLabels,
 	}, nil
+}
+
+func firstLabelInFile(fileIdx int, opts config.InitOpts) uint64 {
+	return uint64(fileIdx) * opts.MaxFileNumLabels()
 }

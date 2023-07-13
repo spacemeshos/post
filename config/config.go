@@ -35,6 +35,10 @@ func init() {
 	DefaultDataDir = filepath.Join(home, "post", DefaultDataDirName)
 }
 
+func BytesPerLabel() int {
+	return BitsPerLabel / 8
+}
+
 type PowFlags = postrs.PowFlags
 
 const (
@@ -123,8 +127,14 @@ type InitOpts struct {
 	// ComputeBatchSize must be greater than 0
 	ComputeBatchSize uint64
 
-	From uint64
-	To   *uint64
+	// Index of file to start from
+	FromFileIdx int
+	// Index of file to init to (exclusive). Will init to the end of declared space if not provided.
+	ToFileIdx *int
+}
+
+func (o *InitOpts) MaxFileNumLabels() uint64 {
+	return o.MaxFileSize / uint64(BytesPerLabel())
 }
 
 type ScryptParams struct {

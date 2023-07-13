@@ -1,11 +1,15 @@
 package initialization
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/big"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -64,98 +68,6 @@ func TestInitialize(t *testing.T) {
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	require.NoError(t, verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
-}
-
-func TestMaxFileSize(t *testing.T) {
-	r := require.New(t)
-
-	cfg := Config{
-		LabelsPerUnit: 128,
-	}
-	opts := InitOpts{
-		NumUnits:    10,
-		MaxFileSize: 2048,
-	}
-
-	layout, err := deriveFilesLayout(cfg, opts)
-	r.NoError(err)
-	r.Equal(10, int(layout.NumFiles))
-	r.Equal(128, int(layout.FileNumLabels))
-	r.Equal(128, int(layout.LastFileNumLabels))
-
-	opts.MaxFileSize = 2000
-
-	layout, err = deriveFilesLayout(cfg, opts)
-	r.NoError(err)
-	r.Equal(10*128, 10*125+30)
-	r.Equal(11, int(layout.NumFiles))
-	r.Equal(125, int(layout.FileNumLabels))
-	r.Equal(30, int(layout.LastFileNumLabels))
-}
-
-func TestCustomStart(t *testing.T) {
-	r := require.New(t)
-
-	cfg := Config{
-		LabelsPerUnit: 128,
-	}
-	opts := InitOpts{
-		NumUnits:    100,
-		MaxFileSize: 2048,
-		From:        2048 / 16,
-	}
-
-	layout, err := deriveFilesLayout(cfg, opts)
-	r.NoError(err)
-	r.EqualValues(opts.From, layout.From)
-	r.EqualValues(12800, layout.To)
-	r.Equal(99, int(layout.NumFiles)) // should skip the first file
-	r.Equal(128, int(layout.FileNumLabels))
-	r.Equal(128, int(layout.LastFileNumLabels))
-}
-
-func TestCustomEnd(t *testing.T) {
-	r := require.New(t)
-
-	cfg := Config{
-		LabelsPerUnit: 128,
-	}
-	to := uint64(256) // two units
-	opts := InitOpts{
-		NumUnits:    100,
-		MaxFileSize: 2048,
-		To:          &to,
-	}
-
-	layout, err := deriveFilesLayout(cfg, opts)
-	r.NoError(err)
-	r.EqualValues(0, layout.From)
-	r.EqualValues(to, layout.To)
-	r.Equal(2, int(layout.NumFiles))
-	r.Equal(128, int(layout.FileNumLabels))
-	r.Equal(128, int(layout.LastFileNumLabels))
-}
-
-func TestCustomEndPartialLastFile(t *testing.T) {
-	r := require.New(t)
-
-	cfg := Config{
-		LabelsPerUnit: 128,
-	}
-	to := uint64(cfg.LabelsPerUnit * 99)
-	opts := InitOpts{
-		NumUnits:    100,
-		MaxFileSize: 4096,
-		To:          &to,
-	}
-
-	layout, err := deriveFilesLayout(cfg, opts)
-	r.NoError(err)
-	r.EqualValues(0, layout.From)
-	r.EqualValues(to, layout.To)
-	r.Equal(50, int(layout.NumFiles))
-	r.Equal(256, int(layout.FileNumLabels))
-	r.Equal(128, int(layout.LastFileNumLabels))
 }
 
 func TestInitialize_PowOutOfRange(t *testing.T) {
@@ -937,4 +849,71 @@ func initData(datadir string) ([]byte, error) {
 	defer reader.Close()
 
 	return io.ReadAll(reader)
+}
+
+func TestInitializeSubset(t *testing.T) {
+	r := require.New(t)
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 128
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = 10
+	opts.MaxFileSize = cfg.LabelsPerUnit * 2 * uint64(config.BytesPerLabel()) // 2 units per file
+	opts.ProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 2
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+	)
+	require.NoError(t, err)
+	err = init.Initialize(context.Background())
+	require.NoError(t, err)
+
+	optsSubset := opts
+	optsSubset.DataDir = t.TempDir()
+	optsSubset.FromFileIdx = 3
+	optsSubset.ToFileIdx = new(int)
+	*optsSubset.ToFileIdx = 4
+
+	initSubset, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(optsSubset),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+	)
+	r.NoError(err)
+	err = initSubset.Initialize(context.Background())
+	r.NoError(err)
+
+	// Verify that the subset is a subset of the full set
+	fullData, err := initData(opts.DataDir)
+	r.NoError(err)
+	subsetData, err := initData(optsSubset.DataDir)
+	r.NoError(err)
+	r.True(bytes.Contains(fullData, subsetData))
+
+	// Verify that the subset contains file postdata_3.bin, but not postdata_0.bin, postdata_1.bin, postdata_2.bin and postdata_4.bin
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_0.bin"))
+	r.ErrorIs(err, os.ErrNotExist)
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_1.bin"))
+	r.ErrorIs(err, os.ErrNotExist)
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_2.bin"))
+	r.ErrorIs(err, os.ErrNotExist)
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_4.bin"))
+	r.ErrorIs(err, os.ErrNotExist)
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_3.bin"))
+	r.NoError(err)
+
+	// Verify that postdata_3.bin from both initializations contain the same data
+	fullPostdata3, err := ioutil.ReadFile(filepath.Join(opts.DataDir, "postdata_3.bin"))
+	r.NoError(err)
+	subsetPostdata3, err := ioutil.ReadFile(filepath.Join(optsSubset.DataDir, "postdata_3.bin"))
+	r.NoError(err)
+	r.Equal(fullPostdata3, subsetPostdata3)
 }

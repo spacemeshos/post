@@ -244,19 +244,15 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		zap.Uint32("numUnits", init.opts.NumUnits),
 		zap.Uint64("maxFileSize", init.opts.MaxFileSize),
 		zap.Uint64("labelsPerUnit", init.cfg.LabelsPerUnit),
-		zap.Uint64("from", layout.From),
-		zap.Uint64("to", layout.To),
-		zap.Uint64("total", layout.To-layout.From),
 	)
 
-	firstFileIndex := int(layout.From / layout.FileNumLabels)
-	lastFileIndex := firstFileIndex + int(layout.NumFiles)
+	lastFileIndex := layout.FirstFileIdx + int(layout.NumFiles)
 
 	init.logger.Info("initialization file layout",
 		zap.Uint("numFiles", layout.NumFiles),
 		zap.Uint64("labelsPerFile", layout.FileNumLabels),
 		zap.Uint64("labelsLastFile", layout.LastFileNumLabels),
-		zap.Int("firstFileIndex", firstFileIndex),
+		zap.Int("firstFileIndex", layout.FirstFileIdx),
 		zap.Int("lastFileIndex", lastFileIndex),
 	)
 	if err := init.removeRedundantFiles(layout); err != nil {
@@ -279,7 +275,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 	defer wo.Close()
 
-	for i := firstFileIndex; i < lastFileIndex; i++ {
+	for i := layout.FirstFileIdx; i < lastFileIndex; i++ {
 		fileOffset := uint64(i) * layout.FileNumLabels
 		fileNumLabels := layout.FileNumLabels
 		if i == int(layout.NumFiles)-1 {
