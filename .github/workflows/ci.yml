@@ -142,15 +142,27 @@ jobs:
         run: make install
       - name: build postcli
         run: make build
-      - name: Version suffix
-        id: version
-        run: echo "suffix=${{ github.ref_type == 'tag' && '-' || ''}}${{ github.ref_type == 'tag' && github.ref || ''}}" >> $GITHUB_OUTPUT
+      - shell: bash
+        run: |
+          if [[ ${{ runner.arch }} == "ARM64" ]]; then
+            echo "OUTNAME=${{ runner.os }}_${{ runner.arch }}" >> $GITHUB_ENV
+          else
+            echo "OUTNAME=${{ runner.os }}" >> $GITHUB_ENV
+          fi
+      - name: Create release archive
+        shell: bash
+        env:
+          OUTNAME: ${{ env.OUTNAME }}
+        run: |
+          mkdir $OUTNAME
+          mv ./build/* $OUTNAME
+          rm -f $OUTNAME/post.h
+          zip -r $OUTNAME.zip $OUTNAME
       - name: Archive postcli artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: postcli-${{ matrix.artifact-name }}${{ steps.version.output.suffix }}
-          path: |
-            build/postcli${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+          name: ${{ env.OUTNAME }}.zip
+          path: ${{ env.OUTNAME }}.zip
           if-no-files-found: error
 
   release:
@@ -162,15 +174,7 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
-          path: ./artifacts
-      - name: Pack artifacts
-        run: >
-          mkdir ./assets;
-          for dir in ./artifacts/*/; do
-            zip -o -j -r "./assets/$(basename "$dir")-$TAG.zip" "$dir";
-          done
-        env:
-          TAG: ${{ github.ref_name }}
+          path: ./assets
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
