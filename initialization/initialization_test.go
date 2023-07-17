@@ -858,7 +858,7 @@ func TestWrongLabelsDetected(t *testing.T) {
 	var errWrongLabels ErrReferenceLabelMismatch
 	require.ErrorAs(t, err, &errWrongLabels)
 	require.Equal(t, oracle.CommitmentBytes(nodeId, commitmentAtxId), errWrongLabels.Commitment)
-	require.Equal(t, uint64(0), errWrongLabels.Index)
+	require.Equal(t, uint64(1<<12-1), errWrongLabels.Index)
 
 	require.Equal(t, uint64(0), init.NumLabelsWritten())
 }

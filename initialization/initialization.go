@@ -523,16 +523,16 @@ func (init *Initializer) initFile(ctx context.Context, wo, woReference *oracle.W
 		}
 
 		// sanity check with reference oracle
-		reference, err := woReference.Position(startPosition)
+		reference, err := woReference.Position(endPosition)
 		if err != nil {
 			return fmt.Errorf("failed to compute reference label: %w", err)
 		}
-		if !bytes.Equal(res.Output[:postrs.LabelLength], reference.Output) {
+		if !bytes.Equal(res.Output[(batchSize-1)*postrs.LabelLength:], reference.Output) {
 			return ErrReferenceLabelMismatch{
-				Index:      startPosition,
+				Index:      endPosition,
 				Commitment: init.commitment,
 				Expected:   reference.Output,
-				Actual:     res.Output[:postrs.LabelLength],
+				Actual:     res.Output[batchSize-postrs.LabelLength:],
 			}
 		}
 
