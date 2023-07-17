@@ -180,7 +180,7 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	cfg := config.DefaultConfig()
 
 	// Test-net settings:
-	cfg.LabelsPerUnit = 20 * KiB / 16 // 20kB unit
+	cfg.LabelsPerUnit = 20 * KiB / postrs.LabelLength // 20kB unit
 	cfg.K1 = 273
 	cfg.K2 = 300
 	cfg.K3 = 100
