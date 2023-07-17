@@ -116,9 +116,6 @@ jobs:
         - [self-hosted, macos, arm64]
         - windows-latest
     steps:
-      - name: Install dependencies in windows
-        if: ${{ matrix.os == 'windows-latest' }}
-        run: choco install zip
       - name: Add OpenCL support - Ubuntu
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: sudo apt-get update -q && sudo apt-get install -qy ocl-icd-opencl-dev libpocl2
@@ -155,7 +152,7 @@ jobs:
           mkdir $OUTNAME
           mv ./build/* $OUTNAME
           rm -f $OUTNAME/post.h
-          zip -r $OUTNAME.zip $OUTNAME
+          7z a -tzip $OUTNAME.zip $OUTNAME
       - name: Archive postcli artifacts
         uses: actions/upload-artifact@v3
         with:
@@ -179,3 +176,4 @@ jobs:
           files: ./assets/*.zip
           prerelease: false
           draft: true
+          fail_on_unmatched_files: true
