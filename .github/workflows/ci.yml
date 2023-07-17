@@ -173,7 +173,7 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ github.workspace }}/assets/*
+          files: ${{ github.workspace }}/assets/*/*.zip
           prerelease: false
           draft: true
           fail_on_unmatched_files: true
