@@ -56,7 +56,7 @@ func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces,
 		}
 	}
 	if logger != nil {
-		setLogCallback(logger)
+		SetLogCallback(logger)
 	}
 
 	dataDirPtr := C.CString(dataDir)
@@ -175,7 +175,7 @@ func (v *Verifier) VerifyProof(
 		}
 	}
 	if logger != nil {
-		setLogCallback(logger)
+		SetLogCallback(logger)
 	}
 
 	if proof == nil {

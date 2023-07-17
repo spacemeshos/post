@@ -80,7 +80,7 @@ func InitResultToError(retVal uint32) error {
 // initializer.
 func cNewInitializer(opt *option) (*C.Initializer, error) {
 	if opt.logger != nil {
-		setLogCallback(opt.logger)
+		SetLogCallback(opt.logger)
 	}
 
 	cProviderId := C.uint32_t(*opt.providerID)

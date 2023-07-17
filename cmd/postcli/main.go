@@ -27,12 +27,16 @@ import (
 const edKeyFileName = "key.bin"
 
 var (
-	cfg                = config.MainnetConfig()
-	opts               = config.MainnetInitOpts()
-	printProviders     bool
-	printNumFiles      bool
-	printConfig        bool
-	genProof           bool
+	cfg            = config.MainnetConfig()
+	opts           = config.MainnetInitOpts()
+	printProviders bool
+	printNumFiles  bool
+	printConfig    bool
+	genProof       bool
+
+	verifyPos bool
+	fraction  float64
+
 	idHex              string
 	id                 []byte
 	commitmentAtxIdHex string
@@ -41,6 +45,9 @@ var (
 )
 
 func parseFlags() {
+	flag.BoolVar(&verifyPos, "verify", false, "verify initialized data")
+	flag.Float64Var(&fraction, "fraction", 1.0, "fraction of POS data to verify")
+
 	flag.BoolVar(&printProviders, "printProviders", false, "print the list of compute providers")
 	flag.BoolVar(&printNumFiles, "printNumFiles", false, "print the total number of files that would be initialized")
 	flag.BoolVar(&printConfig, "printConfig", false, "print the used config and options")
@@ -121,13 +128,19 @@ func main() {
 		return
 	}
 
-	if err := processFlags(); err != nil {
-		log.Fatalln("failed to process flags", err)
-	}
-
-	zapLog, err := zap.NewProduction()
+	zapLog, err := zap.NewProduction(zap.AddStacktrace(zap.PanicLevel))
 	if err != nil {
 		log.Fatalln("failed to initialize zap logger:", err)
+	}
+	postrs.SetLogCallback(zapLog)
+
+	if verifyPos {
+		ec := cmdVerifyPos(opts, fraction)
+		os.Exit(ec)
+	}
+
+	if err := processFlags(); err != nil {
+		log.Fatalln("failed to process flags", err)
 	}
 
 	init, err := initialization.NewInitializer(
@@ -197,4 +210,28 @@ func saveKey(key ed25519.PrivateKey) error {
 		return fmt.Errorf("key write to disk error: %w", err)
 	}
 	return nil
+}
+
+func cmdVerifyPos(opts config.InitOpts, fraction float64) int {
+	params := postrs.TranslateScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)
+	verifyOpts := []postrs.VerifyPosOptionsFunc{
+		postrs.WithFraction(fraction),
+		postrs.FromFile(uint32(opts.FromFileIdx)),
+	}
+	if opts.ToFileIdx != nil {
+		verifyOpts = append(verifyOpts, postrs.ToFile(uint32(*opts.ToFileIdx)))
+	}
+
+	err := postrs.VerifyPos(opts.DataDir, params, verifyOpts...)
+	switch {
+	case err == nil:
+		log.Println("cli: POS data is valid")
+		return 0
+	case errors.Is(err, postrs.ErrInvalidPos):
+		log.Println(err)
+		return 1
+	default:
+		log.Printf("cli: failed (%v)\n", err)
+		return 2
+	}
 }
