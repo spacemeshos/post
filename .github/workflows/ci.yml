@@ -169,11 +169,11 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
-          path: ./assets
+          path: ${{ github.workspace }}/assets
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ./assets/*.zip
+          files: ${{ github.workspace }}/assets/*.zip
           prerelease: false
           draft: true
           fail_on_unmatched_files: true
