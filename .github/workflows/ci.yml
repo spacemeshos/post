@@ -137,27 +137,23 @@ jobs:
         run: make install
       - name: build postcli
         run: make build
-      - shell: bash
+      - name: Prepare release archive
+        shell: bash
+        run: |
+          rm -f ./build/post.h
+      - name: Set name of release archive
+        shell: bash
         run: |
           if [[ ${{ runner.arch }} == "ARM64" ]]; then
             echo "OUTNAME=${{ runner.os }}_${{ runner.arch }}" >> $GITHUB_ENV
           else
             echo "OUTNAME=${{ runner.os }}" >> $GITHUB_ENV
           fi
-      - name: Create release archive
-        shell: bash
-        env:
-          OUTNAME: ${{ env.OUTNAME }}
-        run: |
-          mkdir $OUTNAME
-          mv ./build/* $OUTNAME
-          rm -f $OUTNAME/post.h
-          7z a -tzip $OUTNAME.zip $OUTNAME
       - name: Archive postcli artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ env.OUTNAME }}.zip
-          path: ${{ env.OUTNAME }}.zip
+          name: postcli-${{ env.OUTNAME }}.zip
+          path: ./build/*
           if-no-files-found: error
 
   release:
