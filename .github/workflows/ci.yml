@@ -166,10 +166,12 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           path: ${{ github.workspace }}/assets
+      - name: Debug
+        run: tree ${{ github.workspace }}/assets
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ github.workspace }}/assets/*.zip
+          files: ${{ github.workspace }}/assets/*/*.zip
           prerelease: false
           draft: true
           fail_on_unmatched_files: true
