@@ -135,8 +135,10 @@ func main() {
 	postrs.SetLogCallback(zapLog)
 
 	if verifyPos {
-		ec := cmdVerifyPos(opts, fraction)
-		os.Exit(ec)
+		if cmdVerifyPos(opts, fraction) != nil {
+			os.Exit(1)
+		}
+		os.Exit(0)
 	}
 
 	if err := processFlags(); err != nil {
@@ -212,7 +214,7 @@ func saveKey(key ed25519.PrivateKey) error {
 	return nil
 }
 
-func cmdVerifyPos(opts config.InitOpts, fraction float64) int {
+func cmdVerifyPos(opts config.InitOpts, fraction float64) error {
 	params := postrs.TranslateScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)
 	verifyOpts := []postrs.VerifyPosOptionsFunc{
 		postrs.WithFraction(fraction),
@@ -226,12 +228,10 @@ func cmdVerifyPos(opts config.InitOpts, fraction float64) int {
 	switch {
 	case err == nil:
 		log.Println("cli: POS data is valid")
-		return 0
 	case errors.Is(err, postrs.ErrInvalidPos):
-		log.Println(err)
-		return 1
+		log.Printf("cli: %v\n", err)
 	default:
 		log.Printf("cli: failed (%v)\n", err)
-		return 2
 	}
+	return err
 }

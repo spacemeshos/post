@@ -45,7 +45,7 @@ func TestVerifyPos(t *testing.T) {
 	t.Run("invalid N", func(t *testing.T) {
 		wrongScrypt := postrs.TranslateScryptParams(4, opts.Scrypt.R, opts.Scrypt.P)
 		err := postrs.VerifyPos(opts.DataDir, wrongScrypt, postrs.WithFraction(100.0))
-		require.ErrorContains(t, err, "invalid POS")
+		require.ErrorIs(t, err, postrs.ErrInvalidPos)
 	})
 	t.Run("corrupted data", func(t *testing.T) {
 		file, err := os.OpenFile(opts.DataDir+"/postdata_0.bin", os.O_WRONLY, 0)
@@ -55,6 +55,6 @@ func TestVerifyPos(t *testing.T) {
 		require.NoError(t, err)
 
 		err = postrs.VerifyPos(opts.DataDir, scryptParams, postrs.WithFraction(100.0))
-		require.ErrorContains(t, err, "invalid POS")
+		require.ErrorIs(t, err, postrs.ErrInvalidPos)
 	})
 }
