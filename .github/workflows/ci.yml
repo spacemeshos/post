@@ -109,17 +109,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-        - os: ubuntu-latest
-          artifact-name: linux
-        - os: [self-hosted, linux, arm64]
-          artifact-name: linux-arm64
-        - os: macos-latest
-          artifact-name: macos
-        - os: [self-hosted, macos, arm64]
-          artifact-name: macos-m1
-        - os: windows-latest
-          artifact-name: windows
+        os:
+        - ubuntu-latest
+        - [self-hosted, linux, arm64]
+        - macos-latest
+        - [self-hosted, macos, arm64]
+        - windows-latest
     steps:
       - name: Add OpenCL support - Ubuntu
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -142,15 +137,23 @@ jobs:
         run: make install
       - name: build postcli
         run: make build
-      - name: Version suffix
-        id: version
-        run: echo "suffix=${{ github.ref_type == 'tag' && '-' || ''}}${{ github.ref_type == 'tag' && github.ref || ''}}" >> $GITHUB_OUTPUT
+      - name: Prepare release archive
+        shell: bash
+        run: |
+          rm -f ./build/post.h
+      - name: Set name of release archive
+        shell: bash
+        run: |
+          if [[ ${{ runner.arch }} == "ARM64" ]]; then
+            echo "OUTNAME=${{ runner.os }}_${{ runner.arch }}" >> $GITHUB_ENV
+          else
+            echo "OUTNAME=${{ runner.os }}" >> $GITHUB_ENV
+          fi
       - name: Archive postcli artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: postcli-${{ matrix.artifact-name }}${{ steps.version.output.suffix }}
-          path: |
-            build/postcli${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+          name: postcli-${{ env.OUTNAME }}.zip
+          path: ./build/*
           if-no-files-found: error
 
   release:
@@ -162,18 +165,17 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
-          path: ./artifacts
-      - name: Pack artifacts
-        run: >
-          mkdir ./assets;
-          for dir in ./artifacts/*/; do
-            zip -o -j -r "./assets/$(basename "$dir")-$TAG.zip" "$dir";
+          path: ${{ github.workspace }}/assets
+      - name: Create archives
+        run: |
+          mkdir ./artifacts;
+          for dir in ./assets/*/; do
+            7z a -tzip "${{ github.workspace }}/artifacts/$(basename $dir)" "$dir/*";
           done
-        env:
-          TAG: ${{ github.ref_name }}
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ./assets/*.zip
+          files: ${{ github.workspace }}/artifacts/*.zip
           prerelease: false
           draft: true
+          fail_on_unmatched_files: true
