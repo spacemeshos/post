@@ -152,7 +152,7 @@ jobs:
       - name: Archive postcli artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: postcli-${{ env.OUTNAME }}.zip
+          name: postcli-${{ env.OUTNAME }}
           path: ./build/*
           if-no-files-found: error
 
@@ -169,7 +169,7 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ github.workspace }}/assets/*/*.zip
+          files: ${{ github.workspace }}/assets/*.zip
           prerelease: false
           draft: true
           fail_on_unmatched_files: true
