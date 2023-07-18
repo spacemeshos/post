@@ -166,14 +166,12 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           path: ${{ github.workspace }}/assets
-      - name: Debug
+      - name: Create archives
         run: |
-          tree ${{ github.workspace }}/assets
           mkdir ./artifacts;
           for dir in ./assets/*/; do
-            7z a -tzip "${{ github.workspace }}/artifacts/$(basename $dir)" $dir;
+            7z a -tzip "${{ github.workspace }}/artifacts/$(basename $dir)" "$dir/*";
           done
-          tree ${{ github.workspace }}/artifacts
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
