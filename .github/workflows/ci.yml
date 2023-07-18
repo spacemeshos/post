@@ -58,10 +58,10 @@ jobs:
       matrix:
         os: 
           - ubuntu-latest
-          # - [self-hosted, linux, arm64]
-          # - macos-latest
-          # - [self-hosted, macos, arm64]
-          # - windows-latest
+          - [self-hosted, linux, arm64]
+          - macos-latest
+          - [self-hosted, macos, arm64]
+          - windows-latest
     steps:
       - name: Add OpenCL support - Ubuntu
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -111,10 +111,10 @@ jobs:
       matrix:
         os:
         - ubuntu-latest
-        # - [self-hosted, linux, arm64]
-        # - macos-latest
-        # - [self-hosted, macos, arm64]
-        # - windows-latest
+        - [self-hosted, linux, arm64]
+        - macos-latest
+        - [self-hosted, macos, arm64]
+        - windows-latest
     steps:
       - name: Add OpenCL support - Ubuntu
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -171,7 +171,7 @@ jobs:
           tree ${{ github.workspace }}/assets
           mkdir ./artifacts;
           for dir in ./assets/*/; do
-            7z a -tzip "${{ github.workspace }}/artifacts/$(basename $dir).zip" $dir;
+            7z a -tzip "${{ github.workspace }}/artifacts/$(basename $dir)" $dir;
           done
           tree ${{ github.workspace }}/artifacts
       - name: Release
