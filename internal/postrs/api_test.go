@@ -80,7 +80,7 @@ func TestScryptPositions(t *testing.T) {
 	}
 
 	require.NotNil(t, prevOutput)
-	require.Len(t, prevOutput, 16*int(end-start+1))
+	require.Len(t, prevOutput, LabelLength*int(end-start+1))
 	require.NotNil(t, nonce)
 }
 

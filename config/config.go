@@ -19,7 +19,7 @@ const (
 
 	MinBitsPerLabel = 1
 	MaxBitsPerLabel = 256
-	BitsPerLabel    = 8 * 16
+	BitsPerLabel    = 8 * postrs.LabelLength
 
 	KiB = 1024
 	MiB = 1024 * KiB
