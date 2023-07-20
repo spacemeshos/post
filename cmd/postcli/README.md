@@ -98,7 +98,9 @@ that would be created during initialization:
 1600
 ```
 
-Next, on machine A:
+**Note:** Ensure that `-id` and `-commitmentAtxId` are the same for all subsets!
+
+On machine A:
 
 ```bash
 ./postcli -numUnits 100 -id <id> -commitmentAtxId <id> -toFile 799 -datadir ./dataA
@@ -111,7 +113,7 @@ ls -la ./dataA/*.bin | wc -l
 800
 ```
 
-Next, on machine B:
+On machine B:
 
 ```bash
 ./postcli -numUnits 100 -id <id> -commitmentAtxId <id> -fromFile 800 -datadir ./dataB
