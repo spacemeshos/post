@@ -185,7 +185,6 @@ func main() {
 		initialization.WithCommitmentAtxId(commitmentAtxId),
 		initialization.WithLogger(logger),
 	)
-
 	if err != nil {
 		log.Panic(err.Error())
 	}
