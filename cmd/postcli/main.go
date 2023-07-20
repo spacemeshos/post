@@ -219,6 +219,10 @@ func saveKey(key ed25519.PrivateKey) error {
 	}
 
 	filename := filepath.Join(opts.DataDir, edKeyFileName)
+	if _, err := os.Stat(filename); err == nil {
+		return fmt.Errorf("key.bin file already exists, abort")
+	}
+
 	if err := os.WriteFile(filename, []byte(hex.EncodeToString(key)), 0o600); err != nil {
 		return fmt.Errorf("key write to disk error: %w", err)
 	}
