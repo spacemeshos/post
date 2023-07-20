@@ -20,7 +20,8 @@ func TestMaxFileSize(t *testing.T) {
 
 	layout, err := deriveFilesLayout(cfg, opts)
 	r.NoError(err)
-	r.Equal(10, int(layout.NumFiles))
+	r.Equal(0, layout.FirstFileIdx)
+	r.Equal(9, layout.LastFileIdx)
 	r.Equal(128, int(layout.FileNumLabels))
 	r.Equal(128, int(layout.LastFileNumLabels))
 
@@ -29,7 +30,8 @@ func TestMaxFileSize(t *testing.T) {
 	layout, err = deriveFilesLayout(cfg, opts)
 	r.NoError(err)
 	r.Equal(10*128, 10*125+30)
-	r.Equal(11, int(layout.NumFiles))
+	r.Equal(0, layout.FirstFileIdx)
+	r.Equal(10, layout.LastFileIdx)
 	r.Equal(125, int(layout.FileNumLabels))
 	r.Equal(30, int(layout.LastFileNumLabels))
 }
@@ -49,8 +51,8 @@ func TestCustomFrom(t *testing.T) {
 
 	layout, err := deriveFilesLayout(cfg, opts)
 	r.NoError(err)
-	r.EqualValues(1, layout.FirstFileIdx)
-	r.Equal(99, int(layout.NumFiles)) // should skip the first file
+	r.Equal(1, layout.FirstFileIdx) // should skip the first file
+	r.Equal(99, layout.LastFileIdx)
 	r.Equal(128, int(layout.FileNumLabels))
 	r.Equal(128, int(layout.LastFileNumLabels))
 }
@@ -71,8 +73,8 @@ func TestCustomTo(t *testing.T) {
 
 	layout, err := deriveFilesLayout(cfg, opts)
 	r.NoError(err)
-	r.EqualValues(0, layout.FirstFileIdx)
-	r.Equal(3, int(layout.NumFiles))
+	r.Equal(0, layout.FirstFileIdx)
+	r.Equal(3, int(layout.LastFileIdx-layout.FirstFileIdx+1))
 	r.Equal(128, int(layout.FileNumLabels))
 	r.Equal(128, int(layout.LastFileNumLabels))
 }
@@ -94,8 +96,8 @@ func TestCustomFromAndTo(t *testing.T) {
 
 	layout, err := deriveFilesLayout(cfg, opts)
 	r.NoError(err)
-	r.EqualValues(1, layout.FirstFileIdx)
-	r.Equal(2, int(layout.NumFiles))
+	r.Equal(1, layout.FirstFileIdx)
+	r.Equal(2, int(layout.LastFileIdx-layout.FirstFileIdx+1))
 	r.Equal(128, int(layout.FileNumLabels))
 	r.Equal(128, int(layout.LastFileNumLabels))
 }
@@ -165,8 +167,8 @@ func TestCustomToPartialLastFile(t *testing.T) {
 
 	layout, err := deriveFilesLayout(cfg, opts)
 	r.NoError(err)
-	r.EqualValues(0, layout.FirstFileIdx)
-	r.Equal(50, int(layout.NumFiles))
+	r.Equal(0, layout.FirstFileIdx)
+	r.Equal(49, layout.LastFileIdx)
 	r.Equal(256, int(layout.FileNumLabels))
 	r.Equal(128, int(layout.LastFileNumLabels))
 }

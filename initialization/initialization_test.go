@@ -514,7 +514,7 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 		r.NoError(err)
 		layout, err := deriveFilesLayout(cfg, opts)
 		r.NoError(err)
-		r.Equal(int(layout.NumFiles), numFiles)
+		r.Equal(layout.LastFileIdx+1, numFiles)
 
 		r.NoError(newInit.Initialize(ctx))
 
@@ -522,8 +522,9 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 		r.NoError(err)
 		newLayout, err := deriveFilesLayout(cfg, newOpts)
 		r.NoError(err)
-		r.Equal(int(newLayout.NumFiles), numFiles)
-		r.Less(newLayout.NumFiles, layout.NumFiles)
+		r.Equal(newLayout.LastFileIdx+1, numFiles)
+		r.Equal(0, newLayout.FirstFileIdx)
+		r.Less(newLayout.LastFileIdx, layout.LastFileIdx)
 
 		cancel()
 		eg.Wait()
@@ -576,7 +577,8 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 
 			layout, err := deriveFilesLayout(cfg, opts)
 			require.NoError(t, err)
-			require.Equal(t, numFiles, int(layout.NumFiles))
+			require.Equal(t, 0, layout.FirstFileIdx)
+			require.Equal(t, numFiles-1, layout.LastFileIdx)
 
 			init, err := NewInitializer(
 				WithNodeId(nodeId),

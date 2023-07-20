@@ -8,7 +8,7 @@ import (
 
 type filesLayout struct {
 	FirstFileIdx      int
-	NumFiles          uint
+	LastFileIdx       int
 	FileNumLabels     uint64
 	LastFileNumLabels uint64
 }
@@ -39,11 +39,9 @@ func deriveFilesLayout(cfg config.Config, opts config.InitOpts) (filesLayout, er
 		lastFileNumLabels = labelsLeft
 	}
 
-	numFiles := lastFileIdx - firstFileIdx + 1
-
 	return filesLayout{
 		FirstFileIdx:      firstFileIdx,
-		NumFiles:          uint(numFiles),
+		LastFileIdx:       lastFileIdx,
 		FileNumLabels:     maxFileNumLabels,
 		LastFileNumLabels: lastFileNumLabels,
 	}, nil
