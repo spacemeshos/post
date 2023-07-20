@@ -81,6 +81,10 @@ func processFlags() error {
 		return fmt.Errorf("invalid commitmentAtxId: %w", err)
 	}
 
+	if (opts.FromFileIdx != 0 || opts.ToFileIdx != nil) && idHex == "" {
+		return errors.New("-id flag is required when using -fromFile or -toFile")
+	}
+
 	if idHex == "" {
 		pub, priv, err := ed25519.GenerateKey(nil)
 		if err != nil {

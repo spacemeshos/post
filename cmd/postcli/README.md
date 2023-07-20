@@ -2,9 +2,9 @@
 
 CLI tool for PoST initialization
 
-# Getting it
+## Getting it
 
-Go to the https://github.com/spacemeshos/post/releases and take the most recent release for your platform. In case if you want to build it from source, follow the instructions below.
+Go to the <https://github.com/spacemeshos/post/releases> and take the most recent release for your platform. In case if you want to build it from source, follow the instructions below.
 
 ```bash
 git clone https://github.com/spacemeshos/post
@@ -12,7 +12,7 @@ cd post
 make postcli
 ```
 
-# Usage
+## Usage
 
 ```bash
 ./postcli --help
@@ -23,6 +23,7 @@ make postcli
 You need to have OpenCL support on your system. OpenCL usually comes with your graphics drivers. On Windows it should work out of the box on linux you will need to install them separately.
 
 You can always list the providers by using
+
 ```bash
 clinfo -l
 ```
@@ -30,108 +31,130 @@ clinfo -l
 That's separate command NOT shipped with post implementation. Please refer to your system installation manual of clinfo for installation instructions.
 
 ### Nvidia
+
 ```bash
 apt install nvidia-opencl-icd 
 ```
 
 ### AMD
 
-https://amdgpu-install.readthedocs.io/en/latest/install-script.html
+<https://amdgpu-install.readthedocs.io/en/latest/install-script.html>
 
 ### Intel
 
-https://github.com/intel/compute-runtime/releases
+<https://github.com/intel/compute-runtime/releases>
 
-###  Print the list of compute providers
+## Print the list of compute providers
 
 ```bash
 ./postcli -printProviders
 ```
 
-###  Print the number of files that would be initialized
+## Print the number of files that would be initialized
 
 ```bash
 ./postcli -numUnits 100 -printNumFiles
 1600
 ```
 
-### Print the used config and options
+## Print the used config and options
 
 ```bash
 ./postcli -printConfig
 ```
 
-### Initialize
+## Initializing PoST data
 
 Example
 
 ```bash
 ./postcli -provider=2 -id=c230c51669d1fcd35860131e438e234726b2bd5f9adbbd91bd88a718e7e98ecb -commitmentAtxId=c230c51669d1fcd35860131e438e234726b2bd5f9adbbd91bd88a718e7e98ecb -genproof
-
 ```
 
-### Initialize subset
-It is possible to initialize only subset of the files. It's useful if one wants to split initialization between many machines.
-#### Example - split initialization between 2 machines
-Let's assume one wants to initialize 100 units and split the process of initialization to machine A and B.
+### Remarks
 
-First let's see how many files it would be:
+* Both `-id` and `-commitmentAtxId` are needed to generate the PoST data.
+* If `-id` isn't provided a new identity will be auto-generated. Its private key will be stored in `key.bin` in `-datadir`
+with the PoST data. This file then **must** to be copied/moved with the PoST data to run a node with this generated identity.
+**NOTE:** The generated PoST data is ONLY valid for this identity!
+If a public key is provided with the `-id` flag, the `key.bin` file will be NOT created. Make sure that the key file that belongs
+to the identity provided to `postcli` is available in the PoST directory **before** running a node with it.
+* `-commitmentAtxId`: it is recommended to look up the highest ATX by querying it from a synced node with
+`grpcurl -plaintext -d '' 0.0.0.0:9093 spacemesh.v1.AdminService.Highest`. The node can be operated in
+"non-smeshing" mode during synchronization and when querying the highest ATX.
+* The `-reset` flag can be used to clean up a previous initialization. **Careful**: This will delete data that won't be recoverable.
+
+## Initializing a subset of PoST data
+
+It is possible to initialize only subset of the files. This feature is intended to be used to split initialization between many machines.
+
+### Example - split initialization between 2 machines
+
+For this example we initialize 100 units and split the process of initialization into two chunks. This command shows the number of files
+that would be created during initialization:
+
 ```bash
 ./postcli -numUnits 100 -printNumFiles
 1600
 ```
 
-Next, on machine A:
+**Note:** Ensure that `-id` and `-commitmentAtxId` are the same for all subsets!
+
+On machine A:
+
 ```bash
 ./postcli -numUnits 100 -id <id> -commitmentAtxId <id> -toFile 799 -datadir ./dataA
 ```
-We get the first half - 800 binary files
+
+This will create the first 800 files in `./dataA` directory. To verify:
+
 ```bash
 ls -la ./dataA/*.bin | wc -l
 800
 ```
 
-Next, on machine B:
+On machine B:
+
 ```bash
 ./postcli -numUnits 100 -id <id> -commitmentAtxId <id> -fromFile 800 -datadir ./dataB
 ```
-We get the second half - 800 binary files
+
+This will create the second 800 files in `./dataB` directory. To verify:
+
 ```bash
 ls -la ./dataB/*.bin | wc -l
 800
 ```
 
-Finally we can combine both sets together. A dummy example to get the feeling. Realisticly it would probably be copying over the network
+Finally these sets can be combined by moving/copying the `*.bin` files into the same directory:
+
 ```bash
-cp ./dataA/* ./data/
-cp ./dataB/* ./data/
+cp ./dataA/*.bin ./data/
+cp ./dataB/*.bin ./data/
 ls -la ./data/*.bin | wc -l
 1600
 ```
 
-**An optional step to select best possible VRF nonce**
-Normally, when `postcli`initializates from the start to the end it will automatically pick the best VRF nonce. The best means pointing to **the label with the smallest value**. This will avoid a longer initialization time when a node increases their PoST size in the future (not supported yet).
+**Merging postmeta_data.json**: Every subset will create its own `postmeta_data.json`. These files MUST be merged manually.
+During initialization a VRF nonce is searched that represents the index of the **the label with the smallest value**.
 
-Now, when `postcli` initializes in chunks, each subset will find a valid vrf nonce, which represents the local minimum in the inititalized subset. It is recommended to select the best one (the global minimum).
+When `postcli` initializes in chunks, each subset can find a valid VRF nonce, which represents the local minimum in the
+initialized subset. It is **necessary** to manually select the best one (the global minimum) when merging the subsets.
 
-The values of nonces are 128bit, represented as a 16B binary array in big endian. Given two nonces:
+The VRF nonces are stored as Nonce (index) and NonceValue (the label - 16 byte big endian numbers encoded in hex)
+in each `post_metadata.json` of every subset. Given two files:
+
+```json
+... (other fields omitted for brevity)
+"Nonce": 12345
+"NonceValue": 0000ffda94993723a980bf557509773e
 ```
-NonceA = 12345
-NonceValueA = 0000ffda94993723a980bf557509773e
-NonceB = 98765
-NonceValueB = 0000488e171389cce69344d68b66f6b4
+
+```json
+... (other fields omitted for brevity)
+"Nonce": 98765
+"NonceValue": 0000488e171389cce69344d68b66f6b4
 ```
-`NonceB` is the global minimum since its value is smaller than the one of `NonceA`.
 
-The nonce (index) and noncevalue (the label) is included in the post_metadata.json. It is up to the operator to find the best VRF nonce manually and copy the `Nonce` and `NonceValue` to the postdata_metadata.json on the target machine.
-
-### Remarks
-* `-id` and `-commitmentAtxId` are required because they are committed to the generated data.
-* If `-id` isn't provided, the id (public key) will be auto-generated, while saving `key.bin` in `-datadir`.
-* If `postcli` is called multiple times on a given `-datadir`, config mismatch error is likely to occur. In this case, the `-reset` flag can be used to easily clean the previous instance.
-
-
-### How to set the required options
-
-* `-commitmentAtxId`: At the moment, there is no easy way to get that programaticaly. If you start to initialize before first 2 epochs finish then it's safe to use `goldenATX` value here. Later the best way to get it is to use grpc api of the node and call `ActivationService::Highest()` to get that value.
-* `-id`: There are two options there, you can autogenerate it (do not provide it as an option) then there will be `key.bin` file in the `-datadir` folder which will have private key *REMEMBER* to copy it also. The other option is to provide the `-id` flag with the public key you want to use. In this case, the `key.bin` file will be NOT craeted. Make sure that you put the binary representation of the key there.
+The nonce in the second file is the global minimum since its value is smaller than the first one. The operator is **required** to find the
+smallest VRF nonce by hand and ensure that its index and value are in the `postdata_metadata.json` of the merged directory on the target machine.
