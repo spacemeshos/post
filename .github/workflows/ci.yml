@@ -141,6 +141,7 @@ jobs:
         shell: bash
         run: |
           rm -f ./build/post.h
+          cp ./cmd/postcli/README.md ./build/
       - name: Set name of release archive
         shell: bash
         run: |

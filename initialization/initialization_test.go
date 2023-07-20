@@ -19,6 +19,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/oracle"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/verifying"
@@ -817,7 +818,49 @@ func TestValidateComputeBatchSize(t *testing.T) {
 		WithInitOpts(opts),
 		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
-	assert.Error(t, err)
+	require.Error(t, err)
+}
+
+func TestWrongLabelsDetected(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
+	opts.ProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 16
+
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
+
+	woReference, err := oracle.New(
+		oracle.WithProviderID(CPUProviderID()),
+		oracle.WithCommitment(make([]byte, 32)), // different commitment to trigger error
+		oracle.WithScryptParams(opts.Scrypt),
+		oracle.WithVRFDifficulty(make([]byte, 32)),
+		oracle.WithLogger(logger),
+	)
+	require.NoError(t, err)
+	defer woReference.Close()
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(logger),
+		withReferenceOracle(woReference),
+	)
+	require.NoError(t, err)
+
+	err = init.Initialize(context.Background())
+
+	var errWrongLabels ErrReferenceLabelMismatch
+	require.ErrorAs(t, err, &errWrongLabels)
+	require.Equal(t, oracle.CommitmentBytes(nodeId, commitmentAtxId), errWrongLabels.Commitment)
+	require.Equal(t, uint64(1<<12-1), errWrongLabels.Index)
+
+	require.Equal(t, uint64(0), init.NumLabelsWritten())
 }
 
 func assertNumLabelsWritten(ctx context.Context, t *testing.T, init *Initializer) func() error {
