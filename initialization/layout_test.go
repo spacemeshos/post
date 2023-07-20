@@ -74,7 +74,7 @@ func TestCustomTo(t *testing.T) {
 	layout, err := deriveFilesLayout(cfg, opts)
 	r.NoError(err)
 	r.Equal(0, layout.FirstFileIdx)
-	r.Equal(3, int(layout.LastFileIdx-layout.FirstFileIdx+1))
+	r.Equal(2, layout.LastFileIdx)
 	r.Equal(128, int(layout.FileNumLabels))
 	r.Equal(128, int(layout.LastFileNumLabels))
 }
@@ -97,7 +97,7 @@ func TestCustomFromAndTo(t *testing.T) {
 	layout, err := deriveFilesLayout(cfg, opts)
 	r.NoError(err)
 	r.Equal(1, layout.FirstFileIdx)
-	r.Equal(2, int(layout.LastFileIdx-layout.FirstFileIdx+1))
+	r.Equal(2, layout.LastFileIdx)
 	r.Equal(128, int(layout.FileNumLabels))
 	r.Equal(128, int(layout.LastFileNumLabels))
 }
