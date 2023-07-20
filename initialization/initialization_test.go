@@ -190,8 +190,12 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(err)
 	r.Equal(origNonce, *m.Nonce)
 
-	// no nonce found and lastPos not set finds a higher nonce than numLabels
+	// no nonce found and lastPos not set finds a nonce higher than numLabels
+	// e.g. when initialized in chunks and no nonce was found in any chunk
+	// starting smeshing in go-spacemesh will then continue to search outside
+	// the range of the PoST
 	m.Nonce = nil
+	m.LastPosition = nil
 	r.NoError(SaveMetadata(opts.DataDir, m))
 
 	init, err = NewInitializer(
@@ -901,7 +905,6 @@ func initData(datadir string) ([]byte, error) {
 }
 
 func TestInitializeSubset(t *testing.T) {
-	r := require.New(t)
 	cfg := config.DefaultConfig()
 	cfg.LabelsPerUnit = 128
 
@@ -936,46 +939,84 @@ func TestInitializeSubset(t *testing.T) {
 		WithInitOpts(optsSubset),
 		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
-	r.NoError(err)
-	err = initSubset.Initialize(context.Background())
-	r.NoError(err)
+	require.NoError(t, err)
+	require.NoError(t, initSubset.Initialize(context.Background()))
 
 	// Verify that the subset is a subset of the full set
 	fullData, err := initData(opts.DataDir)
-	r.NoError(err)
+	require.NoError(t, err)
 	subsetData, err := initData(optsSubset.DataDir)
-	r.NoError(err)
-	r.True(bytes.Contains(fullData, subsetData))
+	require.NoError(t, err)
+	require.True(t, bytes.Contains(fullData, subsetData))
 
 	// Verify that the subset contains files 3 and 4, but not 0-2 and 5
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_0.bin"))
-	r.ErrorIs(err, os.ErrNotExist)
+	require.ErrorIs(t, err, os.ErrNotExist)
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_1.bin"))
-	r.ErrorIs(err, os.ErrNotExist)
+	require.ErrorIs(t, err, os.ErrNotExist)
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_2.bin"))
-	r.ErrorIs(err, os.ErrNotExist)
+	require.ErrorIs(t, err, os.ErrNotExist)
 
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_3.bin"))
-	r.NoError(err)
+	require.NoError(t, err)
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_4.bin"))
-	r.NoError(err)
+	require.NoError(t, err)
 
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_5.bin"))
-	r.ErrorIs(err, os.ErrNotExist)
+	require.ErrorIs(t, err, os.ErrNotExist)
 
 	// Verify that postdata_3.bin from both initializations contain the same data
 	fullPostdata3, err := os.ReadFile(filepath.Join(opts.DataDir, "postdata_3.bin"))
-	r.NoError(err)
+	require.NoError(t, err)
 	subsetPostdata3, err := os.ReadFile(filepath.Join(optsSubset.DataDir, "postdata_3.bin"))
-	r.NoError(err)
-	r.Equal(fullPostdata3, subsetPostdata3)
+	require.NoError(t, err)
+	require.Equal(t, fullPostdata3, subsetPostdata3)
 
 	// Verify that postdata_4.bin from both initializations contain the same data
 	fullPostdata4, err := os.ReadFile(filepath.Join(opts.DataDir, "postdata_4.bin"))
-	r.NoError(err)
+	require.NoError(t, err)
 	subsetPostdata4, err := os.ReadFile(filepath.Join(optsSubset.DataDir, "postdata_4.bin"))
-	r.NoError(err)
-	r.Equal(fullPostdata4, subsetPostdata4)
+	require.NoError(t, err)
+	require.Equal(t, fullPostdata4, subsetPostdata4)
+}
+
+func TestInitializeSubset_NoNonce(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 128
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.FromFileIdx = 3
+	opts.ToFileIdx = new(int)
+	*opts.ToFileIdx = 4
+	opts.NumUnits = 20
+	opts.MaxFileSize = cfg.LabelsPerUnit * 2 * uint64(config.BytesPerLabel()) // 2 units per file
+	opts.ProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 2
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+		// use a higher difficulty to make sure no Pow is found in the first `numLabels` labels.
+		withDifficultyFunc(func(numLabels uint64) []byte {
+			x := new(big.Int).Lsh(big.NewInt(1), 256)
+			x.Div(x, big.NewInt(int64(numLabels)))
+
+			difficulty := make([]byte, 32)
+			return x.FillBytes(difficulty)
+		}),
+	)
+	require.NoError(t, err)
+	require.NoError(t, init.Initialize(context.Background()))
+
+	require.Nil(t, init.Nonce()) // no nonce is found when initializing a subset
+
+	m, err := LoadMetadata(opts.DataDir)
+	require.NoError(t, err)
+	require.Nil(t, m.Nonce)
 }
 
 func TestInitializeLastFileIsSmaller(t *testing.T) {
