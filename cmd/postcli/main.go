@@ -15,6 +15,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
@@ -38,9 +39,13 @@ var (
 	commitmentAtxIdHex string
 	commitmentAtxId    []byte
 	reset              bool
+
+	logLevel zapcore.Level
 )
 
 func parseFlags() {
+	flag.TextVar(&logLevel, "logLevel", zapcore.InfoLevel, "log level (debug, info, warn, error, dpanic, panic, fatal)")
+
 	flag.BoolVar(&printProviders, "printProviders", false, "print the list of compute providers")
 	flag.BoolVar(&printNumFiles, "printNumFiles", false, "print the total number of files that would be initialized")
 	flag.BoolVar(&printConfig, "printConfig", false, "print the used config and options")
@@ -125,13 +130,30 @@ func main() {
 		return
 	}
 
-	if err := processFlags(); err != nil {
-		log.Fatalln("failed to process flags", err)
+	zapCfg := zap.Config{
+		Level:    zap.NewAtomicLevelAt(logLevel),
+		Encoding: "console",
+		EncoderConfig: zapcore.EncoderConfig{
+			TimeKey:        "T",
+			LevelKey:       "L",
+			NameKey:        "N",
+			MessageKey:     "M",
+			LineEnding:     zapcore.DefaultLineEnding,
+			EncodeLevel:    zapcore.CapitalLevelEncoder,
+			EncodeTime:     zapcore.ISO8601TimeEncoder,
+			EncodeDuration: zapcore.StringDurationEncoder,
+		},
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
 	}
 
-	zapLog, err := zap.NewProduction()
+	zapLog, err := zapCfg.Build()
 	if err != nil {
 		log.Fatalln("failed to initialize zap logger:", err)
+	}
+
+	if err := processFlags(); err != nil {
+		log.Fatalln("failed to process flags", err)
 	}
 
 	init, err := initialization.NewInitializer(
