@@ -859,6 +859,11 @@ func TestWrongLabelsDetected(t *testing.T) {
 	require.ErrorAs(t, err, &errWrongLabels)
 	require.Equal(t, oracle.CommitmentBytes(nodeId, commitmentAtxId), errWrongLabels.Commitment)
 	require.Equal(t, uint64(1<<12-1), errWrongLabels.Index)
+	reference, err := init.referenceOracle.Position(errWrongLabels.Index)
+	require.NoError(t, err)
+	require.Equal(t, reference.Output, errWrongLabels.Expected)
+	require.Equal(t, len(reference.Output), len(errWrongLabels.Actual))
+	require.NotEqual(t, reference.Output, errWrongLabels.Actual)
 
 	require.Equal(t, uint64(0), init.NumLabelsWritten())
 }

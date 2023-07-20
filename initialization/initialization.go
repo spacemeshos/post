@@ -532,7 +532,7 @@ func (init *Initializer) initFile(ctx context.Context, wo, woReference *oracle.W
 				Index:      endPosition,
 				Commitment: init.commitment,
 				Expected:   reference.Output,
-				Actual:     res.Output[batchSize-postrs.LabelLength:],
+				Actual:     res.Output[(batchSize-1)*postrs.LabelLength:],
 			}
 		}
 
