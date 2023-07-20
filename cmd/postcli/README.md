@@ -79,11 +79,10 @@ with the PoST data. This file then **must** to be copied/moved with the PoST dat
 **NOTE:** The generated PoST data is ONLY valid for this identity!
 If a public key is provided with the `-id` flag, the `key.bin` file will be NOT created. Make sure that the key file that belongs
 to the identity provided to `postcli` is available in the PoST directory **before** running a node with it.
-* `-commitmentAtxId`: it is recommended to look up the highest ATX by querying it from a synced node with e.g.
-`grpcurl -plaintext -d '' 0.0.0.0:9093 spacemesh.v1.AdminService.Highest` to get that value. The node can be operated in
+* `-commitmentAtxId`: it is recommended to look up the highest ATX by querying it from a synced node with
+`grpcurl -plaintext -d '' 0.0.0.0:9093 spacemesh.v1.AdminService.Highest`. The node can be operated in
 "non-smeshing" mode during synchronization and when querying the highest ATX.
-* If `postcli` is called multiple times on a given `-datadir`, config mismatch error is likely to occur.
-In this case, the `-reset` flag can be used to easily clean the previous instance.
+* The `-reset` flag can be used to clean up a previous initialization. **Careful**: This will delete data that won't be recoverable.
 
 ## Initializing a subset of PoST data
 
