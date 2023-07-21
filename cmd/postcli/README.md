@@ -162,6 +162,21 @@ smallest VRF nonce by hand and ensure that its index and value are in the `postd
 Not every chunk will contain a VRF nonce in its `postdata_metadata.json`, but at least one should. If for the very unlikely case that no VRF nonce
 was found in any chunk the operator can run `postcli` again **after merging the data** without `-fromFile` and `-toFile` flags to find a VRF nonce.
 
+## Verifying initialized POS data
+
+The `postcli` allows verifying an already initialized POS data. Verification samples a small fraction of labels from every file and compares them to labels generated with the same algorithm executed on CPU. Please note that generating labels on CPU is slow compared to GPU. Hence it is not possible to verify all the data (it would essentially mean re-initialization on CPU). If the GPU failed during initialization, the created PoST data will contain some or all invalid labels after that point. This method will only sample the PoST and might not detect a small amount of corrupted data.
+
+Depending on PoST size and CPU speed a reasonable *fraction* (%) parameter needs to be picked that gives enough confidence but still completes verification in a reasonable time. Suggested values are <1%, closer to 0.1%.
+
+To verify POS data:
+
+1. locate the directory of the POS data. It should contain postdata_metadata.json and postdata_N.bin files.
+2. run `postcli -verify -datadir <path to POS directory> -fraction <% of data to verify>`.
+
+For example, `postcli -verify -datadir ~/post/data -fraction 0.1` will verify 0.1% of data. No additional arguments (i.e `-id`) are required. The postcli will read all required information from postdata_metadata.json
+
+If the POS data is found to be invalid, `postcli` will exit with status 1 and print the index of file and offset of the label found to be invalid. If verification completes successfully, `postcli` exits with 0.
+
 ## Troubleshooting
 
 ### Searching for a lost VRF nonce

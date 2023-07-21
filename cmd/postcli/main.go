@@ -37,6 +37,9 @@ var (
 	printConfig    bool
 	genProof       bool
 
+	verifyPos bool
+	fraction  float64
+
 	idHex              string
 	id                 []byte
 	commitmentAtxIdHex string
@@ -49,6 +52,9 @@ var (
 )
 
 func parseFlags() {
+	flag.BoolVar(&verifyPos, "verify", false, "verify initialized data")
+	flag.Float64Var(&fraction, "fraction", 0.2, "how much % of POS data to verify. Sane values are < 1.0")
+
 	flag.TextVar(&logLevel, "logLevel", zapcore.InfoLevel, "log level (debug, info, warn, error, dpanic, panic, fatal)")
 
 	flag.BoolVar(&searchForNonce, "searchForNonce", false, "search for VRF nonce in already initialized files")
@@ -159,6 +165,13 @@ func main() {
 		log.Fatalln("failed to initialize zap logger:", err)
 	}
 
+	if verifyPos {
+		if cmdVerifyPos(opts, fraction, logger) != nil {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
@@ -259,4 +272,27 @@ func saveKey(key ed25519.PrivateKey) error {
 		return fmt.Errorf("key write to disk error: %w", err)
 	}
 	return nil
+}
+
+func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) error {
+	params := postrs.TranslateScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)
+	verifyOpts := []postrs.VerifyPosOptionsFunc{
+		postrs.WithFraction(fraction),
+		postrs.FromFile(uint32(opts.FromFileIdx)),
+		postrs.VerifyPosWithLogger(logger),
+	}
+	if opts.ToFileIdx != nil {
+		verifyOpts = append(verifyOpts, postrs.ToFile(uint32(*opts.ToFileIdx)))
+	}
+
+	err := postrs.VerifyPos(opts.DataDir, params, verifyOpts...)
+	switch {
+	case err == nil:
+		log.Println("cli: POS data is valid")
+	case errors.Is(err, postrs.ErrInvalidPos):
+		log.Printf("cli: %v\n", err)
+	default:
+		log.Printf("cli: failed (%v)\n", err)
+	}
+	return err
 }
