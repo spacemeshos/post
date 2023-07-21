@@ -162,9 +162,9 @@ smallest VRF nonce by hand and ensure that its index and value are in the `postd
 
 ## Verifying initialized POS data
 
-The `postcli` allows verifying an already initialized POS data. Verification randomly picks a small fraction of labels from every file and compares them to labels generated with the scrypt-jane algorithm executed on CPU. Please note that generating labels on CPU is slow, compared to GPU. Hence it is not possible to verify all the data (it would essentially mean re-initialization on CPU). The assumption is that if the GPU process breaks, it starts to output large chunks of invalid labels. This method will not detect a single invalid byte/label.
+The `postcli` allows verifying an already initialized POS data. Verification samples a small fraction of labels from every file and compares them to labels generated with the same algorithm executed on CPU. Please note that generating labels on CPU is slow compared to GPU. Hence it is not possible to verify all the data (it would essentially mean re-initialization on CPU). If the GPU failed during initialization, the created PoST data will contain some or all invalid labels after that point. This method will only sample the PoST and might not detect a small amount of corrupted data.
 
-Depending on how much storage you have and your CPU speed you should pick the *fraction* (%) parameter that would give you enough confidence but still end in a reasonable time. Suggested values are <1%, closer to 0.1%.
+Depending on PoST size and CPU speed a reasonable *fraction* (%) parameter needs to be picked that gives enough confidence but still completes verification in a reasonable time. Suggested values are <1%, closer to 0.1%.
 
 To verify POS data:
 
@@ -173,4 +173,4 @@ To verify POS data:
 
 For example, `postcli -verify -datadir ~/post/data -fraction 0.1` will verify 0.1% of data. No additional arguments (i.e `-id`) are required. The postcli will read all required information from postdata_metadata.json
 
-If the POS data is found invalid, it will exit with 1 and print the index of invalid file and offset of the invalid label. Otherwise, it exits with 0.
+If the POS data is found to be invalid, `postcli` will exit with status 1 and print the index of file and offset of the label found to be invalid. If verification completes successfully, `postcli` exits with 0.
