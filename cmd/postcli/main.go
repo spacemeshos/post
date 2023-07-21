@@ -49,7 +49,7 @@ var (
 
 func parseFlags() {
 	flag.BoolVar(&verifyPos, "verify", false, "verify initialized data")
-	flag.Float64Var(&fraction, "fraction", 1.0, "fraction of POS data to verify")
+	flag.Float64Var(&fraction, "fraction", 0.2, "how much % of POS data to verify. Sane values are < 1.0")
 
 	flag.TextVar(&logLevel, "logLevel", zapcore.InfoLevel, "log level (debug, info, warn, error, dpanic, panic, fatal)")
 
