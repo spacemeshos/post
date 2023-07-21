@@ -28,8 +28,10 @@ import (
 const edKeyFileName = "key.bin"
 
 var (
-	cfg            = config.MainnetConfig()
-	opts           = config.MainnetInitOpts()
+	cfg  = config.MainnetConfig()
+	opts = config.MainnetInitOpts()
+
+	searchForNonce bool
 	printProviders bool
 	printNumFiles  bool
 	printConfig    bool
@@ -55,10 +57,12 @@ func parseFlags() {
 
 	flag.TextVar(&logLevel, "logLevel", zapcore.InfoLevel, "log level (debug, info, warn, error, dpanic, panic, fatal)")
 
+	flag.BoolVar(&searchForNonce, "searchForNonce", false, "search for VRF nonce in already initialized files")
 	flag.BoolVar(&printProviders, "printProviders", false, "print the list of compute providers")
 	flag.BoolVar(&printNumFiles, "printNumFiles", false, "print the total number of files that would be initialized")
 	flag.BoolVar(&printConfig, "printConfig", false, "print the used config and options")
 	flag.BoolVar(&genProof, "genproof", false, "generate proof as a sanity test, after initialization")
+
 	flag.StringVar(&opts.DataDir, "datadir", opts.DataDir, "filesystem datadir path")
 	flag.Uint64Var(&opts.MaxFileSize, "maxFileSize", opts.MaxFileSize, "max file size")
 	flag.IntVar(&opts.ProviderID, "provider", opts.ProviderID, "compute provider id (required)")
@@ -156,18 +160,42 @@ func main() {
 		ErrorOutputPaths: []string{"stderr"},
 	}
 
-	zapLog, err := zapCfg.Build()
+	logger, err := zapCfg.Build()
 	if err != nil {
 		log.Fatalln("failed to initialize zap logger:", err)
 	}
 
-	postrs.SetLogCallback(zapLog)
+	postrs.SetLogCallback(logger)
 
 	if verifyPos {
 		if cmdVerifyPos(opts, fraction) != nil {
 			os.Exit(1)
 		}
 		os.Exit(0)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	if searchForNonce {
+		nonce, label, err := initialization.SearchForNonce(
+			ctx,
+			cfg,
+			opts,
+			initialization.SearchWithLogger(logger),
+		)
+		switch {
+		case errors.Is(err, context.Canceled):
+			log.Println("cli: search for nonce interrupted")
+			if label != nil {
+				log.Printf("cli: nonce found so far: Nonce: %d | Label: %X\n", nonce, label)
+			}
+		case err != nil:
+			log.Fatalf("cli: search for nonce failed: %v", err)
+		default:
+			log.Printf("cli: search for nonce completed. Nonce: %d | Label: %X\n", nonce, label)
+		}
+		return
 	}
 
 	err = processFlags()
@@ -183,7 +211,7 @@ func main() {
 		initialization.WithInitOpts(opts),
 		initialization.WithNodeId(id),
 		initialization.WithCommitmentAtxId(commitmentAtxId),
-		initialization.WithLogger(zapLog),
+		initialization.WithLogger(logger),
 	)
 	if err != nil {
 		log.Panic(err.Error())
@@ -196,9 +224,6 @@ func main() {
 		log.Println("cli: reset completed")
 		return
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
 
 	err = init.Initialize(ctx)
 	switch {
@@ -218,7 +243,7 @@ func main() {
 	if genProof {
 		log.Println("cli: generating proof as a sanity test")
 
-		proof, proofMetadata, err := proving.Generate(ctx, shared.ZeroChallenge, cfg, zapLog, proving.WithDataSource(cfg, id, commitmentAtxId, opts.DataDir))
+		proof, proofMetadata, err := proving.Generate(ctx, shared.ZeroChallenge, cfg, logger, proving.WithDataSource(cfg, id, commitmentAtxId, opts.DataDir))
 		if err != nil {
 			log.Fatalln("proof generation error", err)
 		}
@@ -227,7 +252,7 @@ func main() {
 			log.Fatalln("failed to create verifier", err)
 		}
 		defer verifier.Close()
-		if err := verifier.Verify(proof, proofMetadata, cfg, zapLog); err != nil {
+		if err := verifier.Verify(proof, proofMetadata, cfg, logger); err != nil {
 			log.Fatalln("failed to verify test proof", err)
 		}
 

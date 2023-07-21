@@ -33,7 +33,7 @@ That's separate command NOT shipped with post implementation. Please refer to yo
 ### Nvidia
 
 ```bash
-apt install nvidia-opencl-icd 
+apt install nvidia-opencl-icd
 ```
 
 ### AMD
@@ -159,7 +159,6 @@ in each `post_metadata.json` of every subset. Given two files:
 The nonce in the second file is the global minimum since its value is smaller than the first one. The operator is **required** to find the
 smallest VRF nonce by hand and ensure that its index and value are in the `postdata_metadata.json` of the merged directory on the target machine.
 
-
 ## Verifying initialized POS data
 
 The `postcli` allows verifying an already initialized POS data. Verification randomly picks a small fraction of labels from every file and compares them to labels generated with the scrypt-jane algorithm executed on CPU. Please note that generating labels on CPU is slow, compared to GPU. Hence it is not possible to verify all the data (it would essentially mean re-initialization on CPU). The assumption is that if the GPU process breaks, it starts to output large chunks of invalid labels. This method will not detect a single invalid byte/label.
@@ -174,3 +173,16 @@ To verify POS data:
 For example, `postcli -verify -datadir ~/post/data -fraction 0.1` will verify 0.1% of data. No additional arguments (i.e `-id`) are required. The postcli will read all required information from postdata_metadata.json
 
 If the POS data is found invalid, it will exit with 1 and print the index of invalid file and offset of the invalid label. Otherwise, it exits with 0.
+
+## Troubleshooting
+
+### Searching for a lost VRF nonce
+
+In case you lost a VRF nonce after merging initialized subsets, you can use postcli to recover it without re-initializing the data. Postcli will need to **read** the entire POS data and find the nonce.
+
+To find a lost nonce:
+
+1. locate the directory of the POS data. It should contain postdata_metadata.json and postdata_N.bin files.
+2. run `postcli -searchForNonce -datadir <path to POS directory>`.
+
+The postcli will read the metadata from postdata_metadata.json and then look for the nonce in all postdata_N.bin files one by one. If the nonce is found it will update the metadata file.

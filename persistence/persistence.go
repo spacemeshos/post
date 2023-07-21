@@ -52,7 +52,7 @@ func GetReaders(datadir string, bitsPerLabel uint) ([]Reader, error) {
 	}
 
 	// Sort.
-	sort.Sort(numericalSorter(initFiles))
+	sort.Sort(NumericalSorter(initFiles))
 
 	// Initialize readers.
 	var readers []Reader
