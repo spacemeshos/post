@@ -92,7 +92,15 @@ func TestSearchForNonce(t *testing.T) {
 	err = init.Initialize(context.Background())
 	require.NoError(t, err)
 
-	metadata, err := init.loadMetadata()
+	metadata, err := LoadMetadata(opts.DataDir)
+	require.NoError(t, err)
+
+	expectedNonce := metadata.Nonce
+	expectedNonceValue := metadata.NonceValue
+	// remove Nonce and NonceValue from metadata
+	metadata.Nonce = nil
+	metadata.NonceValue = nil
+	err = SaveMetadata(opts.DataDir, metadata)
 	require.NoError(t, err)
 
 	nonce, value, err := SearchForNonce(
@@ -102,8 +110,14 @@ func TestSearchForNonce(t *testing.T) {
 		SearchWithLogger(logger),
 	)
 	require.NoError(t, err)
-	require.Equal(t, *metadata.Nonce, nonce)
-	require.EqualValues(t, metadata.NonceValue, value)
+	require.Equal(t, *expectedNonce, nonce)
+	require.EqualValues(t, expectedNonceValue, value)
+
+	// Verify that nonce was written to the metatada file
+	metadata, err = LoadMetadata(opts.DataDir)
+	require.NoError(t, err)
+	require.Equal(t, expectedNonce, metadata.Nonce)
+	require.EqualValues(t, expectedNonceValue, metadata.NonceValue)
 }
 
 func TestSearchForNonceNotFound(t *testing.T) {

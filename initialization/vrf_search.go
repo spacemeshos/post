@@ -118,6 +118,10 @@ func SearchForNonce(ctx context.Context, cfg Config, initOpts InitOpts, opts ...
 		}
 	}
 	if nonceValue != nil {
+		logger.Info("updating postdata_metadata.json with found nonce", zap.Uint64("nonce", nonce), zap.String("NonceValue", hex.EncodeToString(nonceValue)))
+		metadata.Nonce = &nonce
+		metadata.NonceValue = shared.NonceValue(nonceValue)
+		SaveMetadata(initOpts.DataDir, metadata)
 		return nonce, nonceValue, nil
 	}
 	return 0, nil, ErrNonceNotFound
