@@ -192,15 +192,17 @@ func searchForNonce(ctx context.Context, r io.Reader, difficulty []byte, oracle 
 // * wo:         the oracle used to regenerate the label.
 func checkLabel(index uint64, label, difficulty []byte, wo *oracle.WorkOracle) (bool, error) {
 	comp := bytes.Compare(label, difficulty)
-	if comp < 0 {
+	switch {
+	case comp < 0:
 		return true, nil
-	} else if comp == 0 {
+	case comp == 0:
 		// need to regenerate label to verify lower bytes
 		res, err := wo.Position(index)
 		if err != nil {
 			return false, fmt.Errorf("failed to regenerate label: %w", err)
 		}
 		return bytes.Compare(res.Output, difficulty) < 0, nil
+	default: // comp > 0
+		return false, nil
 	}
-	return false, nil
 }
