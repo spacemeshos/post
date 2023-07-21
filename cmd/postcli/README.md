@@ -33,7 +33,7 @@ That's separate command NOT shipped with post implementation. Please refer to yo
 ### Nvidia
 
 ```bash
-apt install nvidia-opencl-icd 
+apt install nvidia-opencl-icd
 ```
 
 ### AMD
@@ -158,3 +158,16 @@ in each `post_metadata.json` of every subset. Given two files:
 
 The nonce in the second file is the global minimum since its value is smaller than the first one. The operator is **required** to find the
 smallest VRF nonce by hand and ensure that its index and value are in the `postdata_metadata.json` of the merged directory on the target machine.
+
+## Troubleshooting
+
+### Searching for a lost VRF nonce
+
+In case you lost a VRF nonce after merging initialized subsets, you can use postcli to recover it without re-initializing the data. Postcli will need to **read** the entire POS data and find the nonce.
+
+To find a lost nonce:
+
+1. locate the directory of the POS data. It should contain postdata_metadata.json and postdata_N.bin files.
+2. run `postcli -searchForNonce -datadir <path to POS directory>`.
+
+The postcli will read the metadata from postdata_metadata.json and then look for the nonce in all postdata_N.bin files one by one. If the nonce is found it will update the metadata file.
