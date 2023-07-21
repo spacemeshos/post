@@ -255,14 +255,11 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		zap.Uint64("labelsPerUnit", init.cfg.LabelsPerUnit),
 	)
 
-	lastFileIndex := layout.FirstFileIdx + int(layout.NumFiles) - 1
-
 	init.logger.Info("initialization file layout",
-		zap.Uint("numFiles", layout.NumFiles),
 		zap.Uint64("labelsPerFile", layout.FileNumLabels),
 		zap.Uint64("labelsLastFile", layout.LastFileNumLabels),
 		zap.Int("firstFileIndex", layout.FirstFileIdx),
-		zap.Int("lastFileIndex", lastFileIndex),
+		zap.Int("lastFileIndex", layout.LastFileIdx),
 	)
 	if err := removeRedundantFiles(init.cfg, init.opts, init.logger); err != nil {
 		return err
@@ -299,10 +296,10 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		defer woReference.Close()
 	}
 
-	for i := layout.FirstFileIdx; i <= lastFileIndex; i++ {
+	for i := layout.FirstFileIdx; i <= layout.LastFileIdx; i++ {
 		fileOffset := uint64(i) * layout.FileNumLabels
 		fileNumLabels := layout.FileNumLabels
-		if i == lastFileIndex {
+		if i == layout.LastFileIdx {
 			fileNumLabels = layout.LastFileNumLabels
 		}
 
@@ -312,6 +309,11 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 
 	if init.nonce.Load() != nil {
+		init.logger.Info("initialization: completed, found nonce", zap.Uint64("nonce", *init.nonce.Load()))
+		return nil
+	}
+	if layout.NumFiles() < init.opts.TotalFiles(init.cfg.LabelsPerUnit) {
+		init.logger.Info("initialization: no nonce found while computing labels")
 		return nil
 	}
 
