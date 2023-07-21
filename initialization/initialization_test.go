@@ -518,7 +518,7 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 		r.NoError(err)
 		layout, err := deriveFilesLayout(cfg, opts)
 		r.NoError(err)
-		r.Equal(layout.LastFileIdx+1, numFiles)
+		r.Equal(layout.NumFiles(), numFiles)
 
 		r.NoError(newInit.Initialize(ctx))
 
@@ -526,9 +526,8 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 		r.NoError(err)
 		newLayout, err := deriveFilesLayout(cfg, newOpts)
 		r.NoError(err)
-		r.Equal(newLayout.LastFileIdx+1, numFiles)
-		r.Equal(0, newLayout.FirstFileIdx)
-		r.Less(newLayout.LastFileIdx, layout.LastFileIdx)
+		r.Equal(newLayout.NumFiles(), numFiles)
+		r.Less(newLayout.NumFiles(), layout.NumFiles())
 
 		cancel()
 		eg.Wait()
@@ -543,7 +542,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.MaxFileSize = uint64(opts.NumUnits) * cfg.LabelsPerUnit * config.BitsPerLabel / 8
+	opts.MaxFileSize = cfg.UnitSize()
 	opts.ProviderID = int(CPUProviderID())
 
 	var oneFileData []byte
@@ -581,8 +580,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 
 			layout, err := deriveFilesLayout(cfg, opts)
 			require.NoError(t, err)
-			require.Equal(t, 0, layout.FirstFileIdx)
-			require.Equal(t, numFiles-1, layout.LastFileIdx)
+			require.Equal(t, numFiles, layout.NumFiles())
 
 			init, err := NewInitializer(
 				WithNodeId(nodeId),
@@ -911,7 +909,7 @@ func TestInitializeSubset(t *testing.T) {
 	opts := config.DefaultInitOpts()
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = 20
-	opts.MaxFileSize = cfg.LabelsPerUnit * 2 * uint64(config.BytesPerLabel()) // 2 units per file
+	opts.MaxFileSize = 2 * cfg.UnitSize() // 2 units per file
 	opts.ProviderID = int(CPUProviderID())
 	opts.Scrypt.N = 2
 
@@ -990,7 +988,7 @@ func TestInitializeSubset_NoNonce(t *testing.T) {
 	opts.ToFileIdx = new(int)
 	*opts.ToFileIdx = 4
 	opts.NumUnits = 20
-	opts.MaxFileSize = cfg.LabelsPerUnit * 2 * uint64(config.BytesPerLabel()) // 2 units per file
+	opts.MaxFileSize = 2 * cfg.UnitSize() // 2 units per file
 	opts.ProviderID = int(CPUProviderID())
 	opts.Scrypt.N = 2
 
@@ -1014,9 +1012,40 @@ func TestInitializeSubset_NoNonce(t *testing.T) {
 
 	require.Nil(t, init.Nonce()) // no nonce is found when initializing a subset
 
-	m, err := LoadMetadata(opts.DataDir)
+	meta, err := LoadMetadata(opts.DataDir)
 	require.NoError(t, err)
-	require.Nil(t, m.Nonce)
+	require.Nil(t, meta.Nonce)
+
+	// completing initialization finds nonce outside range
+	opts.FromFileIdx = 0
+	opts.ToFileIdx = nil
+
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+		// use a higher difficulty to make sure no Pow is found in the first `numLabels` labels.
+		withDifficultyFunc(func(numLabels uint64) []byte {
+			x := new(big.Int).Lsh(big.NewInt(1), 256)
+			x.Div(x, big.NewInt(int64(numLabels)))
+
+			difficulty := make([]byte, 32)
+			return x.FillBytes(difficulty)
+		}),
+	)
+	require.NoError(t, err)
+	require.NoError(t, init.Initialize(context.Background()))
+
+	require.NotNil(t, init.Nonce())
+	m := &shared.VRFNonceMetadata{
+		NodeId:          nodeId,
+		CommitmentAtxId: commitmentAtxId,
+		NumUnits:        opts.NumUnits,
+		LabelsPerUnit:   cfg.LabelsPerUnit,
+	}
+	require.NoError(t, verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
 }
 
 func TestInitializeLastFileIsSmaller(t *testing.T) {

@@ -13,6 +13,10 @@ type filesLayout struct {
 	LastFileNumLabels uint64
 }
 
+func (l filesLayout) NumFiles() int {
+	return l.LastFileIdx - l.FirstFileIdx + 1
+}
+
 func deriveFilesLayout(cfg config.Config, opts config.InitOpts) (filesLayout, error) {
 	maxFileNumLabels := opts.MaxFileNumLabels()
 

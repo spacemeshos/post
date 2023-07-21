@@ -312,7 +312,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		init.logger.Info("initialization: completed, found nonce", zap.Uint64("nonce", *init.nonce.Load()))
 		return nil
 	}
-	if layout.FirstFileIdx > 0 || layout.LastFileIdx < init.opts.TotalFiles(init.cfg.LabelsPerUnit)-1 {
+	if layout.NumFiles() < init.opts.TotalFiles(init.cfg.LabelsPerUnit) {
 		init.logger.Info("initialization: no nonce found while computing labels")
 		return nil
 	}
