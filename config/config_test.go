@@ -35,3 +35,14 @@ func TestTotalFiles(t *testing.T) {
 	}
 	r.Equal(0, opts.TotalFiles(128))
 }
+
+func TestOptsValidateScryptParams(t *testing.T) {
+	t.Parallel()
+	cfg := config.DefaultConfig()
+	opts := config.DefaultInitOpts()
+
+	require.Nil(t, config.Validate(cfg, opts))
+
+	opts.Scrypt.N = 0
+	require.Error(t, config.Validate(cfg, opts))
+}
