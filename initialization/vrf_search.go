@@ -95,6 +95,12 @@ func SearchForNonce(ctx context.Context, cfg Config, initOpts InitOpts, opts ...
 		if err != nil {
 			logger.Panic("failed to parse file index", zap.Error(err))
 		}
+
+		if fileIndex < initOpts.FromFileIdx || (initOpts.ToFileIdx != nil && fileIndex > *initOpts.ToFileIdx) {
+			logger.Debug("skipping file", zap.String("file", file.Name()))
+			continue
+		}
+
 		firstLabelIndex := uint64(fileIndex) * metadata.MaxFileSize / postrs.LabelLength
 		logger.Info("looking for VRF nonce in file", zap.String("file", file.Name()))
 

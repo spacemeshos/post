@@ -118,6 +118,18 @@ func TestSearchForNonce(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedNonce, metadata.Nonce)
 	require.EqualValues(t, expectedNonceValue, metadata.NonceValue)
+
+	// Search only in 1 file - nonce not found
+	opts.FromFileIdx = 2
+	opts.ToFileIdx = &opts.FromFileIdx
+
+	_, _, err = SearchForNonce(
+		context.Background(),
+		cfg,
+		opts,
+		SearchWithLogger(logger),
+	)
+	require.ErrorIs(t, err, ErrNonceNotFound)
 }
 
 func TestSearchForNonceNotFound(t *testing.T) {
