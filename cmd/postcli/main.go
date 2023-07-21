@@ -45,6 +45,8 @@ var (
 	reset              bool
 
 	logLevel zapcore.Level
+
+	ErrKeyFileExists = errors.New("key file already exists")
 )
 
 func parseFlags() {
@@ -168,7 +170,11 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := processFlags(); err != nil {
+	err = processFlags()
+	switch {
+	case errors.Is(err, ErrKeyFileExists):
+		log.Fatalln("cli: key file already exists. This appears to be a mistake. If you're trying to initialize a new identity delete key.bin and try again otherwise specify identity with `-id` flag")
+	case err != nil:
 		log.Fatalln("failed to process flags", err)
 	}
 
@@ -235,6 +241,10 @@ func saveKey(key ed25519.PrivateKey) error {
 	}
 
 	filename := filepath.Join(opts.DataDir, edKeyFileName)
+	if _, err := os.Stat(filename); err == nil {
+		return ErrKeyFileExists
+	}
+
 	if err := os.WriteFile(filename, []byte(hex.EncodeToString(key)), 0o600); err != nil {
 		return fmt.Errorf("key write to disk error: %w", err)
 	}
