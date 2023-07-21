@@ -10,11 +10,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"go.uber.org/zap"
 
 	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/oracle"
+	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
 )
 
@@ -80,17 +82,21 @@ func SearchForNonce(ctx context.Context, cfg Config, initOpts InitOpts, opts ...
 	}
 	defer woReference.Close()
 
+	// Filter and sort init files.
+	var initFiles []os.FileInfo
 	for _, file := range allFiles {
 		info, err := file.Info()
 		if err != nil {
 			logger.Error("failed to get file info", zap.Error(err))
 			continue
 		}
-
-		if !shared.IsInitFile(info) {
-			continue
+		if shared.IsInitFile(info) {
+			initFiles = append(initFiles, info)
 		}
+	}
+	sort.Sort(persistence.NumericalSorter(initFiles))
 
+	for _, file := range initFiles {
 		fileIndex, err := shared.ParseFileIndex(file.Name())
 		if err != nil {
 			logger.Panic("failed to parse file index", zap.Error(err))

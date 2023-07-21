@@ -8,14 +8,14 @@ import (
 	"strings"
 )
 
-type numericalSorter []os.FileInfo
+type NumericalSorter []os.FileInfo
 
 // A compile time check to ensure that numericalSorter fully implements the sort.Interface interface.
-var _ sort.Interface = (*numericalSorter)(nil)
+var _ sort.Interface = (*NumericalSorter)(nil)
 
-func (s numericalSorter) Len() int      { return len(s) }
-func (s numericalSorter) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
-func (s numericalSorter) Less(i, j int) bool {
+func (s NumericalSorter) Len() int      { return len(s) }
+func (s NumericalSorter) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s NumericalSorter) Less(i, j int) bool {
 	nameA := s[i].Name()
 	nameA = strings.TrimSuffix(nameA, filepath.Ext(nameA))
 
