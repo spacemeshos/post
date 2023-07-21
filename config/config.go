@@ -1,8 +1,10 @@
 package config
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 
@@ -17,10 +19,7 @@ const (
 
 	MinBitsPerLabel = 1
 	MaxBitsPerLabel = 256
-	BitsPerLabel    = 8 * 16
-
-	defaultMaxNumUnits = 100
-	defaultMinNumUnits = 1
+	BitsPerLabel    = 8 * postrs.LabelLength
 
 	KiB = 1024
 	MiB = 1024 * KiB
@@ -35,6 +34,10 @@ var DefaultDataDir string
 func init() {
 	home, _ := os.UserHomeDir()
 	DefaultDataDir = filepath.Join(home, "post", DefaultDataDirName)
+}
+
+func BytesPerLabel() int {
+	return BitsPerLabel / 8
 }
 
 type PowFlags = postrs.PowFlags
@@ -82,11 +85,29 @@ type Config struct {
 	PowDifficulty [32]byte
 }
 
+// MainnetConfig returns the default config for mainnet.
+func MainnetConfig() Config {
+	cfg := Config{
+		MinNumUnits:   4,
+		MaxNumUnits:   1048576,    // max post size 64 PiB
+		LabelsPerUnit: 4294967296, // 64GiB units
+		K1:            26,
+		K2:            37,
+		K3:            37,
+	}
+	_, err := hex.Decode(cfg.PowDifficulty[:], []byte("00037ec8ec25e6d2c00000000000000000000000000000000000000000000000"))
+	if err != nil {
+		panic(err)
+	}
+	return cfg
+}
+
+// DefaultConfig returns the default config. These are intended for testing.
 func DefaultConfig() Config {
 	cfg := Config{
+		MinNumUnits:   1,
+		MaxNumUnits:   100,
 		LabelsPerUnit: 512, // 8kB units
-		MaxNumUnits:   defaultMaxNumUnits,
-		MinNumUnits:   defaultMinNumUnits,
 		K1:            26,
 		K2:            37,
 		K3:            37,
@@ -94,8 +115,11 @@ func DefaultConfig() Config {
 	for i := range cfg.PowDifficulty {
 		cfg.PowDifficulty[i] = 0xFF
 	}
-
 	return cfg
+}
+
+func (c *Config) UnitSize() uint64 {
+	return c.LabelsPerUnit * uint64(BytesPerLabel())
 }
 
 type InitOpts struct {
@@ -107,6 +131,23 @@ type InitOpts struct {
 	Scrypt      ScryptParams
 	// ComputeBatchSize must be greater than 0
 	ComputeBatchSize uint64
+
+	// Index of the first file to init (inclusive)
+	FromFileIdx int
+	// Index of the last file to init (inclusive). Will init to the end of declared space if not provided.
+	ToFileIdx *int
+}
+
+func (o *InitOpts) MaxFileNumLabels() uint64 {
+	return o.MaxFileSize / uint64(BytesPerLabel())
+}
+
+func (o *InitOpts) TotalLabels(labelsPerUnit uint64) uint64 {
+	return uint64(o.NumUnits) * labelsPerUnit
+}
+
+func (o *InitOpts) TotalFiles(labelsPerUnit uint64) int {
+	return int(math.Ceil(float64(o.TotalLabels(labelsPerUnit)) / float64(o.MaxFileNumLabels())))
 }
 
 type ScryptParams struct {
@@ -138,10 +179,24 @@ func DefaultLabelParams() ScryptParams {
 // based on a short benchmarking session.
 const BestProviderID = -1
 
+// MainnetInitOpts returns the default InitOpts for mainnet.
+func MainnetInitOpts() InitOpts {
+	return InitOpts{
+		DataDir:          DefaultDataDir,
+		NumUnits:         4,
+		MaxFileSize:      defaultMaxFileSize,
+		ProviderID:       BestProviderID,
+		Throttle:         false,
+		Scrypt:           DefaultLabelParams(),
+		ComputeBatchSize: DefaultComputeBatchSize,
+	}
+}
+
+// DefaultInitOpts returns the default InitOpts. These are intended for testing.
 func DefaultInitOpts() InitOpts {
 	return InitOpts{
 		DataDir:          DefaultDataDir,
-		NumUnits:         defaultMinNumUnits + 1,
+		NumUnits:         2,
 		MaxFileSize:      defaultMaxFileSize,
 		ProviderID:       BestProviderID,
 		Throttle:         false,

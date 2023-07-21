@@ -7,9 +7,12 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"io"
 
 	"go.uber.org/zap"
 )
+
+//go:generate mockgen -package mocks -destination mocks/api.go . Scrypter
 
 // ErrScryptClosed is returned when calling a method on an already closed Scrypt instance.
 var ErrScryptClosed = errors.New("scrypt has been closed")
@@ -26,6 +29,11 @@ func CPUProviderID() uint {
 type ScryptPositionsResult struct {
 	Output      []byte  // The output of the scrypt computation.
 	IdxSolution *uint64 // The index of a solution to the proof of work (if checked for).
+}
+
+type Scrypter interface {
+	io.Closer
+	Positions(start, end uint64) (ScryptPositionsResult, error)
 }
 
 type option struct {

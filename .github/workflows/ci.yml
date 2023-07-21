@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - develop
+    tags:
+      - 'v*'
 
 jobs:
   quicktests:
@@ -18,6 +20,8 @@ jobs:
         with:
           check-latest: true
           go-version-file: "go.mod"
+      - name: Install OpenCL dev
+        run: sudo apt-get update -q && sudo apt-get install -qy ocl-icd-opencl-dev
       - name: fmt, tidy, generate
         run: |
           make install
@@ -52,8 +56,26 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: 
+          - ubuntu-latest
+          - [self-hosted, linux, arm64]
+          - macos-latest
+          - [self-hosted, macos, arm64]
+          - windows-latest
     steps:
+      - name: Add OpenCL support - Ubuntu
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: sudo apt-get update -q && sudo apt-get install -qy ocl-icd-opencl-dev libpocl2
+      - name: Override SDKROOT for macOS
+        if: ${{ contains(matrix.os, 'macos') && runner.arch == 'arm64' }}
+        run: echo "SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX12.3.sdk" >> $GITHUB_ENV
+      - name: disable Windows Defender - Windows
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
+      - name: Add OpenCL support - Windows
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: choco install opencl-intel-cpu-runtime
       - name: checkout
         uses: actions/checkout@v3
       - name: set up go
@@ -63,12 +85,6 @@ jobs:
           go-version-file: "go.mod"
       - name: setup env
         run: make install
-      - name: Add OpenCL support for Linux
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: sudo apt-get update -q && sudo apt-get install -qy ocl-icd-opencl-dev libpocl2 clinfo
-      - name: Add OpenCL support for Windows
-        if: ${{ matrix.os == 'windows-latest' }}
-        run: choco install opencl-intel-cpu-runtime
       - name: Clear test cache
         run: make clear-test-cache
       - name: unit tests
@@ -83,3 +99,84 @@ jobs:
         with:
           report_paths: "**/unit-tests.xml"
           annotate_only: true
+
+  build:
+    name: Build postcli
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    needs:
+      - unittests
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+        - ubuntu-latest
+        - [self-hosted, linux, arm64]
+        - macos-latest
+        - [self-hosted, macos, arm64]
+        - windows-latest
+    steps:
+      - name: Add OpenCL support - Ubuntu
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: sudo apt-get update -q && sudo apt-get install -qy ocl-icd-opencl-dev libpocl2
+      - name: Override SDKROOT for macOS
+        if: ${{ contains(matrix.os, 'macos') && runner.arch == 'arm64' }}
+        run: echo "SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX12.3.sdk" >> $GITHUB_ENV
+      - name: disable Windows Defender - Windows
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
+      - name: checkout
+        uses: actions/checkout@v3
+      - name: set up go
+        uses: actions/setup-go@v4
+        with:
+          check-latest: true
+          go-version-file: "go.mod"
+      - name: setup env
+        run: make install
+      - name: build postcli
+        run: make build
+      - name: Prepare release archive
+        shell: bash
+        run: |
+          rm -f ./build/post.h
+          cp ./cmd/postcli/README.md ./build/
+      - name: Set name of release archive
+        shell: bash
+        run: |
+          if [[ ${{ runner.arch }} == "ARM64" ]]; then
+            echo "OUTNAME=${{ runner.os }}_${{ runner.arch }}" >> $GITHUB_ENV
+          else
+            echo "OUTNAME=${{ runner.os }}" >> $GITHUB_ENV
+          fi
+      - name: Archive postcli artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: postcli-${{ env.OUTNAME }}.zip
+          path: ./build/*
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ${{ github.workspace }}/assets
+      - name: Create archives
+        run: |
+          mkdir ./artifacts;
+          for dir in ./assets/*/; do
+            7z a -tzip "${{ github.workspace }}/artifacts/$(basename $dir)" "$dir/*";
+          done
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ github.workspace }}/artifacts/*.zip
+          prerelease: false
+          draft: true
+          fail_on_unmatched_files: true

@@ -24,7 +24,6 @@ import (
 type (
 	Config              = config.Config
 	InitOpts            = config.InitOpts
-	Proof               = shared.Proof
 	Logger              = zap.Logger
 	ConfigMismatchError = shared.ConfigMismatchError
 	Provider            = postrs.Provider
@@ -38,12 +37,6 @@ const (
 	StatusInitializing
 	StatusCompleted
 	StatusError
-)
-
-var (
-	ErrAlreadyInitializing          = errors.New("already initializing")
-	ErrCannotResetWhileInitializing = errors.New("cannot reset while initializing")
-	ErrStateMetadataFileMissing     = errors.New("metadata file is missing")
 )
 
 // Providers returns a list of available compute providers.
@@ -67,6 +60,7 @@ type option struct {
 
 	logger            *Logger
 	powDifficultyFunc func(uint64) []byte
+	referenceOracle   *oracle.WorkOracle
 }
 
 func (o *option) validate() error {
@@ -153,6 +147,18 @@ func withDifficultyFunc(powDifficultyFunc func(uint64) []byte) OptionFunc {
 	}
 }
 
+// withReferenceOracle sets the reference oracle for the initializer.
+// NOTE: This is an internal option for tests and should not be used by external packages.
+func withReferenceOracle(referenceOracle *oracle.WorkOracle) OptionFunc {
+	return func(opts *option) error {
+		if referenceOracle == nil {
+			return errors.New("reference oracle is nil")
+		}
+		opts.referenceOracle = referenceOracle
+		return nil
+	}
+}
+
 // Initializer is responsible for initializing a new PoST commitment.
 type Initializer struct {
 	nodeId          []byte
@@ -172,6 +178,7 @@ type Initializer struct {
 	mtx              sync.RWMutex
 
 	logger            *Logger
+	referenceOracle   *oracle.WorkOracle
 	powDifficultyFunc func(uint64) []byte
 }
 
@@ -201,6 +208,7 @@ func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 		diskState:         NewDiskState(options.initOpts.DataDir, uint(config.BitsPerLabel)),
 		logger:            options.logger,
 		powDifficultyFunc: options.powDifficultyFunc,
+		referenceOracle:   options.referenceOracle,
 	}
 
 	numLabelsWritten, err := init.diskState.NumLabelsWritten()
@@ -235,19 +243,25 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 	defer init.mtx.Unlock()
 
-	layout := deriveFilesLayout(init.cfg, init.opts)
+	layout, err := deriveFilesLayout(init.cfg, init.opts)
+	if err != nil {
+		return err
+	}
+
 	init.logger.Info("initialization started",
 		zap.String("datadir", init.opts.DataDir),
 		zap.Uint32("numUnits", init.opts.NumUnits),
 		zap.Uint64("maxFileSize", init.opts.MaxFileSize),
 		zap.Uint64("labelsPerUnit", init.cfg.LabelsPerUnit),
 	)
+
 	init.logger.Info("initialization file layout",
-		zap.Uint("numFiles", layout.NumFiles),
 		zap.Uint64("labelsPerFile", layout.FileNumLabels),
 		zap.Uint64("labelsLastFile", layout.LastFileNumLabels),
+		zap.Int("firstFileIndex", layout.FirstFileIdx),
+		zap.Int("lastFileIndex", layout.LastFileIdx),
 	)
-	if err := init.removeRedundantFiles(layout); err != nil {
+	if err := removeRedundantFiles(init.cfg, init.opts, init.logger); err != nil {
 		return err
 	}
 
@@ -267,19 +281,39 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 	defer wo.Close()
 
-	for i := 0; i < int(layout.NumFiles); i++ {
+	woReference := init.referenceOracle
+	if woReference == nil {
+		woReference, err = oracle.New(
+			oracle.WithProviderID(CPUProviderID()),
+			oracle.WithCommitment(init.commitment),
+			oracle.WithVRFDifficulty(difficulty),
+			oracle.WithScryptParams(init.opts.Scrypt),
+			oracle.WithLogger(init.logger),
+		)
+		if err != nil {
+			return err
+		}
+		defer woReference.Close()
+	}
+
+	for i := layout.FirstFileIdx; i <= layout.LastFileIdx; i++ {
 		fileOffset := uint64(i) * layout.FileNumLabels
 		fileNumLabels := layout.FileNumLabels
-		if i == int(layout.NumFiles)-1 {
+		if i == layout.LastFileIdx {
 			fileNumLabels = layout.LastFileNumLabels
 		}
 
-		if err := init.initFile(ctx, wo, i, batchSize, fileOffset, fileNumLabels, difficulty); err != nil {
+		if err := init.initFile(ctx, wo, woReference, i, batchSize, fileOffset, fileNumLabels, difficulty); err != nil {
 			return err
 		}
 	}
 
 	if init.nonce.Load() != nil {
+		init.logger.Info("initialization: completed, found nonce", zap.Uint64("nonce", *init.nonce.Load()))
+		return nil
+	}
+	if layout.NumFiles() < init.opts.TotalFiles(init.cfg.LabelsPerUnit) {
+		init.logger.Info("initialization: no nonce found while computing labels")
 		return nil
 	}
 
@@ -326,22 +360,32 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	return fmt.Errorf("no nonce found")
 }
 
-func (init *Initializer) removeRedundantFiles(layout filesLayout) error {
-	numFiles, err := init.diskState.NumFilesWritten()
+func removeRedundantFiles(cfg config.Config, opts config.InitOpts, logger *zap.Logger) error {
+	// Go over all postdata_N.bin files in the data directory and remove the ones that are not needed.
+	// The files with indices from 0 to init.opts.TotalFiles(init.cfg.LabelsPerUnit) - 1 are preserved.
+	// The rest are redundant and can be removed.
+	maxFileIndex := opts.TotalFiles(cfg.LabelsPerUnit) - 1
+	logger.Debug("attempting to remove redundant files above index", zap.Int("maxFileIndex", maxFileIndex))
+
+	files, err := os.ReadDir(opts.DataDir)
 	if err != nil {
 		return err
 	}
-
-	for i := int(layout.NumFiles); i < numFiles; i++ {
-		name := shared.InitFileName(i)
-		init.logger.Info("initialization: removing redundant file",
-			zap.String("fileName", name),
-		)
-		if err := init.RemoveFile(name); err != nil {
-			return err
+	for _, file := range files {
+		name := file.Name()
+		fileIndex, err := shared.ParseFileIndex(name)
+		if err != nil && name != metadataFileName {
+			logger.Warn("found unrecognized file", zap.String("fileName", name))
+			continue
+		}
+		if fileIndex > maxFileIndex {
+			logger.Info("removing redundant file", zap.String("fileName", name))
+			path := filepath.Join(opts.DataDir, name)
+			if err := os.Remove(path); err != nil {
+				return fmt.Errorf("failed to delete file (%v): %w", path, err)
+			}
 		}
 	}
-
 	return nil
 }
 
@@ -371,19 +415,11 @@ func (init *Initializer) Reset() error {
 		}
 		name := file.Name()
 		if shared.IsInitFile(info) || name == metadataFileName {
-			if err := init.RemoveFile(name); err != nil {
-				return err
+			path := filepath.Join(init.opts.DataDir, name)
+			if err := os.Remove(path); err != nil {
+				return fmt.Errorf("failed to delete file (%v): %w", path, err)
 			}
 		}
-	}
-
-	return nil
-}
-
-func (init *Initializer) RemoveFile(name string) error {
-	path := filepath.Join(init.opts.DataDir, name)
-	if err := os.Remove(path); err != nil {
-		return fmt.Errorf("failed to delete file (%v): %w", path, err)
 	}
 
 	return nil
@@ -412,7 +448,7 @@ func (init *Initializer) Status() Status {
 	return StatusNotStarted
 }
 
-func (init *Initializer) initFile(ctx context.Context, wo *oracle.WorkOracle, fileIndex int, batchSize, fileOffset, fileNumLabels uint64, difficulty []byte) error {
+func (init *Initializer) initFile(ctx context.Context, wo, woReference *oracle.WorkOracle, fileIndex int, batchSize, fileOffset, fileNumLabels uint64, difficulty []byte) error {
 	fileTargetPosition := fileOffset + fileNumLabels
 
 	// Initialize the labels file writer.
@@ -485,12 +521,26 @@ func (init *Initializer) initFile(ctx context.Context, wo *oracle.WorkOracle, fi
 
 		res, err := wo.Positions(startPosition, endPosition)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to compute labels: %w", err)
+		}
+
+		// sanity check with reference oracle
+		reference, err := woReference.Position(endPosition)
+		if err != nil {
+			return fmt.Errorf("failed to compute reference label: %w", err)
+		}
+		if !bytes.Equal(res.Output[(batchSize-1)*postrs.LabelLength:], reference.Output) {
+			return ErrReferenceLabelMismatch{
+				Index:      endPosition,
+				Commitment: init.commitment,
+				Expected:   reference.Output,
+				Actual:     res.Output[(batchSize-1)*postrs.LabelLength:],
+			}
 		}
 
 		if res.Nonce != nil {
-			candidate := res.Output[(*res.Nonce-startPosition)*16:]
-			candidate = candidate[:16]
+			candidate := res.Output[(*res.Nonce-startPosition)*postrs.LabelLength:]
+			candidate = candidate[:postrs.LabelLength]
 
 			fields := []zap.Field{
 				zap.Int("fileIndex", fileIndex),
@@ -500,7 +550,7 @@ func (init *Initializer) initFile(ctx context.Context, wo *oracle.WorkOracle, fi
 			init.logger.Debug("initialization: found nonce", fields...)
 
 			if init.nonceValue == nil || bytes.Compare(candidate, init.nonceValue) < 0 {
-				nonceValue := make([]byte, 16)
+				nonceValue := make([]byte, postrs.LabelLength)
 				copy(nonceValue, candidate)
 
 				init.logger.Info("initialization: found new best nonce", fields...)
@@ -591,6 +641,7 @@ func (init *Initializer) saveMetadata() error {
 		NumUnits:        init.opts.NumUnits,
 		MaxFileSize:     init.opts.MaxFileSize,
 		Nonce:           init.nonce.Load(),
+		NonceValue:      init.nonceValue,
 		LastPosition:    init.lastPosition.Load(),
 	}
 	return SaveMetadata(init.opts.DataDir, &v)

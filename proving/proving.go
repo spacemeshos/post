@@ -29,7 +29,12 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		return nil, nil, err
 	}
 
-	result, err := postrs.GenerateProof(options.datadir, ch, logger, options.nonces, options.threads, cfg.K1, cfg.K2, cfg.PowDifficulty, options.powFlags)
+	provingOpts := []postrs.PostOptionFunc{}
+	if options.powCreatorId != nil {
+		provingOpts = append(provingOpts, postrs.WithPowCreator(options.powCreatorId))
+	}
+
+	result, err := postrs.GenerateProof(options.datadir, ch, logger, options.nonces, options.threads, cfg.K1, cfg.K2, cfg.PowDifficulty, options.powFlags, provingOpts...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generating proof: %w", err)
 	}

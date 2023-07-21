@@ -35,7 +35,6 @@ func Test_Generate(t *testing.T) {
 	for numUnits := uint32(1); numUnits < 6; numUnits++ {
 		numUnits := numUnits
 		t.Run(fmt.Sprintf("numUnits=%d", numUnits), func(t *testing.T) {
-			t.Parallel()
 			r := require.New(t)
 			log := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
 
@@ -181,7 +180,7 @@ func Test_Generate_TestNetSettings(t *testing.T) {
 	cfg := config.DefaultConfig()
 
 	// Test-net settings:
-	cfg.LabelsPerUnit = 20 * KiB / 16 // 20kB unit
+	cfg.LabelsPerUnit = 20 * KiB / postrs.LabelLength // 20kB unit
 	cfg.K1 = 273
 	cfg.K2 = 300
 	cfg.K3 = 100

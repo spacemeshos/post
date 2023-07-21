@@ -1,6 +1,8 @@
 package verifying
 
 import (
+	"errors"
+
 	"github.com/spacemeshos/post/config"
 )
 
@@ -8,6 +10,8 @@ type option struct {
 	powFlags config.PowFlags
 	// scrypt parameters for labels initialization
 	labelScrypt config.ScryptParams
+
+	powCreatorId []byte
 }
 
 func defaultOpts() *option {
@@ -39,6 +43,16 @@ func WithLabelScryptParams(params config.ScryptParams) OptionFunc {
 func WithPowFlags(flags config.PowFlags) OptionFunc {
 	return func(o *option) error {
 		o.powFlags = flags
+		return nil
+	}
+}
+
+func WithPowCreator(id []byte) OptionFunc {
+	return func(o *option) error {
+		if len(id) != 32 {
+			return errors.New("pow creator id must be 32 bytes")
+		}
+		o.powCreatorId = id
 		return nil
 	}
 }

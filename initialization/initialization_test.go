@@ -1,11 +1,14 @@
 package initialization
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"math/big"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -16,6 +19,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/oracle"
 	"github.com/spacemeshos/post/persistence"
 	"github.com/spacemeshos/post/shared"
 	"github.com/spacemeshos/post/verifying"
@@ -64,31 +68,6 @@ func TestInitialize(t *testing.T) {
 		LabelsPerUnit:   cfg.LabelsPerUnit,
 	}
 	require.NoError(t, verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
-}
-
-func TestMaxFileSize(t *testing.T) {
-	r := require.New(t)
-
-	cfg := Config{
-		LabelsPerUnit: 128,
-	}
-	opts := InitOpts{
-		NumUnits:    10,
-		MaxFileSize: 2048,
-	}
-
-	layout := deriveFilesLayout(cfg, opts)
-	r.Equal(10, int(layout.NumFiles))
-	r.Equal(128, int(layout.FileNumLabels))
-	r.Equal(128, int(layout.LastFileNumLabels))
-
-	opts.MaxFileSize = 2000
-
-	layout = deriveFilesLayout(cfg, opts)
-	r.Equal(10*128, 10*125+30)
-	r.Equal(11, int(layout.NumFiles))
-	r.Equal(125, int(layout.FileNumLabels))
-	r.Equal(30, int(layout.LastFileNumLabels))
 }
 
 func TestInitialize_PowOutOfRange(t *testing.T) {
@@ -211,8 +190,12 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(err)
 	r.Equal(origNonce, *m.Nonce)
 
-	// no nonce found and lastPos not set finds a higher nonce than numLabels
+	// no nonce found and lastPos not set finds a nonce higher than numLabels
+	// e.g. when initialized in chunks and no nonce was found in any chunk
+	// starting smeshing in go-spacemesh will then continue to search outside
+	// the range of the PoST
 	m.Nonce = nil
+	m.LastPosition = nil
 	r.NoError(SaveMetadata(opts.DataDir, m))
 
 	init, err = NewInitializer(
@@ -533,16 +516,18 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 
 		numFiles, err := init.diskState.NumFilesWritten()
 		r.NoError(err)
-		layout := deriveFilesLayout(cfg, opts)
-		r.Equal(int(layout.NumFiles), numFiles)
+		layout, err := deriveFilesLayout(cfg, opts)
+		r.NoError(err)
+		r.Equal(layout.NumFiles(), numFiles)
 
 		r.NoError(newInit.Initialize(ctx))
 
 		numFiles, err = newInit.diskState.NumFilesWritten()
 		r.NoError(err)
-		newLayout := deriveFilesLayout(cfg, newOpts)
-		r.Equal(int(newLayout.NumFiles), numFiles)
-		r.Less(newLayout.NumFiles, layout.NumFiles)
+		newLayout, err := deriveFilesLayout(cfg, newOpts)
+		r.NoError(err)
+		r.Equal(newLayout.NumFiles(), numFiles)
+		r.Less(newLayout.NumFiles(), layout.NumFiles())
 
 		cancel()
 		eg.Wait()
@@ -557,7 +542,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 	opts.Scrypt.N = 16
 	opts.DataDir = t.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.MaxFileSize = uint64(opts.NumUnits) * cfg.LabelsPerUnit * config.BitsPerLabel / 8
+	opts.MaxFileSize = cfg.UnitSize()
 	opts.ProviderID = int(CPUProviderID())
 
 	var oneFileData []byte
@@ -593,8 +578,9 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			opts.MaxFileSize /= uint64(numFiles)
 			opts.DataDir = t.TempDir()
 
-			layout := deriveFilesLayout(cfg, opts)
-			require.Equal(t, numFiles, int(layout.NumFiles))
+			layout, err := deriveFilesLayout(cfg, opts)
+			require.NoError(t, err)
+			require.Equal(t, numFiles, layout.NumFiles())
 
 			init, err := NewInitializer(
 				WithNodeId(nodeId),
@@ -836,7 +822,54 @@ func TestValidateComputeBatchSize(t *testing.T) {
 		WithInitOpts(opts),
 		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
-	assert.Error(t, err)
+	require.Error(t, err)
+}
+
+func TestWrongLabelsDetected(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
+	opts.ProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 16
+
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
+
+	woReference, err := oracle.New(
+		oracle.WithProviderID(CPUProviderID()),
+		oracle.WithCommitment(make([]byte, 32)), // different commitment to trigger error
+		oracle.WithScryptParams(opts.Scrypt),
+		oracle.WithVRFDifficulty(make([]byte, 32)),
+		oracle.WithLogger(logger),
+	)
+	require.NoError(t, err)
+	defer woReference.Close()
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(logger),
+		withReferenceOracle(woReference),
+	)
+	require.NoError(t, err)
+
+	err = init.Initialize(context.Background())
+
+	var errWrongLabels ErrReferenceLabelMismatch
+	require.ErrorAs(t, err, &errWrongLabels)
+	require.Equal(t, oracle.CommitmentBytes(nodeId, commitmentAtxId), errWrongLabels.Commitment)
+	require.Equal(t, uint64(1<<12-1), errWrongLabels.Index)
+	reference, err := init.referenceOracle.Position(errWrongLabels.Index)
+	require.NoError(t, err)
+	require.Equal(t, reference.Output, errWrongLabels.Expected)
+	require.Equal(t, len(reference.Output), len(errWrongLabels.Actual))
+	require.NotEqual(t, reference.Output, errWrongLabels.Actual)
+
+	require.Equal(t, uint64(0), init.NumLabelsWritten())
 }
 
 func assertNumLabelsWritten(ctx context.Context, t *testing.T, init *Initializer) func() error {
@@ -867,4 +900,215 @@ func initData(datadir string) ([]byte, error) {
 	defer reader.Close()
 
 	return io.ReadAll(reader)
+}
+
+func TestInitializeSubset(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 128
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = 20
+	opts.MaxFileSize = 2 * cfg.UnitSize() // 2 units per file
+	opts.ProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 2
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+	)
+	require.NoError(t, err)
+	err = init.Initialize(context.Background())
+	require.NoError(t, err)
+
+	optsSubset := opts
+	optsSubset.DataDir = t.TempDir()
+	optsSubset.FromFileIdx = 3
+	optsSubset.ToFileIdx = new(int)
+	*optsSubset.ToFileIdx = 4
+
+	initSubset, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(optsSubset),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+	)
+	require.NoError(t, err)
+	require.NoError(t, initSubset.Initialize(context.Background()))
+
+	// Verify that the subset is a subset of the full set
+	fullData, err := initData(opts.DataDir)
+	require.NoError(t, err)
+	subsetData, err := initData(optsSubset.DataDir)
+	require.NoError(t, err)
+	require.True(t, bytes.Contains(fullData, subsetData))
+
+	// Verify that the subset contains files 3 and 4, but not 0-2 and 5
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_0.bin"))
+	require.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_1.bin"))
+	require.ErrorIs(t, err, os.ErrNotExist)
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_2.bin"))
+	require.ErrorIs(t, err, os.ErrNotExist)
+
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_3.bin"))
+	require.NoError(t, err)
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_4.bin"))
+	require.NoError(t, err)
+
+	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_5.bin"))
+	require.ErrorIs(t, err, os.ErrNotExist)
+
+	// Verify that postdata_3.bin from both initializations contain the same data
+	fullPostdata3, err := os.ReadFile(filepath.Join(opts.DataDir, "postdata_3.bin"))
+	require.NoError(t, err)
+	subsetPostdata3, err := os.ReadFile(filepath.Join(optsSubset.DataDir, "postdata_3.bin"))
+	require.NoError(t, err)
+	require.Equal(t, fullPostdata3, subsetPostdata3)
+
+	// Verify that postdata_4.bin from both initializations contain the same data
+	fullPostdata4, err := os.ReadFile(filepath.Join(opts.DataDir, "postdata_4.bin"))
+	require.NoError(t, err)
+	subsetPostdata4, err := os.ReadFile(filepath.Join(optsSubset.DataDir, "postdata_4.bin"))
+	require.NoError(t, err)
+	require.Equal(t, fullPostdata4, subsetPostdata4)
+}
+
+func TestInitializeSubset_NoNonce(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 128
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.FromFileIdx = 3
+	opts.ToFileIdx = new(int)
+	*opts.ToFileIdx = 4
+	opts.NumUnits = 20
+	opts.MaxFileSize = 2 * cfg.UnitSize() // 2 units per file
+	opts.ProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 2
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+		// use a higher difficulty to make sure no Pow is found in the first `numLabels` labels.
+		withDifficultyFunc(func(numLabels uint64) []byte {
+			x := new(big.Int).Lsh(big.NewInt(1), 256)
+			x.Div(x, big.NewInt(int64(numLabels)))
+
+			difficulty := make([]byte, 32)
+			return x.FillBytes(difficulty)
+		}),
+	)
+	require.NoError(t, err)
+	require.NoError(t, init.Initialize(context.Background()))
+
+	require.Nil(t, init.Nonce()) // no nonce is found when initializing a subset
+
+	meta, err := LoadMetadata(opts.DataDir)
+	require.NoError(t, err)
+	require.Nil(t, meta.Nonce)
+
+	// completing initialization finds nonce outside range
+	opts.FromFileIdx = 0
+	opts.ToFileIdx = nil
+
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+		// use a higher difficulty to make sure no Pow is found in the first `numLabels` labels.
+		withDifficultyFunc(func(numLabels uint64) []byte {
+			x := new(big.Int).Lsh(big.NewInt(1), 256)
+			x.Div(x, big.NewInt(int64(numLabels)))
+
+			difficulty := make([]byte, 32)
+			return x.FillBytes(difficulty)
+		}),
+	)
+	require.NoError(t, err)
+	require.NoError(t, init.Initialize(context.Background()))
+
+	require.NotNil(t, init.Nonce())
+	m := &shared.VRFNonceMetadata{
+		NodeId:          nodeId,
+		CommitmentAtxId: commitmentAtxId,
+		NumUnits:        opts.NumUnits,
+		LabelsPerUnit:   cfg.LabelsPerUnit,
+	}
+	require.NoError(t, verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
+}
+
+func TestInitializeLastFileIsSmaller(t *testing.T) {
+	r := require.New(t)
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 128
+
+	opts := config.DefaultInitOpts()
+	opts.FromFileIdx = 1
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = 5 // the last file will have 1 unit
+	opts.MaxFileSize = 2 * cfg.UnitSize()
+	opts.ProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 2
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+	)
+	require.NoError(t, err)
+	err = init.Initialize(context.Background())
+	require.NoError(t, err)
+
+	// Verify that the first file contains 2 units
+	file, err := os.Stat(filepath.Join(opts.DataDir, "postdata_1.bin"))
+	r.NoError(err)
+	r.Equal(2*cfg.UnitSize(), uint64(file.Size()))
+
+	// Verify that the last file contains only 1 unit
+	file, err = os.Stat(filepath.Join(opts.DataDir, "postdata_2.bin"))
+	r.NoError(err)
+	r.Equal(cfg.UnitSize(), uint64(file.Size()))
+}
+
+func TestRemoveRedundantFiles(t *testing.T) {
+	cfg := config.DefaultConfig()
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = 3
+	opts.MaxFileSize = 2 * cfg.UnitSize()
+
+	expectedFilesCount := opts.TotalFiles(cfg.LabelsPerUnit)
+	// Create 2 redundant files
+	for i := 0; i < expectedFilesCount+2; i++ {
+		f, err := os.Create(filepath.Join(opts.DataDir, shared.InitFileName(i)))
+		require.NoError(t, err)
+		_, err = f.Write([]byte("test"))
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+	}
+
+	removeRedundantFiles(cfg, opts, zap.NewNop())
+
+	files, err := os.ReadDir(opts.DataDir)
+	require.NoError(t, err)
+	require.Len(t, files, expectedFilesCount)
+
+	for i := 0; i < expectedFilesCount; i++ {
+		_, err := os.Stat(filepath.Join(opts.DataDir, shared.InitFileName(i)))
+		require.NoError(t, err)
+	}
 }

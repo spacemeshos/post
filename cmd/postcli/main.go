@@ -8,12 +8,14 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
 
 	"github.com/davecgh/go-spew/spew"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
@@ -23,23 +25,44 @@ import (
 	"github.com/spacemeshos/post/verifying"
 )
 
+const edKeyFileName = "key.bin"
+
 var (
-	cfg                = config.DefaultConfig()
-	opts               = config.DefaultInitOpts()
-	printProviders     bool
-	printConfig        bool
-	genProof           bool
+	cfg  = config.MainnetConfig()
+	opts = config.MainnetInitOpts()
+
+	searchForNonce bool
+	printProviders bool
+	printNumFiles  bool
+	printConfig    bool
+	genProof       bool
+
+	verifyPos bool
+	fraction  float64
+
 	idHex              string
 	id                 []byte
 	commitmentAtxIdHex string
 	commitmentAtxId    []byte
 	reset              bool
+
+	logLevel zapcore.Level
+
+	ErrKeyFileExists = errors.New("key file already exists")
 )
 
 func parseFlags() {
+	flag.BoolVar(&verifyPos, "verify", false, "verify initialized data")
+	flag.Float64Var(&fraction, "fraction", 0.2, "how much % of POS data to verify. Sane values are < 1.0")
+
+	flag.TextVar(&logLevel, "logLevel", zapcore.InfoLevel, "log level (debug, info, warn, error, dpanic, panic, fatal)")
+
+	flag.BoolVar(&searchForNonce, "searchForNonce", false, "search for VRF nonce in already initialized files")
 	flag.BoolVar(&printProviders, "printProviders", false, "print the list of compute providers")
+	flag.BoolVar(&printNumFiles, "printNumFiles", false, "print the total number of files that would be initialized")
 	flag.BoolVar(&printConfig, "printConfig", false, "print the used config and options")
 	flag.BoolVar(&genProof, "genproof", false, "generate proof as a sanity test, after initialization")
+
 	flag.StringVar(&opts.DataDir, "datadir", opts.DataDir, "filesystem datadir path")
 	flag.Uint64Var(&opts.MaxFileSize, "maxFileSize", opts.MaxFileSize, "max file size")
 	flag.IntVar(&opts.ProviderID, "provider", opts.ProviderID, "compute provider id (required)")
@@ -48,8 +71,17 @@ func parseFlags() {
 	flag.StringVar(&idHex, "id", "", "miner's id (public key), in hex (will be auto-generated if not provided)")
 	flag.StringVar(&commitmentAtxIdHex, "commitmentAtxId", "", "commitment atx id, in hex (required)")
 	numUnits := flag.Uint64("numUnits", uint64(opts.NumUnits), "number of units")
+
+	flag.IntVar(&opts.FromFileIdx, "fromFile", 0, "index of the first file to init (inclusive)")
+	var to int
+	flag.IntVar(&to, "toFile", math.MaxInt, "index of the last file to init (inclusive). Will init to the end of declared space if not provided.")
 	flag.Parse()
 
+	// A workaround to simulate an optional value w/o a default ¯\_(ツ)_/¯
+	// The default will be known later, after parsing the flags.
+	if to != math.MaxInt {
+		opts.ToFileIdx = &to
+	}
 	opts.NumUnits = uint32(*numUnits) // workaround the missing type support for uint32
 }
 
@@ -67,6 +99,10 @@ func processFlags() error {
 		return fmt.Errorf("invalid commitmentAtxId: %w", err)
 	}
 
+	if (opts.FromFileIdx != 0 || opts.ToFileIdx != nil) && idHex == "" {
+		return errors.New("-id flag is required when using -fromFile or -toFile")
+	}
+
 	if idHex == "" {
 		pub, priv, err := ed25519.GenerateKey(nil)
 		if err != nil {
@@ -74,15 +110,12 @@ func processFlags() error {
 		}
 		id = pub
 		log.Printf("cli: generated id %x\n", id)
-		saveKey(priv) // The key will need to be loaded in clients for the PoST data to be usable.
-	} else {
-		var err error
-		id, err = hex.DecodeString(idHex)
-		if err != nil {
-			return fmt.Errorf("invalid id: %w", err)
-		}
+		return saveKey(priv)
 	}
-
+	id, err = hex.DecodeString(idHex)
+	if err != nil {
+		return fmt.Errorf("invalid id: %w", err)
+	}
 	return nil
 }
 
@@ -98,19 +131,77 @@ func main() {
 		return
 	}
 
+	if printNumFiles {
+		totalFiles := opts.TotalFiles(cfg.LabelsPerUnit)
+		fmt.Println(totalFiles)
+		return
+	}
+
 	if printConfig {
 		spew.Dump(cfg)
 		spew.Dump(opts)
 		return
 	}
 
-	if err := processFlags(); err != nil {
-		log.Fatalln("failed to process flags", err)
+	zapCfg := zap.Config{
+		Level:    zap.NewAtomicLevelAt(logLevel),
+		Encoding: "console",
+		EncoderConfig: zapcore.EncoderConfig{
+			TimeKey:        "T",
+			LevelKey:       "L",
+			NameKey:        "N",
+			MessageKey:     "M",
+			LineEnding:     zapcore.DefaultLineEnding,
+			EncodeLevel:    zapcore.CapitalLevelEncoder,
+			EncodeTime:     zapcore.ISO8601TimeEncoder,
+			EncodeDuration: zapcore.StringDurationEncoder,
+		},
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
 	}
 
-	zapLog, err := zap.NewProduction()
+	logger, err := zapCfg.Build()
 	if err != nil {
 		log.Fatalln("failed to initialize zap logger:", err)
+	}
+
+	if verifyPos {
+		if cmdVerifyPos(opts, fraction, logger) != nil {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	if searchForNonce {
+		nonce, label, err := initialization.SearchForNonce(
+			ctx,
+			cfg,
+			opts,
+			initialization.SearchWithLogger(logger),
+		)
+		switch {
+		case errors.Is(err, context.Canceled):
+			log.Println("cli: search for nonce interrupted")
+			if label != nil {
+				log.Printf("cli: nonce found so far: Nonce: %d | Label: %X\n", nonce, label)
+			}
+		case err != nil:
+			log.Fatalf("cli: search for nonce failed: %v", err)
+		default:
+			log.Printf("cli: search for nonce completed. Nonce: %d | Label: %X\n", nonce, label)
+		}
+		return
+	}
+
+	err = processFlags()
+	switch {
+	case errors.Is(err, ErrKeyFileExists):
+		log.Fatalln("cli: key file already exists. This appears to be a mistake. If you're trying to initialize a new identity delete key.bin and try again otherwise specify identity with `-id` flag")
+	case err != nil:
+		log.Fatalln("failed to process flags", err)
 	}
 
 	init, err := initialization.NewInitializer(
@@ -118,7 +209,7 @@ func main() {
 		initialization.WithInitOpts(opts),
 		initialization.WithNodeId(id),
 		initialization.WithCommitmentAtxId(commitmentAtxId),
-		initialization.WithLogger(zapLog),
+		initialization.WithLogger(logger),
 	)
 	if err != nil {
 		log.Panic(err.Error())
@@ -131,9 +222,6 @@ func main() {
 		log.Println("cli: reset completed")
 		return
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
 
 	err = init.Initialize(ctx)
 	switch {
@@ -153,7 +241,7 @@ func main() {
 	if genProof {
 		log.Println("cli: generating proof as a sanity test")
 
-		proof, proofMetadata, err := proving.Generate(ctx, shared.ZeroChallenge, cfg, zapLog, proving.WithDataSource(cfg, id, commitmentAtxId, opts.DataDir))
+		proof, proofMetadata, err := proving.Generate(ctx, shared.ZeroChallenge, cfg, logger, proving.WithDataSource(cfg, id, commitmentAtxId, opts.DataDir))
 		if err != nil {
 			log.Fatalln("proof generation error", err)
 		}
@@ -162,7 +250,7 @@ func main() {
 			log.Fatalln("failed to create verifier", err)
 		}
 		defer verifier.Close()
-		if err := verifier.Verify(proof, proofMetadata, cfg, zapLog); err != nil {
+		if err := verifier.Verify(proof, proofMetadata, cfg, logger); err != nil {
 			log.Fatalln("failed to verify test proof", err)
 		}
 
@@ -170,13 +258,41 @@ func main() {
 	}
 }
 
-func saveKey(key []byte) error {
-	if err := os.MkdirAll(opts.DataDir, shared.OwnerReadWriteExec); err != nil && !os.IsExist(err) {
+func saveKey(key ed25519.PrivateKey) error {
+	if err := os.MkdirAll(opts.DataDir, 0o700); err != nil && !os.IsExist(err) {
 		return fmt.Errorf("mkdir error: %w", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(opts.DataDir, "key.bin"), key, shared.OwnerReadWrite); err != nil {
+	filename := filepath.Join(opts.DataDir, edKeyFileName)
+	if _, err := os.Stat(filename); err == nil {
+		return ErrKeyFileExists
+	}
+
+	if err := os.WriteFile(filename, []byte(hex.EncodeToString(key)), 0o600); err != nil {
 		return fmt.Errorf("key write to disk error: %w", err)
 	}
 	return nil
+}
+
+func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) error {
+	params := postrs.TranslateScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)
+	verifyOpts := []postrs.VerifyPosOptionsFunc{
+		postrs.WithFraction(fraction),
+		postrs.FromFile(uint32(opts.FromFileIdx)),
+		postrs.VerifyPosWithLogger(logger),
+	}
+	if opts.ToFileIdx != nil {
+		verifyOpts = append(verifyOpts, postrs.ToFile(uint32(*opts.ToFileIdx)))
+	}
+
+	err := postrs.VerifyPos(opts.DataDir, params, verifyOpts...)
+	switch {
+	case err == nil:
+		log.Println("cli: POS data is valid")
+	case errors.Is(err, postrs.ErrInvalidPos):
+		log.Printf("cli: %v\n", err)
+	default:
+		log.Printf("cli: failed (%v)\n", err)
+	}
+	return err
 }
