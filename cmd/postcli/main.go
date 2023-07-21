@@ -169,10 +169,17 @@ func main() {
 			opts,
 			initialization.SearchWithLogger(logger),
 		)
-		if err != nil {
-			log.Fatalln("search for nonce error", err)
+		switch {
+		case errors.Is(err, context.Canceled):
+			log.Println("cli: search for nonce interrupted")
+			if label != nil {
+				log.Printf("cli: nonce found so far: Nonce: %d | Label: %X\n", nonce, label)
+			}
+		case err != nil:
+			log.Fatalf("cli: search for nonce failed: %v", err)
+		default:
+			log.Printf("cli: search for nonce completed. Nonce: %d | Label: %X\n", nonce, label)
 		}
-		log.Printf("cli: search for nonce completed. Nonce: %d | Label: %X\n", nonce, label)
 		return
 	}
 

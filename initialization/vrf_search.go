@@ -111,36 +111,48 @@ func SearchForNonce(ctx context.Context, cfg Config, initOpts InitOpts, opts ...
 		}
 		defer file.Close()
 
-		idx, l, err := searchForNonce(ctx, bufio.NewReader(file), difficulty, woReference)
-		if err != nil {
-			return 0, nil, fmt.Errorf("failed to search for nonce: %w", err)
-		}
-		if l != nil {
-			nonceValue = l
+		idx, label, err := searchForNonce(ctx, bufio.NewReader(file), difficulty, woReference)
+		if label != nil {
+			nonceValue = label
 			nonce = firstLabelIndex + idx
-			logger.Info("found nonce", zap.Uint64("index", nonce), zap.String("label", hex.EncodeToString(nonceValue)))
+			if err := persistNonce(nonce, nonceValue, metadata, initOpts.DataDir, logger); err != nil {
+				return nonce, nonceValue, err
+			}
 			difficulty = nonceValue // override difficulty to the new lowest label
+		}
 
+		switch {
+		case errors.Is(err, context.Canceled):
+			logger.Info("search for nonce interrupted", zap.Uint64("nonce", nonce), zap.String("nonceValue", hex.EncodeToString(nonceValue)))
+			return nonce, nonceValue, err
+		case err != nil:
+			return 0, nil, fmt.Errorf("failed to search for nonce: %w", err)
 		}
 	}
 	if nonceValue != nil {
-		logger.Info("updating postdata_metadata.json with found nonce", zap.Uint64("nonce", nonce), zap.String("NonceValue", hex.EncodeToString(nonceValue)))
-		metadata.Nonce = &nonce
-		metadata.NonceValue = shared.NonceValue(nonceValue)
-		SaveMetadata(initOpts.DataDir, metadata)
 		return nonce, nonceValue, nil
 	}
 	return 0, nil, ErrNonceNotFound
 }
 
+func persistNonce(nonce uint64, label []byte, metadata *shared.PostMetadata, datadir string, logger *zap.Logger) error {
+	logger.Info("found nonce: updating postdata_metadata.json", zap.Uint64("nonce", nonce), zap.String("NonceValue", hex.EncodeToString(label)))
+	metadata.Nonce = &nonce
+	metadata.NonceValue = shared.NonceValue(label)
+	if err := SaveMetadata(datadir, metadata); err != nil {
+		return fmt.Errorf("failed to save metadata: %w", err)
+	}
+	return nil
+}
+
 // searchForNonce searches for a nonce in the given reader.
 func searchForNonce(ctx context.Context, r io.Reader, difficulty []byte, oracle *oracle.WorkOracle) (nonce uint64, nonceValue []byte, err error) {
 	labelBuf := make([]byte, postrs.LabelLength)
-	labelIndex := uint64(0)
-	for {
+
+	for labelIndex := uint64(0); ; labelIndex++ {
 		select {
 		case <-ctx.Done():
-			return nonce, labelBuf, ctx.Err()
+			return nonce, nonceValue, ctx.Err()
 		default:
 			// continue looking for a nonce
 		}
@@ -150,7 +162,7 @@ func searchForNonce(ctx context.Context, r io.Reader, difficulty []byte, oracle 
 		case err == io.EOF:
 			return nonce, nonceValue, nil
 		case err == io.ErrUnexpectedEOF:
-			return 0, nil, errors.New("unexpected end of file - file is truncated. please reinit it")
+			return 0, nil, fmt.Errorf("file appears truncated. please re-init it: %w", err)
 		}
 
 		ok, err := checkLabel(labelIndex, labelBuf, difficulty, oracle)
@@ -162,7 +174,6 @@ func searchForNonce(ctx context.Context, r io.Reader, difficulty []byte, oracle 
 			nonceValue = append(nonceValue[:0], labelBuf...)
 			difficulty = nonceValue // override difficulty to the new lowest label
 		}
-		labelIndex++
 	}
 }
 
@@ -170,8 +181,8 @@ func searchForNonce(ctx context.Context, r io.Reader, difficulty []byte, oracle 
 // It will regenerate the whole 32B of the label if its most significant 16B are equal to difficulty
 // in order to check the lower bytes.
 // * index:      the index of the label (used to regenerate it)
-// * label:		 16B most significant bytes of the label
-// * difficulty: all 32b of the difficulty
+// * label:      16B most significant bytes of the label
+// * difficulty: 32b of the difficulty
 // * wo:         the oracle used to regenerate the label.
 func checkLabel(index uint64, label, difficulty []byte, wo *oracle.WorkOracle) (bool, error) {
 	comp := bytes.Compare(label, difficulty)
