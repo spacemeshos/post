@@ -8,12 +8,15 @@ import "C"
 import (
 	"errors"
 	"unsafe"
+
+	"go.uber.org/zap"
 )
 
 type VerifyPosOptions struct {
 	fromFile *uint32
 	toFile   *uint32
 	fraction float64
+	logger   *zap.Logger
 }
 
 var ErrInvalidPos = errors.New("invalid POS")
@@ -41,6 +44,13 @@ func WithFraction(fraction float64) VerifyPosOptionsFunc {
 	}
 }
 
+func VerifyPosWithLogger(logger *zap.Logger) VerifyPosOptionsFunc {
+	return func(o *VerifyPosOptions) error {
+		o.logger = logger
+		return nil
+	}
+}
+
 func VerifyPos(dataDir string, scryptParams ScryptParams, o ...VerifyPosOptionsFunc) error {
 	opts := &VerifyPosOptions{
 		fraction: 5.0,
@@ -50,6 +60,10 @@ func VerifyPos(dataDir string, scryptParams ScryptParams, o ...VerifyPosOptionsF
 		if err := opt(opts); err != nil {
 			return err
 		}
+	}
+
+	if opts.logger != nil {
+		setLogCallback(opts.logger)
 	}
 
 	dataDirPtr := C.CString(dataDir)

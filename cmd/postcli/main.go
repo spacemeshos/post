@@ -165,10 +165,8 @@ func main() {
 		log.Fatalln("failed to initialize zap logger:", err)
 	}
 
-	postrs.SetLogCallback(logger)
-
 	if verifyPos {
-		if cmdVerifyPos(opts, fraction) != nil {
+		if cmdVerifyPos(opts, fraction, logger) != nil {
 			os.Exit(1)
 		}
 		os.Exit(0)
@@ -276,11 +274,12 @@ func saveKey(key ed25519.PrivateKey) error {
 	return nil
 }
 
-func cmdVerifyPos(opts config.InitOpts, fraction float64) error {
+func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) error {
 	params := postrs.TranslateScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)
 	verifyOpts := []postrs.VerifyPosOptionsFunc{
 		postrs.WithFraction(fraction),
 		postrs.FromFile(uint32(opts.FromFileIdx)),
+		postrs.VerifyPosWithLogger(logger),
 	}
 	if opts.ToFileIdx != nil {
 		verifyOpts = append(verifyOpts, postrs.ToFile(uint32(*opts.ToFileIdx)))
