@@ -70,6 +70,59 @@ func TestInitialize(t *testing.T) {
 	require.NoError(t, verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
 }
 
+func TestInitialize_BeforeNonceValue(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1 << 12
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = cfg.MinNumUnits
+	opts.ProviderID = int(CPUProviderID())
+	opts.Scrypt.N = 16
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+	)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	require.NoError(t, init.Initialize(ctx))
+	cancel()
+	require.Equal(t, uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+
+	meta, err := LoadMetadata(opts.DataDir)
+	require.NoError(t, err)
+	require.NotNil(t, meta.Nonce)
+	require.NotNil(t, meta.NonceValue)
+	nonceValue := meta.NonceValue
+
+	// delete nonce value
+	meta.NonceValue = nil
+	require.NoError(t, SaveMetadata(opts.DataDir, meta))
+
+	// just creating a new initializer should update the metadata
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, init)
+
+	meta, err = LoadMetadata(opts.DataDir)
+	require.NoError(t, err)
+	require.NotNil(t, meta.Nonce)
+	require.NotNil(t, meta.NonceValue)
+	require.Equal(t, nonceValue, meta.NonceValue)
+}
+
 func TestInitialize_PowOutOfRange(t *testing.T) {
 	r := require.New(t)
 
@@ -152,6 +205,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 
 	// trying again returns same nonce
 	origNonce := *init.Nonce()
+	origNonceValue := init.NonceValue()
 	init, err = NewInitializer(
 		WithNodeId(nodeId),
 		WithCommitmentAtxId(commitmentAtxId),
@@ -167,6 +221,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
 	r.Equal(origNonce, *m.Nonce)
+	r.EqualValues(origNonceValue, m.NonceValue)
 	r.Nil(m.LastPosition)
 
 	// lastPos lower than numLabels is ignored
@@ -213,6 +268,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	m, err = LoadMetadata(opts.DataDir)
 	r.NoError(err)
 	r.NotNil(m.Nonce)
+	r.NotNil(m.NonceValue)
 	r.NotNil(m.LastPosition)
 	r.LessOrEqual(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.LastPosition)
 	r.LessOrEqual(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.Nonce)
@@ -547,6 +603,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 
 	var oneFileData []byte
 	var oneFileNonce uint64
+	var oneFileNonceValue []byte
 
 	t.Run("NumFiles: 1", func(t *testing.T) {
 		init, err := NewInitializer(
@@ -570,6 +627,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 		}
 		require.NoError(t, verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
 		oneFileNonce = *init.Nonce()
+		oneFileNonceValue = init.NonceValue()
 	})
 
 	for numFiles := 2; numFiles <= 16; numFiles *= 2 {
@@ -605,6 +663,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			}
 			require.NoError(t, verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
 			require.Equal(t, oneFileNonce, *init.Nonce())
+			require.Equal(t, oneFileNonceValue, init.NonceValue())
 		})
 	}
 }
@@ -1010,7 +1069,9 @@ func TestInitializeSubset_NoNonce(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, init.Initialize(context.Background()))
 
-	require.Nil(t, init.Nonce()) // no nonce is found when initializing a subset
+	// no nonce is found when initializing a subset
+	require.Nil(t, init.Nonce())
+	require.Nil(t, init.NonceValue())
 
 	meta, err := LoadMetadata(opts.DataDir)
 	require.NoError(t, err)
@@ -1039,6 +1100,7 @@ func TestInitializeSubset_NoNonce(t *testing.T) {
 	require.NoError(t, init.Initialize(context.Background()))
 
 	require.NotNil(t, init.Nonce())
+	require.NotNil(t, init.NonceValue())
 	m := &shared.VRFNonceMetadata{
 		NodeId:          nodeId,
 		CommitmentAtxId: commitmentAtxId,
