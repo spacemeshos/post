@@ -167,10 +167,7 @@ func main() {
 	}
 
 	if verifyPos {
-		if cmdVerifyPos(opts, fraction, logger) != nil {
-			os.Exit(1)
-		}
-		os.Exit(0)
+		cmdVerifyPos(opts, fraction, logger)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -275,32 +272,33 @@ func saveKey(key ed25519.PrivateKey) error {
 	return nil
 }
 
-func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) error {
+func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) {
 	log.Println("cli: verifying key.bin")
 
-	filename := filepath.Join(opts.DataDir, edKeyFileName)
-	data, err := os.ReadFile(filename)
+	keyPath := filepath.Join(opts.DataDir, edKeyFileName)
+	data, err := os.ReadFile(keyPath)
 	if err != nil {
-		return fmt.Errorf("key read from disk error: %w", err)
+		log.Fatalf("could not read private key from %s: %s\n", keyPath, err)
 	}
 
 	dst := make([]byte, ed25519.PrivateKeySize)
 	n, err := hex.Decode(dst, data)
 	if err != nil {
-		return fmt.Errorf("decoding private key: %w", err)
+		log.Fatalf("failed to decode private key from %s: %s\n", keyPath, err)
 	}
 	if n != ed25519.PrivateKeySize {
-		return fmt.Errorf("invalid key size %d, expected %d", n, ed25519.PrivateKeySize)
+		log.Fatalf("size of key (%d) not expected size %d\n", n, ed25519.PrivateKeySize)
 	}
 	pub := ed25519.NewKeyFromSeed(dst).Public().(ed25519.PublicKey)
 
+	metafile := filepath.Join(opts.DataDir, initialization.MetadataFileName)
 	meta, err := initialization.LoadMetadata(opts.DataDir)
 	if err != nil {
-		return fmt.Errorf("failed to load metadata: %w", err)
+		log.Fatalf("failed to load metadata from %s: %s\n", opts.DataDir, err)
 	}
 
 	if !bytes.Equal(meta.NodeId, pub) {
-		return fmt.Errorf("failed to verify node id (%x) against key.bin", meta.NodeId)
+		log.Fatalf("NodeID in %s (%x) does not match public key from key.bin (%x)", metafile, meta.NodeId, pub)
 	}
 
 	log.Println("cli: key.bin is valid")
@@ -320,10 +318,10 @@ func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) er
 	switch {
 	case err == nil:
 		log.Println("cli: POS data is valid")
+		os.Exit(0)
 	case errors.Is(err, postrs.ErrInvalidPos):
-		log.Printf("cli: %v\n", err)
+		log.Fatalf("cli: %v\n", err)
 	default:
-		log.Printf("cli: failed (%v)\n", err)
+		log.Fatalf("cli: failed (%v)\n", err)
 	}
-	return err
 }
