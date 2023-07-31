@@ -9,7 +9,7 @@ import (
 	"github.com/spacemeshos/post/shared"
 )
 
-const metadataFileName = "postdata_metadata.json"
+const MetadataFileName = "postdata_metadata.json"
 
 func SaveMetadata(dir string, v *shared.PostMetadata) error {
 	err := os.MkdirAll(dir, shared.OwnerReadWriteExec)
@@ -22,7 +22,7 @@ func SaveMetadata(dir string, v *shared.PostMetadata) error {
 		return fmt.Errorf("serialization failure: %w", err)
 	}
 
-	err = os.WriteFile(filepath.Join(dir, metadataFileName), data, shared.OwnerReadWrite)
+	err = os.WriteFile(filepath.Join(dir, MetadataFileName), data, shared.OwnerReadWrite)
 	if err != nil {
 		return fmt.Errorf("write to disk failure: %w", err)
 	}
@@ -31,7 +31,7 @@ func SaveMetadata(dir string, v *shared.PostMetadata) error {
 }
 
 func LoadMetadata(dir string) (*shared.PostMetadata, error) {
-	filename := filepath.Join(dir, metadataFileName)
+	filename := filepath.Join(dir, MetadataFileName)
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {

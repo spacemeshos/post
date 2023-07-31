@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"encoding/hex"
@@ -166,9 +167,7 @@ func main() {
 	}
 
 	if verifyPos {
-		if cmdVerifyPos(opts, fraction, logger) != nil {
-			os.Exit(1)
-		}
+		cmdVerifyPos(opts, fraction, logger)
 		os.Exit(0)
 	}
 
@@ -274,7 +273,38 @@ func saveKey(key ed25519.PrivateKey) error {
 	return nil
 }
 
-func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) error {
+func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) {
+	log.Println("cli: verifying key.bin")
+
+	keyPath := filepath.Join(opts.DataDir, edKeyFileName)
+	data, err := os.ReadFile(keyPath)
+	if err != nil {
+		log.Fatalf("could not read private key from %s: %s\n", keyPath, err)
+	}
+
+	dst := make([]byte, ed25519.PrivateKeySize)
+	n, err := hex.Decode(dst, data)
+	if err != nil {
+		log.Fatalf("failed to decode private key from %s: %s\n", keyPath, err)
+	}
+	if n != ed25519.PrivateKeySize {
+		log.Fatalf("size of key (%d) not expected size %d\n", n, ed25519.PrivateKeySize)
+	}
+	pub := ed25519.NewKeyFromSeed(dst).Public().(ed25519.PublicKey)
+
+	metafile := filepath.Join(opts.DataDir, initialization.MetadataFileName)
+	meta, err := initialization.LoadMetadata(opts.DataDir)
+	if err != nil {
+		log.Fatalf("failed to load metadata from %s: %s\n", opts.DataDir, err)
+	}
+
+	if !bytes.Equal(meta.NodeId, pub) {
+		log.Fatalf("NodeID in %s (%x) does not match public key from key.bin (%x)", metafile, meta.NodeId, pub)
+	}
+
+	log.Println("cli: key.bin is valid")
+	log.Println("cli: verifying POS data")
+
 	params := postrs.TranslateScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)
 	verifyOpts := []postrs.VerifyPosOptionsFunc{
 		postrs.WithFraction(fraction),
@@ -285,14 +315,13 @@ func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) er
 		verifyOpts = append(verifyOpts, postrs.ToFile(uint32(*opts.ToFileIdx)))
 	}
 
-	err := postrs.VerifyPos(opts.DataDir, params, verifyOpts...)
+	err = postrs.VerifyPos(opts.DataDir, params, verifyOpts...)
 	switch {
 	case err == nil:
 		log.Println("cli: POS data is valid")
 	case errors.Is(err, postrs.ErrInvalidPos):
-		log.Printf("cli: %v\n", err)
+		log.Fatalf("cli: %v\n", err)
 	default:
-		log.Printf("cli: failed (%v)\n", err)
+		log.Fatalf("cli: failed (%v)\n", err)
 	}
-	return err
 }

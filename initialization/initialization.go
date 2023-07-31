@@ -407,7 +407,7 @@ func removeRedundantFiles(cfg config.Config, opts config.InitOpts, logger *zap.L
 	for _, file := range files {
 		name := file.Name()
 		fileIndex, err := shared.ParseFileIndex(name)
-		if err != nil && name != metadataFileName {
+		if err != nil && name != MetadataFileName {
 			logger.Warn("found unrecognized file", zap.String("fileName", name))
 			continue
 		}
@@ -457,7 +457,7 @@ func (init *Initializer) Reset() error {
 			continue
 		}
 		name := file.Name()
-		if shared.IsInitFile(info) || name == metadataFileName {
+		if shared.IsInitFile(info) || name == MetadataFileName {
 			path := filepath.Join(init.opts.DataDir, name)
 			if err := os.Remove(path); err != nil {
 				return fmt.Errorf("failed to delete file (%v): %w", path, err)
