@@ -159,6 +159,21 @@ func withReferenceOracle(referenceOracle *oracle.WorkOracle) OptionFunc {
 	}
 }
 
+// Lazy initialized value of type T.
+type LazyInit[T any] struct {
+	init     func() (T, error)
+	initOnce sync.Once
+	value    T
+	err      error
+}
+
+func (l *LazyInit[T]) Get() (T, error) {
+	l.initOnce.Do(func() {
+		l.value, l.err = l.init()
+	})
+	return l.value, l.err
+}
+
 // Initializer is responsible for initializing a new PoST commitment.
 type Initializer struct {
 	nodeId          []byte
@@ -302,31 +317,42 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	difficulty := init.powDifficultyFunc(numLabels)
 	batchSize := init.opts.ComputeBatchSize
 
-	wo, err := oracle.New(
-		oracle.WithProviderID(uint(init.opts.ProviderID)),
-		oracle.WithCommitment(init.commitment),
-		oracle.WithVRFDifficulty(difficulty),
-		oracle.WithScryptParams(init.opts.Scrypt),
-		oracle.WithLogger(init.logger),
-	)
-	if err != nil {
-		return err
-	}
-	defer wo.Close()
-
-	woReference := init.referenceOracle
-	if woReference == nil {
-		woReference, err = oracle.New(
-			oracle.WithProviderID(CPUProviderID()),
+	wo := &LazyInit[*oracle.WorkOracle]{init: func() (*oracle.WorkOracle, error) {
+		return oracle.New(
+			oracle.WithProviderID(uint(init.opts.ProviderID)),
 			oracle.WithCommitment(init.commitment),
 			oracle.WithVRFDifficulty(difficulty),
 			oracle.WithScryptParams(init.opts.Scrypt),
 			oracle.WithLogger(init.logger),
 		)
-		if err != nil {
-			return err
+	}}
+	defer func() {
+		if wo.value != nil {
+			wo.value.Close()
 		}
-		defer woReference.Close()
+	}()
+
+	var woReference *LazyInit[*oracle.WorkOracle]
+	if init.referenceOracle == nil {
+		woReference = &LazyInit[*oracle.WorkOracle]{init: func() (*oracle.WorkOracle, error) {
+			return oracle.New(
+				oracle.WithProviderID(CPUProviderID()),
+				oracle.WithCommitment(init.commitment),
+				oracle.WithVRFDifficulty(difficulty),
+				oracle.WithScryptParams(init.opts.Scrypt),
+				oracle.WithLogger(init.logger),
+			)
+		}}
+
+		defer func() {
+			if woReference.value != nil {
+				woReference.value.Close()
+			}
+		}()
+	} else {
+		woReference = &LazyInit[*oracle.WorkOracle]{init: func() (*oracle.WorkOracle, error) {
+			return init.referenceOracle, nil
+		}}
 	}
 
 	for i := layout.FirstFileIdx; i <= layout.LastFileIdx; i++ {
@@ -359,6 +385,11 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	// continue searching for a nonce
 	defer init.saveMetadata()
 
+	workOracle, err := wo.Get()
+	if err != nil {
+		return fmt.Errorf("get work oracle: %w", err)
+	}
+
 	for i := *init.lastPosition.Load(); i < math.MaxUint64; i += batchSize {
 		lastPos := i
 		init.lastPosition.Store(&lastPos)
@@ -376,7 +407,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 			zap.Uint64("batchSize", batchSize),
 		)
 
-		res, err := wo.Positions(i, i+batchSize-1)
+		res, err := workOracle.Positions(i, i+batchSize-1)
 		if err != nil {
 			return err
 		}
@@ -491,7 +522,7 @@ func (init *Initializer) Status() Status {
 	return StatusNotStarted
 }
 
-func (init *Initializer) initFile(ctx context.Context, wo, woReference *oracle.WorkOracle, fileIndex int, batchSize, fileOffset, fileNumLabels uint64, difficulty []byte) error {
+func (init *Initializer) initFile(ctx context.Context, wo, woReference *LazyInit[*oracle.WorkOracle], fileIndex int, batchSize, fileOffset, fileNumLabels uint64, difficulty []byte) error {
 	fileTargetPosition := fileOffset + fileNumLabels
 
 	// Initialize the labels file writer.
@@ -534,6 +565,15 @@ func (init *Initializer) initFile(ctx context.Context, wo, woReference *oracle.W
 		init.logger.Info("initialization: starting to write file", fields...)
 	}
 
+	workOracle, err := wo.Get()
+	if err != nil {
+		return fmt.Errorf("get work oracle: %w", err)
+	}
+	referenceWorkOracle, err := woReference.Get()
+	if err != nil {
+		return fmt.Errorf("get reference work oracle: %w", err)
+	}
+
 	for currentPosition := numLabelsWritten; currentPosition < fileNumLabels; currentPosition += batchSize {
 		select {
 		case <-ctx.Done():
@@ -562,13 +602,13 @@ func (init *Initializer) initFile(ctx context.Context, wo, woReference *oracle.W
 		startPosition := fileOffset + currentPosition
 		endPosition := startPosition + uint64(batchSize) - 1
 
-		res, err := wo.Positions(startPosition, endPosition)
+		res, err := workOracle.Positions(startPosition, endPosition)
 		if err != nil {
 			return fmt.Errorf("failed to compute labels: %w", err)
 		}
 
 		// sanity check with reference oracle
-		reference, err := woReference.Position(endPosition)
+		reference, err := referenceWorkOracle.Position(endPosition)
 		if err != nil {
 			return fmt.Errorf("failed to compute reference label: %w", err)
 		}
