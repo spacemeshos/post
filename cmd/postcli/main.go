@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"encoding/hex"
@@ -275,6 +276,36 @@ func saveKey(key ed25519.PrivateKey) error {
 }
 
 func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) error {
+	log.Println("cli: verifying key.bin")
+
+	filename := filepath.Join(opts.DataDir, edKeyFileName)
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return fmt.Errorf("key read from disk error: %w", err)
+	}
+
+	dst := make([]byte, ed25519.PrivateKeySize)
+	n, err := hex.Decode(dst, data)
+	if err != nil {
+		return fmt.Errorf("decoding private key: %w", err)
+	}
+	if n != ed25519.PrivateKeySize {
+		return fmt.Errorf("invalid key size %d, expected %d", n, ed25519.PrivateKeySize)
+	}
+	pub := ed25519.NewKeyFromSeed(dst).Public().(ed25519.PublicKey)
+
+	meta, err := initialization.LoadMetadata(opts.DataDir)
+	if err != nil {
+		return fmt.Errorf("failed to load metadata: %w", err)
+	}
+
+	if !bytes.Equal(meta.NodeId, pub) {
+		return fmt.Errorf("failed to verify node id (%x) against key.bin", meta.NodeId)
+	}
+
+	log.Println("cli: key.bin is valid")
+	log.Println("cli: verifying POS data")
+
 	params := postrs.TranslateScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)
 	verifyOpts := []postrs.VerifyPosOptionsFunc{
 		postrs.WithFraction(fraction),
@@ -285,7 +316,7 @@ func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) er
 		verifyOpts = append(verifyOpts, postrs.ToFile(uint32(*opts.ToFileIdx)))
 	}
 
-	err := postrs.VerifyPos(opts.DataDir, params, verifyOpts...)
+	err = postrs.VerifyPos(opts.DataDir, params, verifyOpts...)
 	switch {
 	case err == nil:
 		log.Println("cli: POS data is valid")
