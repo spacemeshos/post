@@ -168,6 +168,7 @@ func main() {
 
 	if verifyPos {
 		cmdVerifyPos(opts, fraction, logger)
+		os.Exit(0)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -318,7 +319,6 @@ func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) {
 	switch {
 	case err == nil:
 		log.Println("cli: POS data is valid")
-		os.Exit(0)
 	case errors.Is(err, postrs.ErrInvalidPos):
 		log.Fatalf("cli: %v\n", err)
 	default:
