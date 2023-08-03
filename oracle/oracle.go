@@ -3,6 +3,7 @@ package oracle
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -136,6 +137,31 @@ type WorkOracle struct {
 	scrypt  postrs.Scrypter
 }
 
+// Lazy initialized Scrypter.
+type LazyScrypter struct {
+	init     func() (postrs.Scrypter, error)
+	initOnce sync.Once
+	scrypt   postrs.Scrypter
+	err      error
+}
+
+func (l *LazyScrypter) Positions(start, end uint64) (postrs.ScryptPositionsResult, error) {
+	l.initOnce.Do(func() {
+		l.scrypt, l.err = l.init()
+	})
+	if l.err != nil {
+		return postrs.ScryptPositionsResult{}, fmt.Errorf("initializing scrypter: %w", l.err)
+	}
+	return l.scrypt.Positions(start, end)
+}
+
+func (l *LazyScrypter) Close() error {
+	if l.scrypt != nil {
+		return l.scrypt.Close()
+	}
+	return nil
+}
+
 // New returns a WorkOracle. If not specified, the labels are computed using the default (CPU) provider.
 func New(opts ...OptionFunc) (*WorkOracle, error) {
 	options := &option{
@@ -158,17 +184,15 @@ func New(opts ...OptionFunc) (*WorkOracle, error) {
 
 	scrypt := options.scrypter
 	if scrypt == nil {
-		s, err := postrs.NewScrypt(
-			postrs.WithProviderID(*options.providerID),
-			postrs.WithCommitment(options.commitment),
-			postrs.WithScryptN(options.n),
-			postrs.WithVRFDifficulty(options.vrfDifficulty),
-			postrs.WithLogger(options.logger),
-		)
-		if err != nil {
-			return nil, err
-		}
-		scrypt = s
+		scrypt = &LazyScrypter{init: func() (postrs.Scrypter, error) {
+			return postrs.NewScrypt(
+				postrs.WithProviderID(*options.providerID),
+				postrs.WithCommitment(options.commitment),
+				postrs.WithScryptN(options.n),
+				postrs.WithVRFDifficulty(options.vrfDifficulty),
+				postrs.WithLogger(options.logger),
+			)
+		}}
 	}
 
 	return &WorkOracle{
