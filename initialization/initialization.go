@@ -171,8 +171,8 @@ type Initializer struct {
 
 	// these values are atomics so they can be read from multiple other goroutines safely
 	// write is protected by mtx
-	nonceValue       atomic.Pointer[[]byte]
 	nonce            atomic.Pointer[uint64]
+	nonceValue       atomic.Pointer[[]byte]
 	lastPosition     atomic.Pointer[uint64]
 	numLabelsWritten atomic.Uint64
 
@@ -681,13 +681,18 @@ func (init *Initializer) verifyMetadata(m *shared.PostMetadata) error {
 
 func (init *Initializer) saveMetadata() error {
 	v := shared.PostMetadata{
+		Version: 1,
+
 		NodeId:          init.nodeId,
 		CommitmentAtxId: init.commitmentAtxId,
-		LabelsPerUnit:   init.cfg.LabelsPerUnit,
-		NumUnits:        init.opts.NumUnits,
-		MaxFileSize:     init.opts.MaxFileSize,
-		Nonce:           init.nonce.Load(),
-		LastPosition:    init.lastPosition.Load(),
+
+		LabelsPerUnit: init.cfg.LabelsPerUnit,
+		NumUnits:      init.opts.NumUnits,
+		MaxFileSize:   init.opts.MaxFileSize,
+		Scrypt:        init.opts.Scrypt,
+
+		Nonce:        init.nonce.Load(),
+		LastPosition: init.lastPosition.Load(),
 	}
 	if init.nonceValue.Load() != nil {
 		v.NonceValue = *init.nonceValue.Load()
@@ -696,5 +701,6 @@ func (init *Initializer) saveMetadata() error {
 }
 
 func (init *Initializer) loadMetadata() (*shared.PostMetadata, error) {
+	// TODO(mafa): migrate metadata if needed before loading it
 	return LoadMetadata(init.opts.DataDir)
 }
