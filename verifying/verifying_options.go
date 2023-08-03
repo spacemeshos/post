@@ -3,12 +3,13 @@ package verifying
 import (
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/internal/postrs"
+	"github.com/spacemeshos/post/shared"
 )
 
 type option struct {
 	powFlags config.PowFlags
 	// scrypt parameters for labels initialization
-	labelScrypt config.ScryptParams
+	labelScrypt shared.ScryptParams
 
 	internalOpts []postrs.VerifyOptionFunc
 }
@@ -26,7 +27,7 @@ func applyOpts(options ...OptionFunc) *option {
 
 type OptionFunc func(*option)
 
-func WithLabelScryptParams(params config.ScryptParams) OptionFunc {
+func WithLabelScryptParams(params shared.ScryptParams) OptionFunc {
 	return func(o *option) {
 		o.labelScrypt = params
 	}

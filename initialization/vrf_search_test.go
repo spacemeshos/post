@@ -9,9 +9,9 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 
-	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/oracle"
+	"github.com/spacemeshos/post/shared"
 )
 
 func TestCheckLabel(t *testing.T) {
@@ -20,7 +20,7 @@ func TestCheckLabel(t *testing.T) {
 		oracle.WithProviderID(&cpuProviderID),
 		oracle.WithCommitment(make([]byte, 32)),
 		oracle.WithVRFDifficulty(make([]byte, 32)),
-		oracle.WithScryptParams(config.ScryptParams{
+		oracle.WithScryptParams(shared.ScryptParams{
 			N: 2,
 			R: 1,
 			P: 1,
