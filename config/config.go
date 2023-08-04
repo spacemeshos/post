@@ -200,10 +200,6 @@ func DefaultInitOpts() InitOpts {
 }
 
 func Validate(cfg Config, opts InitOpts) error {
-	if opts.ProviderID == nil {
-		return errors.New("invalid `opts.ProviderID`; value not set")
-	}
-
 	if opts.NumUnits < cfg.MinNumUnits {
 		return fmt.Errorf("invalid `opts.NumUnits`; expected: >= %d, given: %d", cfg.MinNumUnits, opts.NumUnits)
 	}

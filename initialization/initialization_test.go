@@ -811,7 +811,7 @@ func TestValidateComputeBatchSize(t *testing.T) {
 func TestWrongLabelsDetected(t *testing.T) {
 	cfg, opts := getTestConfig(t)
 
-	logger := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
+	logger := zaptest.NewLogger(t)
 
 	woReference, err := oracle.New(
 		oracle.WithCommitment(make([]byte, 32)), // different commitment to trigger error
@@ -845,6 +845,56 @@ func TestWrongLabelsDetected(t *testing.T) {
 	require.NotEqual(t, reference.Output, errWrongLabels.Actual)
 
 	require.Equal(t, uint64(0), init.NumLabelsWritten())
+}
+
+func TestMissingProviderErrorsOnInitialize(t *testing.T) {
+	cfg, opts := getTestConfig(t)
+	opts.ProviderID = nil
+
+	logger := zaptest.NewLogger(t)
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(logger),
+	)
+	require.NoError(t, err) // no error on missing provider
+
+	err = init.Initialize(context.Background())
+	require.ErrorContains(t, err, "no provider specified")
+}
+
+func TestMissingProviderNoErrorWithFinishedInitialization(t *testing.T) {
+	cfg, opts := getTestConfig(t)
+
+	logger := zaptest.NewLogger(t)
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(logger),
+	)
+	require.NoError(t, err)
+
+	err = init.Initialize(context.Background())
+	require.NoError(t, err)
+
+	opts.ProviderID = nil
+	init, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(logger),
+	)
+	require.NoError(t, err)
+
+	err = init.Initialize(context.Background())
+	require.NoError(t, err) // no error on missing provider because init is finished already
 }
 
 func assertNumLabelsWritten(ctx context.Context, t *testing.T, init *Initializer) func() error {
