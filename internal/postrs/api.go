@@ -21,7 +21,7 @@ func OpenCLProviders() ([]Provider, error) {
 	return cGetProviders()
 }
 
-func CPUProviderID() uint {
+func CPUProviderID() uint32 {
 	return cCPUProviderID()
 }
 
@@ -37,7 +37,7 @@ type Scrypter interface {
 }
 
 type option struct {
-	providerID *uint
+	providerID *uint32
 
 	commitment    []byte
 	n             uint
@@ -66,9 +66,9 @@ func (o *option) validate() error {
 type OptionFunc func(*option) error
 
 // WithProviderID sets the ID of the openCL provider to use.
-func WithProviderID(id uint) OptionFunc {
+func WithProviderID(id uint32) OptionFunc {
 	return func(opts *option) error {
-		opts.providerID = new(uint)
+		opts.providerID = new(uint32)
 		*opts.providerID = id
 		return nil
 	}

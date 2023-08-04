@@ -9,15 +9,15 @@ import "sync"
 // mutex for a given device ID in a thread-safe manner.
 type deviceMutex struct {
 	mtx    sync.Mutex
-	device map[uint]*sync.Mutex
+	device map[uint32]*sync.Mutex
 }
 
-func (g *deviceMutex) Device(deviceId uint) *sync.Mutex {
+func (g *deviceMutex) Device(deviceId uint32) *sync.Mutex {
 	g.mtx.Lock()
 	defer g.mtx.Unlock()
 
 	if g.device == nil {
-		g.device = make(map[uint]*sync.Mutex)
+		g.device = make(map[uint32]*sync.Mutex)
 	}
 
 	if _, ok := g.device[deviceId]; !ok {

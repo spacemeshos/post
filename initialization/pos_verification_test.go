@@ -9,21 +9,13 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 
-	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/internal/postrs"
 )
 
 func TestVerifyPos(t *testing.T) {
-	t.Parallel()
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 128
-
-	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
+	cfg, opts := getTestConfig(t)
 	opts.NumUnits = 5
 	opts.MaxFileSize = 2 * cfg.UnitSize()
-	opts.ProviderID = int(CPUProviderID())
-	opts.Scrypt.N = 2
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),

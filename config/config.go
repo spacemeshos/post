@@ -126,7 +126,7 @@ type InitOpts struct {
 	DataDir     string
 	NumUnits    uint32
 	MaxFileSize uint64
-	ProviderID  int
+	ProviderID  *uint32
 	Throttle    bool
 	Scrypt      ScryptParams
 	// ComputeBatchSize must be greater than 0
@@ -175,17 +175,12 @@ func DefaultLabelParams() ScryptParams {
 	}
 }
 
-// BestProviderID can be used for selecting the most performant provider
-// based on a short benchmarking session.
-const BestProviderID = -1
-
 // MainnetInitOpts returns the default InitOpts for mainnet.
 func MainnetInitOpts() InitOpts {
 	return InitOpts{
 		DataDir:          DefaultDataDir,
 		NumUnits:         4,
 		MaxFileSize:      defaultMaxFileSize,
-		ProviderID:       BestProviderID,
 		Throttle:         false,
 		Scrypt:           DefaultLabelParams(),
 		ComputeBatchSize: DefaultComputeBatchSize,
@@ -198,7 +193,6 @@ func DefaultInitOpts() InitOpts {
 		DataDir:          DefaultDataDir,
 		NumUnits:         2,
 		MaxFileSize:      defaultMaxFileSize,
-		ProviderID:       BestProviderID,
 		Throttle:         false,
 		Scrypt:           DefaultLabelParams(),
 		ComputeBatchSize: DefaultComputeBatchSize,
@@ -206,6 +200,10 @@ func DefaultInitOpts() InitOpts {
 }
 
 func Validate(cfg Config, opts InitOpts) error {
+	if opts.ProviderID == nil {
+		return errors.New("invalid `opts.ProviderID`; value not set")
+	}
+
 	if opts.NumUnits < cfg.MinNumUnits {
 		return fmt.Errorf("invalid `opts.NumUnits`; expected: >= %d, given: %d", cfg.MinNumUnits, opts.NumUnits)
 	}

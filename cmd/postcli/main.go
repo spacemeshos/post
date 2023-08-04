@@ -66,7 +66,8 @@ func parseFlags() {
 
 	flag.StringVar(&opts.DataDir, "datadir", opts.DataDir, "filesystem datadir path")
 	flag.Uint64Var(&opts.MaxFileSize, "maxFileSize", opts.MaxFileSize, "max file size")
-	flag.IntVar(&opts.ProviderID, "provider", opts.ProviderID, "compute provider id (required)")
+	var providerID uint64
+	flag.Uint64Var(&providerID, "provider", math.MaxUint64, "compute provider id (required)")
 	flag.Uint64Var(&cfg.LabelsPerUnit, "labelsPerUnit", cfg.LabelsPerUnit, "the number of labels per unit")
 	flag.BoolVar(&reset, "reset", false, "whether to reset the datadir before starting")
 	flag.StringVar(&idHex, "id", "", "miner's id (public key), in hex (will be auto-generated if not provided)")
@@ -83,11 +84,16 @@ func parseFlags() {
 	if to != math.MaxInt {
 		opts.ToFileIdx = &to
 	}
+	if providerID != math.MaxUint64 {
+		opts.ProviderID = new(uint32)
+		*opts.ProviderID = uint32(providerID)
+	}
+
 	opts.NumUnits = uint32(*numUnits) // workaround the missing type support for uint32
 }
 
 func processFlags() error {
-	if opts.ProviderID < 0 {
+	if opts.ProviderID == nil {
 		return errors.New("-provider flag is required")
 	}
 

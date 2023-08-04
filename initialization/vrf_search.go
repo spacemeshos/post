@@ -71,7 +71,6 @@ func SearchForNonce(ctx context.Context, cfg Config, initOpts InitOpts, opts ...
 	}
 
 	woReference, err := oracle.New(
-		oracle.WithProviderID(CPUProviderID()),
 		oracle.WithCommitment(metadata.CommitmentAtxId),
 		oracle.WithVRFDifficulty(difficulty),
 		oracle.WithScryptParams(initOpts.Scrypt),

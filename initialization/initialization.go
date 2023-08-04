@@ -45,7 +45,7 @@ func OpenCLProviders() ([]Provider, error) {
 }
 
 // CPUProviderID returns the ID of the CPU provider or nil if the CPU provider is not available.
-func CPUProviderID() uint {
+func CPUProviderID() uint32 {
 	return postrs.CPUProviderID()
 }
 
@@ -237,8 +237,9 @@ func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 			init.nonceValue.Store(&nonceValue)
 		case m.Nonce != nil:
 			// there is a nonce in the metadata but no nonce value
+			cpuProviderID := CPUProviderID()
 			wo, err := oracle.New(
-				oracle.WithProviderID(CPUProviderID()),
+				oracle.WithProviderID(&cpuProviderID),
 				oracle.WithCommitment(init.commitment),
 				oracle.WithVRFDifficulty(make([]byte, 32)), // we are not looking for it, so set difficulty to 0
 				oracle.WithScryptParams(init.opts.Scrypt),
@@ -303,7 +304,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	batchSize := init.opts.ComputeBatchSize
 
 	wo, err := oracle.New(
-		oracle.WithProviderID(uint(init.opts.ProviderID)),
+		oracle.WithProviderID(init.opts.ProviderID),
 		oracle.WithCommitment(init.commitment),
 		oracle.WithVRFDifficulty(difficulty),
 		oracle.WithScryptParams(init.opts.Scrypt),
@@ -316,8 +317,9 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 
 	woReference := init.referenceOracle
 	if woReference == nil {
+		cpuProvider := CPUProviderID()
 		woReference, err = oracle.New(
-			oracle.WithProviderID(CPUProviderID()),
+			oracle.WithProviderID(&cpuProvider),
 			oracle.WithCommitment(init.commitment),
 			oracle.WithVRFDifficulty(difficulty),
 			oracle.WithScryptParams(init.opts.Scrypt),

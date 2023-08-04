@@ -3,7 +3,6 @@ package initialization
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"math/big"
@@ -30,15 +29,21 @@ var (
 	commitmentAtxId = make([]byte, 32)
 )
 
-func TestInitialize(t *testing.T) {
+func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
 
 	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
+	opts.Scrypt.N = 16 // speed up initialization
+	opts.DataDir = tb.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ProviderID = int(CPUProviderID())
-	opts.Scrypt.N = 16
+	opts.ProviderID = new(uint32)
+	*opts.ProviderID = CPUProviderID()
+	opts.ComputeBatchSize = 1 << 14
+	return cfg, opts
+}
+
+func TestInitialize(t *testing.T) {
+	cfg, opts := getTestConfig(t)
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -71,14 +76,7 @@ func TestInitialize(t *testing.T) {
 }
 
 func TestInitialize_BeforeNonceValue(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
-
-	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
-	opts.NumUnits = cfg.MinNumUnits
-	opts.ProviderID = int(CPUProviderID())
-	opts.Scrypt.N = 16
+	cfg, opts := getTestConfig(t)
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -126,18 +124,7 @@ func TestInitialize_BeforeNonceValue(t *testing.T) {
 func TestInitialize_PowOutOfRange(t *testing.T) {
 	r := require.New(t)
 
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 8
-
-	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
-	opts.NumUnits = cfg.MinNumUnits
-	opts.ProviderID = int(CPUProviderID())
-	opts.Scrypt.N = 16
-
-	// nodeId where no label in the first uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit satisfies the PoW requirement.
-	nodeId, err := hex.DecodeString("57fdfc072182654f163f5f0f9a621d729566c74d10037c4d7bbb0407d1e2c649")
-	r.NoError(err)
+	cfg, opts := getTestConfig(t)
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -149,6 +136,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 		withDifficultyFunc(func(numLabels uint64) []byte {
 			x := new(big.Int).Lsh(big.NewInt(1), 256)
 			x.Div(x, big.NewInt(int64(numLabels)))
+			x.Div(x, big.NewInt(1024))
 
 			difficulty := make([]byte, 32)
 			return x.FillBytes(difficulty)
@@ -174,14 +162,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r := require.New(t)
 
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
-
-	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
-	opts.NumUnits = cfg.MinNumUnits
-	opts.ProviderID = int(CPUProviderID())
-	opts.Scrypt.N = 16
+	cfg, opts := getTestConfig(t)
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -319,14 +300,8 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 func TestReset_WhileInitializing(t *testing.T) {
 	r := require.New(t)
 
-	cfg := config.DefaultConfig()
+	cfg, opts := getTestConfig(t)
 	cfg.LabelsPerUnit = 1 << 15
-
-	opts := config.DefaultInitOpts()
-	opts.Scrypt.N = 16
-	opts.DataDir = t.TempDir()
-	opts.NumUnits = cfg.MinNumUnits
-	opts.ProviderID = int(CPUProviderID())
 	opts.ComputeBatchSize = 1 << 14
 
 	init, err := NewInitializer(
@@ -355,14 +330,7 @@ func TestReset_WhileInitializing(t *testing.T) {
 func TestInitialize_Repeated(t *testing.T) {
 	r := require.New(t)
 
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
-
-	opts := config.DefaultInitOpts()
-	opts.Scrypt.N = 16
-	opts.DataDir = t.TempDir()
-	opts.NumUnits = cfg.MinNumUnits
-	opts.ProviderID = int(CPUProviderID())
+	cfg, opts := getTestConfig(t)
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -411,14 +379,7 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 
 	r := require.New(t)
 
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
-
-	opts := config.DefaultInitOpts()
-	opts.Scrypt.N = 16
-	opts.DataDir = t.TempDir()
-	opts.NumUnits = cfg.MinNumUnits
-	opts.ProviderID = int(CPUProviderID())
+	cfg, opts := getTestConfig(t)
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -466,14 +427,8 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	r := require.New(t)
 
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
-
-	opts := config.DefaultInitOpts()
-	opts.Scrypt.N = 16
-	opts.DataDir = t.TempDir()
+	cfg, opts := getTestConfig(t)
 	opts.NumUnits = cfg.MinNumUnits + 1
-	opts.ProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -521,15 +476,9 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 func TestInitialize_RedundantFiles(t *testing.T) {
 	r := require.New(t)
 
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
-
-	opts := config.DefaultInitOpts()
-	opts.Scrypt.N = 16
-	opts.DataDir = t.TempDir()
+	cfg, opts := getTestConfig(t)
 	opts.NumUnits = cfg.MinNumUnits + 1
 	opts.MaxFileSize = 1 << 12
-	opts.ProviderID = int(CPUProviderID())
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -591,15 +540,9 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 }
 
 func TestInitialize_MultipleFiles(t *testing.T) {
-	cfg := config.DefaultConfig()
+	cfg, opts := getTestConfig(t)
 	cfg.LabelsPerUnit = 1 << 14
-
-	opts := config.DefaultInitOpts()
-	opts.Scrypt.N = 16
-	opts.DataDir = t.TempDir()
-	opts.NumUnits = cfg.MinNumUnits
 	opts.MaxFileSize = cfg.UnitSize()
-	opts.ProviderID = int(CPUProviderID())
 
 	var oneFileData []byte
 	var oneFileNonce uint64
@@ -671,14 +614,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 func TestNumLabelsWritten(t *testing.T) {
 	r := require.New(t)
 
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
-
-	opts := config.DefaultInitOpts()
-	opts.Scrypt.N = 16
-	opts.DataDir = t.TempDir()
-	opts.NumUnits = cfg.MinNumUnits
-	opts.ProviderID = int(CPUProviderID())
+	cfg, opts := getTestConfig(t)
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -727,14 +663,7 @@ func TestNumLabelsWritten(t *testing.T) {
 func TestValidateMetadata(t *testing.T) {
 	r := require.New(t)
 
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
-
-	opts := config.DefaultInitOpts()
-	opts.Scrypt.N = 16
-	opts.DataDir = t.TempDir()
-	opts.NumUnits = cfg.MinNumUnits
-	opts.ProviderID = int(CPUProviderID())
+	cfg, opts := getTestConfig(t)
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -811,14 +740,9 @@ func TestValidateMetadata(t *testing.T) {
 func TestStop(t *testing.T) {
 	r := require.New(t)
 
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
-
-	opts := config.DefaultInitOpts()
-	opts.Scrypt.N = 64
-	opts.DataDir = t.TempDir()
+	cfg, opts := getTestConfig(t)
+	opts.Scrypt.N = 64 // higher difficulty for a chance at stopping before finished
 	opts.NumUnits = 10
-	opts.ProviderID = int(CPUProviderID())
 	opts.ComputeBatchSize = 1 << 10
 
 	init, err := NewInitializer(
@@ -885,19 +809,11 @@ func TestValidateComputeBatchSize(t *testing.T) {
 }
 
 func TestWrongLabelsDetected(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 1 << 12
-
-	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
-	opts.NumUnits = cfg.MinNumUnits
-	opts.ProviderID = int(CPUProviderID())
-	opts.Scrypt.N = 16
+	cfg, opts := getTestConfig(t)
 
 	logger := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
 
 	woReference, err := oracle.New(
-		oracle.WithProviderID(CPUProviderID()),
 		oracle.WithCommitment(make([]byte, 32)), // different commitment to trigger error
 		oracle.WithScryptParams(opts.Scrypt),
 		oracle.WithVRFDifficulty(make([]byte, 32)),
@@ -921,7 +837,7 @@ func TestWrongLabelsDetected(t *testing.T) {
 	var errWrongLabels ErrReferenceLabelMismatch
 	require.ErrorAs(t, err, &errWrongLabels)
 	require.Equal(t, oracle.CommitmentBytes(nodeId, commitmentAtxId), errWrongLabels.Commitment)
-	require.Equal(t, uint64(1<<12-1), errWrongLabels.Index)
+	require.Equal(t, uint64(cfg.LabelsPerUnit-1), errWrongLabels.Index)
 	reference, err := init.referenceOracle.Position(errWrongLabels.Index)
 	require.NoError(t, err)
 	require.Equal(t, reference.Output, errWrongLabels.Expected)
@@ -962,15 +878,9 @@ func initData(datadir string) ([]byte, error) {
 }
 
 func TestInitializeSubset(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 128
-
-	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
+	cfg, opts := getTestConfig(t)
 	opts.NumUnits = 20
 	opts.MaxFileSize = 2 * cfg.UnitSize() // 2 units per file
-	opts.ProviderID = int(CPUProviderID())
-	opts.Scrypt.N = 2
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -1038,18 +948,12 @@ func TestInitializeSubset(t *testing.T) {
 }
 
 func TestInitializeSubset_NoNonce(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 128
-
-	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
+	cfg, opts := getTestConfig(t)
 	opts.FromFileIdx = 3
 	opts.ToFileIdx = new(int)
 	*opts.ToFileIdx = 4
 	opts.NumUnits = 20
 	opts.MaxFileSize = 2 * cfg.UnitSize() // 2 units per file
-	opts.ProviderID = int(CPUProviderID())
-	opts.Scrypt.N = 2
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -1112,16 +1016,11 @@ func TestInitializeSubset_NoNonce(t *testing.T) {
 
 func TestInitializeLastFileIsSmaller(t *testing.T) {
 	r := require.New(t)
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 128
 
-	opts := config.DefaultInitOpts()
+	cfg, opts := getTestConfig(t)
 	opts.FromFileIdx = 1
-	opts.DataDir = t.TempDir()
 	opts.NumUnits = 5 // the last file will have 1 unit
 	opts.MaxFileSize = 2 * cfg.UnitSize()
-	opts.ProviderID = int(CPUProviderID())
-	opts.Scrypt.N = 2
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
