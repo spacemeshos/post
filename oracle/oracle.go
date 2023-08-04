@@ -31,10 +31,6 @@ type option struct {
 }
 
 func (o *option) validate() error {
-	if o.providerID == nil {
-		return errors.New("`providerID` is required")
-	}
-
 	if o.commitment == nil {
 		return errors.New("`commitment` is required")
 	}
@@ -168,8 +164,6 @@ func New(opts ...OptionFunc) (*WorkOracle, error) {
 		retryDelay: time.Second,
 		logger:     zap.NewNop(),
 	}
-	options.providerID = new(uint32)
-	*options.providerID = postrs.CPUProviderID()
 
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
@@ -184,6 +178,10 @@ func New(opts ...OptionFunc) (*WorkOracle, error) {
 	scrypt := options.scrypter
 	if scrypt == nil {
 		scrypt = &LazyScrypter{init: func() (postrs.Scrypter, error) {
+			if options.providerID == nil {
+				return nil, errors.New("no provider specified")
+			}
+
 			return postrs.NewScrypt(
 				postrs.WithProviderID(*options.providerID),
 				postrs.WithCommitment(options.commitment),
