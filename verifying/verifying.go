@@ -37,7 +37,9 @@ func VerifyVRFNonce(nonce *uint64, m *shared.VRFNonceMetadata, opts ...OptionFun
 	numLabels := uint64(m.NumUnits) * uint64(m.LabelsPerUnit)
 	difficulty := shared.PowDifficulty(numLabels)
 
+	cpuProviderID := postrs.CPUProviderID()
 	wo, err := oracle.New(
+		oracle.WithProviderID(&cpuProviderID),
 		oracle.WithCommitment(oracle.CommitmentBytes(m.NodeId, m.CommitmentAtxId)),
 		oracle.WithScryptParams(options.labelScrypt),
 		oracle.WithVRFDifficulty(difficulty),

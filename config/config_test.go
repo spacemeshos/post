@@ -36,18 +36,6 @@ func TestTotalFiles(t *testing.T) {
 	r.Equal(0, opts.TotalFiles(128))
 }
 
-func TestOptsValidateProviderID(t *testing.T) {
-	t.Parallel()
-	cfg := config.DefaultConfig()
-	opts := config.DefaultInitOpts()
-
-	require.ErrorContains(t, config.Validate(cfg, opts), "invalid `opts.ProviderID`; value not set")
-
-	opts.ProviderID = new(uint32)
-	*opts.ProviderID = 1
-	require.NoError(t, config.Validate(cfg, opts))
-}
-
 func TestOptsValidateScryptParams(t *testing.T) {
 	t.Parallel()
 	cfg := config.DefaultConfig()

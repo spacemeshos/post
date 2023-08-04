@@ -814,6 +814,7 @@ func TestWrongLabelsDetected(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 
 	woReference, err := oracle.New(
+		oracle.WithProviderID(opts.ProviderID),
 		oracle.WithCommitment(make([]byte, 32)), // different commitment to trigger error
 		oracle.WithScryptParams(opts.Scrypt),
 		oracle.WithVRFDifficulty(make([]byte, 32)),

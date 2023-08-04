@@ -10,11 +10,14 @@ import (
 	"go.uber.org/zap/zaptest"
 
 	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/oracle"
 )
 
 func TestCheckLabel(t *testing.T) {
+	cpuProviderID := postrs.CPUProviderID()
 	woReference, err := oracle.New(
+		oracle.WithProviderID(&cpuProviderID),
 		oracle.WithCommitment(make([]byte, 32)),
 		oracle.WithVRFDifficulty(make([]byte, 32)),
 		oracle.WithScryptParams(config.ScryptParams{
