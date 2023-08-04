@@ -70,7 +70,9 @@ func SearchForNonce(ctx context.Context, cfg Config, initOpts InitOpts, opts ...
 		return 0, nil, fmt.Errorf("couldn't open the data directory: %w", err)
 	}
 
+	cpuProviderID := CPUProviderID()
 	woReference, err := oracle.New(
+		oracle.WithProviderID(&cpuProviderID),
 		oracle.WithCommitment(metadata.CommitmentAtxId),
 		oracle.WithVRFDifficulty(difficulty),
 		oracle.WithScryptParams(initOpts.Scrypt),
