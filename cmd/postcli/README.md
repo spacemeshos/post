@@ -156,7 +156,7 @@ in each `post_metadata.json` of every subset. Given two files:
 "NonceValue": "0000488e171389cce69344d68b66f6b4"
 ```
 
-The nonce in the second file is the global minimum since its value is smaller than the first one. The operator is **required** to find the
+The nonce in the first file is the global minimum since its value is smaller than the first one. The operator is **required** to find the
 smallest VRF nonce by hand and ensure that its index and value are in the `postdata_metadata.json` of the merged directory on the target machine.
 
 Not every chunk will contain a VRF nonce in its `postdata_metadata.json`, but at least one should. If for the very unlikely case that no VRF nonce
