@@ -16,7 +16,7 @@ import (
 var ErrWorkOracleClosed = errors.New("work oracle has been closed")
 
 type option struct {
-	providerID *uint
+	providerID *uint32
 
 	commitment    []byte
 	n             uint
@@ -31,10 +31,6 @@ type option struct {
 }
 
 func (o *option) validate() error {
-	if o.providerID == nil {
-		return errors.New("`providerID` is required")
-	}
-
 	if o.commitment == nil {
 		return errors.New("`commitment` is required")
 	}
@@ -53,11 +49,10 @@ func (o *option) validate() error {
 // OptionFunc is a function that sets an option for a WorkOracle instance.
 type OptionFunc func(*option) error
 
-// WithProviderID sets the ID of the openCL provider to use.
-func WithProviderID(id uint) OptionFunc {
+// WithProviderID sets the ID of the OpenCL provider to use.
+func WithProviderID(id *uint32) OptionFunc {
 	return func(opts *option) error {
-		opts.providerID = new(uint)
-		*opts.providerID = id
+		opts.providerID = id
 		return nil
 	}
 }
@@ -169,8 +164,6 @@ func New(opts ...OptionFunc) (*WorkOracle, error) {
 		retryDelay: time.Second,
 		logger:     zap.NewNop(),
 	}
-	options.providerID = new(uint)
-	*options.providerID = postrs.CPUProviderID()
 
 	for _, opt := range opts {
 		if err := opt(options); err != nil {
@@ -185,6 +178,10 @@ func New(opts ...OptionFunc) (*WorkOracle, error) {
 	scrypt := options.scrypter
 	if scrypt == nil {
 		scrypt = &LazyScrypter{init: func() (postrs.Scrypter, error) {
+			if options.providerID == nil {
+				return nil, errors.New("no provider specified")
+			}
+
 			return postrs.NewScrypt(
 				postrs.WithProviderID(*options.providerID),
 				postrs.WithCommitment(options.commitment),

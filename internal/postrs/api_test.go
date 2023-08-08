@@ -131,7 +131,7 @@ func TestScrypt_Close(t *testing.T) {
 }
 
 func TestScryptPositions_InvalidProviderId(t *testing.T) {
-	invalidProviderId := uint(1 << 10)
+	invalidProviderId := uint32(1 << 10)
 	_, err := NewScrypt(
 		WithProviderID(invalidProviderId),
 		WithCommitment(commitment),

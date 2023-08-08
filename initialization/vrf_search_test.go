@@ -10,12 +10,14 @@ import (
 	"go.uber.org/zap/zaptest"
 
 	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/internal/postrs"
 	"github.com/spacemeshos/post/oracle"
 )
 
 func TestCheckLabel(t *testing.T) {
+	cpuProviderID := postrs.CPUProviderID()
 	woReference, err := oracle.New(
-		oracle.WithProviderID(CPUProviderID()),
+		oracle.WithProviderID(&cpuProviderID),
 		oracle.WithCommitment(make([]byte, 32)),
 		oracle.WithVRFDifficulty(make([]byte, 32)),
 		oracle.WithScryptParams(config.ScryptParams{
@@ -69,15 +71,9 @@ func TestCheckLabel(t *testing.T) {
 
 func TestSearchForNonce(t *testing.T) {
 	// Initialize some data first
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 128
-
-	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
+	cfg, opts := getTestConfig(t)
 	opts.NumUnits = 20
 	opts.MaxFileSize = cfg.UnitSize() * 2
-	opts.ProviderID = int(CPUProviderID())
-	opts.Scrypt.N = 2
 
 	logger := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
 
@@ -133,15 +129,9 @@ func TestSearchForNonce(t *testing.T) {
 }
 
 func TestSearchForNonceNotFound(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.LabelsPerUnit = 128
-
-	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
+	cfg, opts := getTestConfig(t)
 	opts.NumUnits = 10
 	opts.MaxFileSize = cfg.UnitSize() * 2
-	opts.ProviderID = int(CPUProviderID())
-	opts.Scrypt.N = 2
 
 	logger := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
 

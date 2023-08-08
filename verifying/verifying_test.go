@@ -25,13 +25,11 @@ func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	cfg.K2 = 3
 	cfg.K3 = 3
 
-	id := postrs.CPUProviderID()
-	require.NotZero(tb, id)
-
 	opts := config.DefaultInitOpts()
 	opts.DataDir = tb.TempDir()
 	opts.NumUnits = cfg.MinNumUnits
-	opts.ProviderID = int(id)
+	opts.ProviderID = new(uint32)
+	*opts.ProviderID = postrs.CPUProviderID()
 	opts.ComputeBatchSize = 1 << 14
 	return cfg, opts
 }

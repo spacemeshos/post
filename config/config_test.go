@@ -40,9 +40,11 @@ func TestOptsValidateScryptParams(t *testing.T) {
 	t.Parallel()
 	cfg := config.DefaultConfig()
 	opts := config.DefaultInitOpts()
+	opts.ProviderID = new(uint32)
+	*opts.ProviderID = 1
 
-	require.Nil(t, config.Validate(cfg, opts))
+	require.NoError(t, config.Validate(cfg, opts))
 
 	opts.Scrypt.N = 0
-	require.Error(t, config.Validate(cfg, opts))
+	require.ErrorContains(t, config.Validate(cfg, opts), "scrypt parameter N cannot be 0")
 }
