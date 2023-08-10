@@ -410,7 +410,8 @@ func removeRedundantFiles(cfg config.Config, opts config.InitOpts, logger *zap.L
 		name := file.Name()
 		fileIndex, err := shared.ParseFileIndex(name)
 		if err != nil && name != MetadataFileName {
-			logger.Warn("found unrecognized file", zap.String("fileName", name))
+			// TODO(mafa): revert back to warning, see https://github.com/spacemeshos/go-spacemesh/issues/4789
+			logger.Debug("found unrecognized file", zap.String("fileName", name))
 			continue
 		}
 		if fileIndex > maxFileIndex {
