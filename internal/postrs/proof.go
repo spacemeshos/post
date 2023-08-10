@@ -21,6 +21,12 @@ import (
 
 type ScryptParams = C.ScryptParams
 
+type HexEncoded []byte
+
+func (h HexEncoded) String() string {
+	return hex.EncodeToString(h)
+}
+
 // Translate scrypt parameters expressed as N,R,P to Nfactor, Rfactor and Pfactor
 // that are understood by scrypt-jane.
 // Relation:
@@ -67,7 +73,7 @@ func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces,
 
 	var powCreatorId unsafe.Pointer
 	if opts.powCreatorId != nil {
-		logger.With().Info("Proving with PoW creator ID", zap.String("id", hex.EncodeToString(opts.powCreatorId)))
+		logger.Debug("Proving with PoW creator ID", zap.Stringer("id", HexEncoded(opts.powCreatorId)))
 		powCreatorId = C.CBytes(opts.powCreatorId)
 		defer C.free(powCreatorId)
 	}
@@ -219,7 +225,7 @@ func (v *Verifier) VerifyProof(
 	}
 
 	if opts.powCreatorId != nil {
-		logger.With().Info("Verifying with PoW creator ID", zap.String("id", hex.EncodeToString(opts.powCreatorId)))
+		logger.Debug("verifying POST with PoW creator ID", zap.Stringer("id", HexEncoded(opts.powCreatorId)))
 		minerIdSliceHdr := (*reflect.SliceHeader)(unsafe.Pointer(&opts.powCreatorId))
 		cProof.pow_creator = C.ArrayU8{
 			ptr: (*C.uchar)(unsafe.Pointer(minerIdSliceHdr.Data)),
