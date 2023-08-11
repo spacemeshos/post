@@ -139,6 +139,7 @@ func NewScrypt(opts ...OptionFunc) (*Scrypt, error) {
 	}
 	init, err := cNewInitializer(options)
 	if err != nil {
+		gpuMtx.Unlock()
 		return nil, err
 	}
 
