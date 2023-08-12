@@ -7,11 +7,12 @@ import "C"
 
 import (
 	"errors"
+	"sync"
 )
 
-// gpuMtx is an instance of deviceMutex that can be used to prevent concurrent calls
-// to the same GPU (by ProviderID) from multiple goroutines.
-var gpuMtx deviceMutex
+// gpuMtx is a mutual exclusion lock preventing concurrent access
+// to any GPU device. CPU can still be used concurrently.
+var gpuMtx sync.Mutex
 
 // DeviceClass is an enum for the type of device (CPU or GPU).
 type DeviceClass int
