@@ -21,4 +21,3 @@ make test
 ## postcli
 
 To read more about `postcli` please refer to [postcli readme](cmd/postcli/README.md)
-
