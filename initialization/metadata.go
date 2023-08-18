@@ -11,7 +11,17 @@ import (
 
 const MetadataFileName = "postdata_metadata.json"
 
+func getEffectiveDir(dir string) string {
+	envDir := os.Getenv("POST_METADATA_DIR")
+	if envDir != "" {
+		return envDir
+	}
+	return dir
+}
+
 func SaveMetadata(dir string, v *shared.PostMetadata) error {
+	dir = getEffectiveDir(dir)
+
 	err := os.MkdirAll(dir, shared.OwnerReadWriteExec)
 	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("dir creation failure: %w", err)
@@ -31,6 +41,8 @@ func SaveMetadata(dir string, v *shared.PostMetadata) error {
 }
 
 func LoadMetadata(dir string) (*shared.PostMetadata, error) {
+	dir = getEffectiveDir(dir)
+
 	filename := filepath.Join(dir, MetadataFileName)
 	data, err := os.ReadFile(filename)
 	if err != nil {
