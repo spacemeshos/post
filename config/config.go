@@ -95,7 +95,7 @@ func MainnetConfig() Config {
 		K2:            37,
 		K3:            37,
 	}
-	_, err := hex.Decode(cfg.PowDifficulty[:], []byte("00037ec8ec25e6d2c00000000000000000000000000000000000000000000000"))
+	_, err := hex.Decode(cfg.PowDifficulty[:], []byte("000dfb23b0979b4b000000000000000000000000000000000000000000000000"))
 	if err != nil {
 		panic(err)
 	}
