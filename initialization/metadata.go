@@ -13,6 +13,7 @@ const MetadataFileName = "postdata_metadata.json"
 
 func getEffectiveDir(dir string) string {
 	envDir := os.Getenv("POST_METADATA_DIR")
+	fmt.Println("Got postmeta dir of env:", envDir)
 	if envDir != "" {
 		return envDir
 	}
@@ -32,7 +33,11 @@ func SaveMetadata(dir string, v *shared.PostMetadata) error {
 		return fmt.Errorf("serialization failure: %w", err)
 	}
 
+	filePath := filepath.Join(dir, MetadataFileName)
+	fmt.Println("Writing metadata to:", filePath)
+
 	err = os.WriteFile(filepath.Join(dir, MetadataFileName), data, shared.OwnerReadWrite)
+
 	if err != nil {
 		return fmt.Errorf("write to disk failure: %w", err)
 	}
@@ -44,6 +49,7 @@ func LoadMetadata(dir string) (*shared.PostMetadata, error) {
 	dir = getEffectiveDir(dir)
 
 	filename := filepath.Join(dir, MetadataFileName)
+	fmt.Println("Reading metadata from:", filename)
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		if os.IsNotExist(err) {
