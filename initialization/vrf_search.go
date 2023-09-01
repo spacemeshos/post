@@ -60,7 +60,7 @@ func SearchForNonce(ctx context.Context, cfg Config, initOpts InitOpts, opts ...
 	}
 
 	difficulty := options.powDifficultyFunc(metadata.LabelsPerUnit * uint64(metadata.NumUnits))
-	logger.Info("searching for lowes nonce",
+	logger.Info("searching for lowest nonce",
 		zap.String("difficulty", hex.EncodeToString(difficulty)),
 		zap.String("datadir", initOpts.DataDir),
 	)
