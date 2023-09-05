@@ -1,6 +1,7 @@
 package initialization
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -19,27 +20,13 @@ func SaveMetadata(dir string, v *shared.PostMetadata) error {
 		return fmt.Errorf("dir creation failure: %w", err)
 	}
 
-	filename := filepath.Join(dir, MetadataFileName)
-
-	tmp, err := os.Create(fmt.Sprintf("%s.tmp", filename))
+	data, err := json.MarshalIndent(v, "", "\t")
 	if err != nil {
-		return fmt.Errorf("create temporary file %s: %w", tmp.Name(), err)
-	}
-	defer tmp.Close()
-
-	enc := json.NewEncoder(tmp)
-	enc.SetIndent("", "\t")
-
-	if err := enc.Encode(v); err != nil {
 		return fmt.Errorf("failed to encode metadata: %w", err)
 	}
 
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("failed to close tmp file %s: %w", tmp.Name(), err)
-	}
-
-	if err := atomic.ReplaceFile(tmp.Name(), filename); err != nil {
-		return fmt.Errorf("atomic replace file %s with %s: %w", filename, tmp.Name(), err)
+	if err := atomic.WriteFile(filepath.Join(dir, MetadataFileName), bytes.NewBuffer(data)); err != nil {
+		return fmt.Errorf("write to disk failure: %w", err)
 	}
 
 	return nil
