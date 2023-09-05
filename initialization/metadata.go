@@ -1,10 +1,13 @@
 package initialization
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/natefinch/atomic"
 
 	"github.com/spacemeshos/post/shared"
 )
@@ -17,13 +20,12 @@ func SaveMetadata(dir string, v *shared.PostMetadata) error {
 		return fmt.Errorf("dir creation failure: %w", err)
 	}
 
-	data, err := json.Marshal(v)
+	data, err := json.MarshalIndent(v, "", "\t")
 	if err != nil {
-		return fmt.Errorf("serialization failure: %w", err)
+		return fmt.Errorf("failed to encode metadata: %w", err)
 	}
 
-	err = os.WriteFile(filepath.Join(dir, MetadataFileName), data, shared.OwnerReadWrite)
-	if err != nil {
+	if err := atomic.WriteFile(filepath.Join(dir, MetadataFileName), bytes.NewBuffer(data)); err != nil {
 		return fmt.Errorf("write to disk failure: %w", err)
 	}
 
