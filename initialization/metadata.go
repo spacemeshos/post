@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/natefinch/atomic"
+
 	"github.com/spacemeshos/post/shared"
 )
 
@@ -17,14 +19,24 @@ func SaveMetadata(dir string, v *shared.PostMetadata) error {
 		return fmt.Errorf("dir creation failure: %w", err)
 	}
 
-	data, err := json.Marshal(v)
+	filename := filepath.Join(dir, MetadataFileName)
+
+	tmp, err := os.Create(fmt.Sprintf("%s.tmp", filename))
 	if err != nil {
-		return fmt.Errorf("serialization failure: %w", err)
+		return fmt.Errorf("create temporary file %s: %w", tmp.Name(), err)
+	}
+	defer tmp.Close()
+
+	if err := json.NewEncoder(tmp).Encode(v); err != nil {
+		return fmt.Errorf("failed to encode metadata: %w", err)
 	}
 
-	err = os.WriteFile(filepath.Join(dir, MetadataFileName), data, shared.OwnerReadWrite)
-	if err != nil {
-		return fmt.Errorf("write to disk failure: %w", err)
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("failed to close tmp file %s: %w", tmp.Name(), err)
+	}
+
+	if err := atomic.ReplaceFile(tmp.Name(), filename); err != nil {
+		return fmt.Errorf("save file from %s, %s: %w", tmp.Name(), filename, err)
 	}
 
 	return nil
