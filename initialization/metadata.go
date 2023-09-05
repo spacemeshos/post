@@ -39,7 +39,7 @@ func SaveMetadata(dir string, v *shared.PostMetadata) error {
 	}
 
 	if err := atomic.ReplaceFile(tmp.Name(), filename); err != nil {
-		return fmt.Errorf("save file from %s, %s: %w", tmp.Name(), filename, err)
+		return fmt.Errorf("atomic replace file %s with %s: %w", filename, tmp.Name(), err)
 	}
 
 	return nil
