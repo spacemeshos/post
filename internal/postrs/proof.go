@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"reflect"
 	"sync"
 	"unsafe"
 
@@ -26,6 +25,9 @@ type HexEncoded []byte
 func (h HexEncoded) String() string {
 	return hex.EncodeToString(h)
 }
+
+// ErrVerifierClosed is returned when calling a method on an already closed Scrypt instance.
+var ErrVerifierClosed = errors.New("verifier has been closed")
 
 // Translate scrypt parameters expressed as N,R,P to Nfactor, Rfactor and Pfactor
 // that are understood by scrypt-jane.
@@ -145,8 +147,8 @@ const (
 )
 
 type Verifier struct {
-	inner     *C.Verifier
-	closeOnce sync.Once
+	mu    sync.RWMutex
+	inner *C.Verifier
 }
 
 // Create a new verifier.
@@ -161,7 +163,14 @@ func NewVerifier(powFlags PowFlags) (*Verifier, error) {
 }
 
 func (v *Verifier) Close() error {
-	v.closeOnce.Do(func() { C.free_verifier(v.inner) })
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if v.inner == nil {
+		return ErrVerifierClosed
+	}
+
+	C.free_verifier(v.inner)
+	v.inner = nil
 	return nil
 }
 
@@ -213,24 +222,22 @@ func (v *Verifier) VerifyProof(
 		config.pow_difficulty[i] = C.uchar(b)
 	}
 
-	indicesSliceHdr := (*reflect.SliceHeader)(unsafe.Pointer(&proof.Indices))
 	cProof := C.Proof{
 		nonce: C.uint32_t(proof.Nonce),
 		pow:   C.uint64_t(proof.Pow),
 		indices: C.ArrayU8{
-			ptr: (*C.uchar)(unsafe.Pointer(indicesSliceHdr.Data)),
-			len: C.size_t(indicesSliceHdr.Len),
-			cap: C.size_t(indicesSliceHdr.Cap),
+			ptr: (*C.uchar)(unsafe.SliceData(proof.Indices)),
+			len: C.size_t(len(proof.Indices)),
+			cap: C.size_t(cap(proof.Indices)),
 		},
 	}
 
 	if opts.powCreatorId != nil {
 		logger.Debug("verifying POST with PoW creator ID", zap.Stringer("id", HexEncoded(opts.powCreatorId)))
-		minerIdSliceHdr := (*reflect.SliceHeader)(unsafe.Pointer(&opts.powCreatorId))
 		cProof.pow_creator = C.ArrayU8{
-			ptr: (*C.uchar)(unsafe.Pointer(minerIdSliceHdr.Data)),
-			len: C.size_t(minerIdSliceHdr.Len),
-			cap: C.size_t(minerIdSliceHdr.Cap),
+			ptr: (*C.uchar)(unsafe.SliceData(opts.powCreatorId)),
+			len: C.size_t(len(opts.powCreatorId)),
+			cap: C.size_t(cap(opts.powCreatorId)),
 		}
 	}
 
@@ -241,6 +248,13 @@ func (v *Verifier) VerifyProof(
 		num_units:         C.uint32_t(metadata.NumUnits),
 		labels_per_unit:   C.uint64_t(metadata.LabelsPerUnit),
 	}
+
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	if v.inner == nil {
+		return ErrVerifierClosed
+	}
+
 	result := C.verify_proof(
 		v.inner,
 		cProof,
