@@ -27,7 +27,10 @@ func SaveMetadata(dir string, v *shared.PostMetadata) error {
 	}
 	defer tmp.Close()
 
-	if err := json.NewEncoder(tmp).Encode(v); err != nil {
+	enc := json.NewEncoder(tmp)
+	enc.SetIndent("", "\t")
+
+	if err := enc.Encode(v); err != nil {
 		return fmt.Errorf("failed to encode metadata: %w", err)
 	}
 
