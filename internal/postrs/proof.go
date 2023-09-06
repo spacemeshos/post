@@ -166,7 +166,7 @@ func (v *Verifier) Close() error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if v.inner == nil {
-		return ErrVerifierClosed
+		return nil
 	}
 
 	C.free_verifier(v.inner)

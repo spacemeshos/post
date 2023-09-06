@@ -121,6 +121,14 @@ func Test_Verify_NoRace_On_Close(t *testing.T) {
 	r.ErrorIs(eg.Wait(), postrs.ErrVerifierClosed)
 }
 
+func Test_Verifier_NoError_On_DoubleClose(t *testing.T) {
+	verifier, err := NewProofVerifier()
+	require.NoError(t, err)
+
+	require.NoError(t, verifier.Close())
+	require.NoError(t, verifier.Close())
+}
+
 func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	r := require.New(t)
 
