@@ -7,8 +7,8 @@ package mocks
 import (
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
 	postrs "github.com/spacemeshos/post/internal/postrs"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockScrypter is a mock of Scrypter interface.
@@ -43,9 +43,33 @@ func (m *MockScrypter) Close() error {
 }
 
 // Close indicates an expected call of Close.
-func (mr *MockScrypterMockRecorder) Close() *gomock.Call {
+func (mr *MockScrypterMockRecorder) Close() *ScrypterCloseCall {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockScrypter)(nil).Close))
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockScrypter)(nil).Close))
+	return &ScrypterCloseCall{Call: call}
+}
+
+// ScrypterCloseCall wrap *gomock.Call
+type ScrypterCloseCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *ScrypterCloseCall) Return(arg0 error) *ScrypterCloseCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *ScrypterCloseCall) Do(f func() error) *ScrypterCloseCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *ScrypterCloseCall) DoAndReturn(f func() error) *ScrypterCloseCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
 }
 
 // Positions mocks base method.
@@ -58,7 +82,31 @@ func (m *MockScrypter) Positions(arg0, arg1 uint64) (postrs.ScryptPositionsResul
 }
 
 // Positions indicates an expected call of Positions.
-func (mr *MockScrypterMockRecorder) Positions(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockScrypterMockRecorder) Positions(arg0, arg1 interface{}) *ScrypterPositionsCall {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Positions", reflect.TypeOf((*MockScrypter)(nil).Positions), arg0, arg1)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Positions", reflect.TypeOf((*MockScrypter)(nil).Positions), arg0, arg1)
+	return &ScrypterPositionsCall{Call: call}
+}
+
+// ScrypterPositionsCall wrap *gomock.Call
+type ScrypterPositionsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *ScrypterPositionsCall) Return(arg0 postrs.ScryptPositionsResult, arg1 error) *ScrypterPositionsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *ScrypterPositionsCall) Do(f func(uint64, uint64) (postrs.ScryptPositionsResult, error)) *ScrypterPositionsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *ScrypterPositionsCall) DoAndReturn(f func(uint64, uint64) (postrs.ScryptPositionsResult, error)) *ScrypterPositionsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
 }

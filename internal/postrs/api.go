@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-//go:generate mockgen -package mocks -destination mocks/api.go . Scrypter
+//go:generate mockgen -typed -package mocks -destination mocks/api.go . Scrypter
 
 // ErrScryptClosed is returned when calling a method on an already closed Scrypt instance.
 var ErrScryptClosed = errors.New("scrypt has been closed")
