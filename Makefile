@@ -63,7 +63,7 @@ lint-github-action: get-postrs-lib
 .PHONY: lint-github-action
 
 cover: get-postrs-lib
-	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -coverprofile=cover.out -timeout 0 -p 1 ./...
+	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -coverprofile=cover.out -timeout 0 -p 1 -coverpkg=./... ./...
 .PHONY: cover
 
 staticcheck: get-postrs-lib
