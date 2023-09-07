@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/initialization"
@@ -57,7 +58,7 @@ func Test_Verify(t *testing.T) {
 		context.Background(),
 		ch,
 		cfg,
-		zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
+		logger,
 		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
 		proving.WithPowFlags(postrs.GetRecommendedPowFlags()),
 	)
@@ -68,6 +69,64 @@ func Test_Verify(t *testing.T) {
 	defer verifier.Close()
 
 	r.NoError(verifier.Verify(proof, proofMetadata, cfg, logger))
+}
+
+func Test_Verify_NoRace_On_Close(t *testing.T) {
+	r := require.New(t)
+
+	nodeId := make([]byte, 32)
+	commitmentAtxId := make([]byte, 32)
+	ch := make(shared.Challenge, 32)
+
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
+	cfg, opts := getTestConfig(t)
+	init, err := initialization.NewInitializer(
+		initialization.WithNodeId(nodeId),
+		initialization.WithCommitmentAtxId(commitmentAtxId),
+		initialization.WithConfig(cfg),
+		initialization.WithInitOpts(opts),
+		initialization.WithLogger(logger),
+	)
+	r.NoError(err)
+	r.NoError(init.Initialize(context.Background()))
+
+	proof, proofMetadata, err := proving.Generate(
+		context.Background(),
+		ch,
+		cfg,
+		logger,
+		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
+		proving.WithPowFlags(postrs.GetRecommendedPowFlags()),
+	)
+	r.NoError(err)
+
+	verifier, err := NewProofVerifier()
+	r.NoError(err)
+	defer verifier.Close()
+
+	var eg errgroup.Group
+	eg.Go(func() error {
+		time.Sleep(50 * time.Millisecond)
+		return verifier.Close()
+	})
+
+	for i := 0; i < 10; i++ {
+		ms := 10 * i
+		eg.Go(func() error {
+			time.Sleep(time.Duration(ms) * time.Millisecond)
+			return verifier.Verify(proof, proofMetadata, cfg, logger)
+		})
+	}
+
+	r.ErrorIs(eg.Wait(), postrs.ErrVerifierClosed)
+}
+
+func Test_Verifier_NoError_On_DoubleClose(t *testing.T) {
+	verifier, err := NewProofVerifier()
+	require.NoError(t, err)
+
+	require.NoError(t, verifier.Close())
+	require.NoError(t, verifier.Close())
 }
 
 func Test_Verify_Detects_invalid_proof(t *testing.T) {
