@@ -3,6 +3,7 @@ package initialization
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
@@ -75,8 +76,9 @@ func TestInitialize(t *testing.T) {
 	require.NoError(t, verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
 }
 
-func TestInitialize_BeforeNonceValue(t *testing.T) {
+func TestInitialize_Migrate_Metadata(t *testing.T) {
 	cfg, opts := getTestConfig(t)
+	opts.Scrypt.N = 8192 // use default scrypt params
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -98,10 +100,27 @@ func TestInitialize_BeforeNonceValue(t *testing.T) {
 	require.NotNil(t, meta.Nonce)
 	require.NotNil(t, meta.NonceValue)
 	nonceValue := meta.NonceValue
+	nonce := meta.Nonce
+
+	old := postMetadataV0{
+		NodeId:          nodeId,
+		CommitmentAtxId: commitmentAtxId,
+		LabelsPerUnit:   meta.LabelsPerUnit,
+		NumUnits:        meta.NumUnits,
+		MaxFileSize:     meta.MaxFileSize,
+		Nonce:           meta.Nonce,
+		NonceValue:      meta.NonceValue,
+		LastPosition:    meta.LastPosition,
+	}
 
 	// delete nonce value
-	meta.NonceValue = nil
-	require.NoError(t, SaveMetadata(opts.DataDir, meta))
+	old.NonceValue = nil
+
+	// store in old metadata format
+	f, err := os.Create(filepath.Join(opts.DataDir, MetadataFileName))
+	require.NoError(t, err)
+	defer f.Close()
+	require.NoError(t, json.NewEncoder(f).Encode(old))
 
 	// just creating a new initializer should update the metadata
 	init, err = NewInitializer(
@@ -116,8 +135,10 @@ func TestInitialize_BeforeNonceValue(t *testing.T) {
 
 	meta, err = LoadMetadata(opts.DataDir)
 	require.NoError(t, err)
+	require.Equal(t, 1, meta.Version)
 	require.NotNil(t, meta.Nonce)
 	require.NotNil(t, meta.NonceValue)
+	require.Equal(t, *nonce, *meta.Nonce)
 	require.Equal(t, nonceValue, meta.NonceValue)
 }
 
@@ -1096,6 +1117,36 @@ func TestInitializeLastFileIsSmaller(t *testing.T) {
 }
 
 func TestRemoveRedundantFiles(t *testing.T) {
+	cfg := config.DefaultConfig()
+
+	opts := config.DefaultInitOpts()
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = 3
+	opts.MaxFileSize = 2 * cfg.UnitSize()
+
+	expectedFilesCount := opts.TotalFiles(cfg.LabelsPerUnit)
+	// Create 2 redundant files
+	for i := 0; i < expectedFilesCount+2; i++ {
+		f, err := os.Create(filepath.Join(opts.DataDir, shared.InitFileName(i)))
+		require.NoError(t, err)
+		_, err = f.Write([]byte("test"))
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+	}
+
+	removeRedundantFiles(cfg, opts, zap.NewNop())
+
+	files, err := os.ReadDir(opts.DataDir)
+	require.NoError(t, err)
+	require.Len(t, files, expectedFilesCount)
+
+	for i := 0; i < expectedFilesCount; i++ {
+		_, err := os.Stat(filepath.Join(opts.DataDir, shared.InitFileName(i)))
+		require.NoError(t, err)
+	}
+}
+
+func Test_Initialize_Migrates_Metadata(t *testing.T) {
 	cfg := config.DefaultConfig()
 
 	opts := config.DefaultInitOpts()

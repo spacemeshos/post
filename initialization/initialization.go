@@ -227,39 +227,10 @@ func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 			return nil, err
 		}
 		init.nonce.Store(m.Nonce)
+		nonceValue := make([]byte, postrs.LabelLength)
+		copy(nonceValue, m.NonceValue)
+		init.nonceValue.Store(&nonceValue)
 		init.lastPosition.Store(m.LastPosition)
-
-		switch {
-		case m.NonceValue != nil:
-			// there is already a nonce value in the metadata
-			nonceValue := make([]byte, postrs.LabelLength)
-			copy(nonceValue, m.NonceValue)
-			init.nonceValue.Store(&nonceValue)
-		case m.Nonce != nil:
-			// there is a nonce in the metadata but no nonce value
-			cpuProviderID := CPUProviderID()
-			wo, err := oracle.New(
-				oracle.WithProviderID(&cpuProviderID),
-				oracle.WithCommitment(init.commitment),
-				oracle.WithVRFDifficulty(make([]byte, 32)), // we are not looking for it, so set difficulty to 0
-				oracle.WithScryptParams(init.opts.Scrypt),
-				oracle.WithLogger(init.logger),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create work oracle: %w", err)
-			}
-			defer wo.Close()
-
-			result, err := wo.Position(*m.Nonce)
-			if err != nil {
-				return nil, fmt.Errorf("failed to compute nonce value: %w", err)
-			}
-			nonceValue := make([]byte, postrs.LabelLength)
-			copy(nonceValue, result.Output)
-			init.nonceValue.Store(&nonceValue)
-		default:
-			// no nonce in the metadata
-		}
 	}
 
 	if err := init.saveMetadata(); err != nil {
