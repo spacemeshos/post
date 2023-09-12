@@ -701,6 +701,8 @@ func (init *Initializer) saveMetadata() error {
 }
 
 func (init *Initializer) loadMetadata() (*shared.PostMetadata, error) {
-	// TODO(mafa): migrate metadata if needed before loading it
+	if err := MigratePoST(init.opts.DataDir, init.logger); err != nil {
+		return nil, err
+	}
 	return LoadMetadata(init.opts.DataDir)
 }
