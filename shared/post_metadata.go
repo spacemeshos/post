@@ -13,8 +13,8 @@ var ErrStateMetadataFileMissing = errors.New("metadata file is missing")
 type PostMetadata struct {
 	Version int `json:",omitempty"`
 
-	NodeId          NodeID
-	CommitmentAtxId ATXID
+	NodeId          []byte
+	CommitmentAtxId []byte
 
 	LabelsPerUnit uint64
 	NumUnits      uint32
@@ -58,6 +58,7 @@ func (n *NonceValue) UnmarshalJSON(data []byte) (err error) {
 	return
 }
 
+// TODO(mafa): for version 2 of metadata use NodeID as type for NodeID.
 type NodeID []byte
 
 func (n NodeID) MarshalJSON() ([]byte, error) {
@@ -73,6 +74,7 @@ func (n *NodeID) UnmarshalJSON(data []byte) (err error) {
 	return
 }
 
+// TODO(mafa): for version 2 of metadata use ATXID as type for CommitmentAtxID.
 type ATXID []byte
 
 func (a ATXID) MarshalJSON() ([]byte, error) {
