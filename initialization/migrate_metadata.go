@@ -101,23 +101,19 @@ func migrateV0(dir string, logger *zap.Logger) (err error) {
 		return fmt.Errorf("failed to determine metadata version: %w", err)
 	}
 
-	var nodeID shared.NodeID
 	if len(old.NodeId) != 32 {
 		return fmt.Errorf("invalid node ID length: %d", len(old.NodeId))
 	}
-	copy(nodeID[:], old.NodeId)
 
-	var commitmentAtxID shared.ATXID
 	if len(old.CommitmentAtxId) != 32 {
 		return fmt.Errorf("invalid commitment ATX ID length: %d", len(old.CommitmentAtxId))
 	}
-	copy(commitmentAtxID[:], old.CommitmentAtxId)
 
 	new := shared.PostMetadata{
 		Version: 1,
 
-		NodeId:          nodeID,
-		CommitmentAtxId: commitmentAtxID,
+		NodeId:          old.NodeId,
+		CommitmentAtxId: old.CommitmentAtxId,
 
 		LabelsPerUnit: old.LabelsPerUnit,
 		NumUnits:      old.NumUnits,
@@ -131,7 +127,7 @@ func migrateV0(dir string, logger *zap.Logger) (err error) {
 
 	if new.Nonce != nil && new.NonceValue == nil {
 		// there is a nonce in the metadata but no nonce value
-		commitment := oracle.CommitmentBytes(new.NodeId[:], new.CommitmentAtxId[:])
+		commitment := oracle.CommitmentBytes(new.NodeId, new.CommitmentAtxId)
 		cpuProviderID := CPUProviderID()
 
 		wo, err := oracle.New(
@@ -149,7 +145,7 @@ func migrateV0(dir string, logger *zap.Logger) (err error) {
 		if err != nil {
 			return fmt.Errorf("failed to compute nonce value: %w", err)
 		}
-		copy(new.NonceValue, result.Output)
+		new.NonceValue = result.Output
 	}
 
 	tmp, err := os.Create(fmt.Sprintf("%s.tmp", filename))
