@@ -1113,7 +1113,7 @@ func TestRemoveRedundantFiles(t *testing.T) {
 		require.NoError(t, f.Close())
 	}
 
-	removeRedundantFiles(cfg, opts, zap.NewNop())
+	reportRedundantFiles(cfg, opts, zap.NewNop())
 
 	files, err := os.ReadDir(opts.DataDir)
 	require.NoError(t, err)

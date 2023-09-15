@@ -295,7 +295,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		zap.Int("firstFileIndex", layout.FirstFileIdx),
 		zap.Int("lastFileIndex", layout.LastFileIdx),
 	)
-	if err := removeRedundantFiles(init.cfg, init.opts, init.logger); err != nil {
+	if err := reportRedundantFiles(init.cfg, init.opts, init.logger); err != nil {
 		return err
 	}
 
@@ -395,12 +395,12 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	return fmt.Errorf("no nonce found")
 }
 
-func removeRedundantFiles(cfg config.Config, opts config.InitOpts, logger *zap.Logger) error {
-	// Go over all postdata_N.bin files in the data directory and remove the ones that are not needed.
+func reportRedundantFiles(cfg config.Config, opts config.InitOpts, logger *zap.Logger) error {
+	// Go over all postdata_N.bin files in the data directory and report the ones that are not needed.
 	// The files with indices from 0 to init.opts.TotalFiles(init.cfg.LabelsPerUnit) - 1 are preserved.
-	// The rest are redundant and can be removed.
+	// The rest are redundant and can be removed (but we don't remove them here).
 	maxFileIndex := opts.TotalFiles(cfg.LabelsPerUnit) - 1
-	logger.Debug("attempting to remove redundant files above index", zap.Int("maxFileIndex", maxFileIndex))
+	logger.Debug("checking for redundant files above index", zap.Int("maxFileIndex", maxFileIndex))
 
 	files, err := os.ReadDir(opts.DataDir)
 	if err != nil {
@@ -415,11 +415,7 @@ func removeRedundantFiles(cfg config.Config, opts config.InitOpts, logger *zap.L
 			continue
 		}
 		if fileIndex > maxFileIndex {
-			logger.Info("removing redundant file", zap.String("fileName", name))
-			path := filepath.Join(opts.DataDir, name)
-			if err := os.Remove(path); err != nil {
-				return fmt.Errorf("failed to delete file (%v): %w", path, err)
-			}
+			logger.Debug("found redundant file", zap.String("fileName", name))
 		}
 	}
 	return nil
