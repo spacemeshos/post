@@ -295,9 +295,6 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		zap.Int("firstFileIndex", layout.FirstFileIdx),
 		zap.Int("lastFileIndex", layout.LastFileIdx),
 	)
-	if err := reportRedundantFiles(init.cfg, init.opts, init.logger); err != nil {
-		return err
-	}
 
 	numLabels := uint64(init.opts.NumUnits) * init.cfg.LabelsPerUnit
 	difficulty := init.powDifficultyFunc(numLabels)
@@ -393,32 +390,6 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	}
 
 	return fmt.Errorf("no nonce found")
-}
-
-func reportRedundantFiles(cfg config.Config, opts config.InitOpts, logger *zap.Logger) error {
-	// Go over all postdata_N.bin files in the data directory and report the ones that are not needed.
-	// The files with indices from 0 to init.opts.TotalFiles(init.cfg.LabelsPerUnit) - 1 are preserved.
-	// The rest are redundant and can be removed (but we don't remove them here).
-	maxFileIndex := opts.TotalFiles(cfg.LabelsPerUnit) - 1
-	logger.Debug("checking for redundant files above index", zap.Int("maxFileIndex", maxFileIndex))
-
-	files, err := os.ReadDir(opts.DataDir)
-	if err != nil {
-		return err
-	}
-	for _, file := range files {
-		name := file.Name()
-		fileIndex, err := shared.ParseFileIndex(name)
-		if err != nil && name != MetadataFileName {
-			// TODO(mafa): revert back to warning, see https://github.com/spacemeshos/go-spacemesh/issues/4789
-			logger.Debug("found unrecognized file", zap.String("fileName", name))
-			continue
-		}
-		if fileIndex > maxFileIndex {
-			logger.Debug("found redundant file", zap.String("fileName", name))
-		}
-	}
-	return nil
 }
 
 func (init *Initializer) NumLabelsWritten() uint64 {

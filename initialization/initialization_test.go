@@ -1094,33 +1094,3 @@ func TestInitializeLastFileIsSmaller(t *testing.T) {
 	r.NoError(err)
 	r.Equal(cfg.UnitSize(), uint64(file.Size()))
 }
-
-func TestRemoveRedundantFiles(t *testing.T) {
-	cfg := config.DefaultConfig()
-
-	opts := config.DefaultInitOpts()
-	opts.DataDir = t.TempDir()
-	opts.NumUnits = 3
-	opts.MaxFileSize = 2 * cfg.UnitSize()
-
-	expectedFilesCount := opts.TotalFiles(cfg.LabelsPerUnit)
-	// Create 2 redundant files
-	for i := 0; i < expectedFilesCount+2; i++ {
-		f, err := os.Create(filepath.Join(opts.DataDir, shared.InitFileName(i)))
-		require.NoError(t, err)
-		_, err = f.Write([]byte("test"))
-		require.NoError(t, err)
-		require.NoError(t, f.Close())
-	}
-
-	reportRedundantFiles(cfg, opts, zap.NewNop())
-
-	files, err := os.ReadDir(opts.DataDir)
-	require.NoError(t, err)
-	require.Len(t, files, expectedFilesCount)
-
-	for i := 0; i < expectedFilesCount; i++ {
-		_, err := os.Stat(filepath.Join(opts.DataDir, shared.InitFileName(i)))
-		require.NoError(t, err)
-	}
-}
