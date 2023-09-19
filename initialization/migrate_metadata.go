@@ -43,6 +43,9 @@ func MigratePoST(dir string, logger *zap.Logger) (err error) {
 	if err := json.NewDecoder(file).Decode(&version); err != nil {
 		return fmt.Errorf("failed to determine metadata version: %w", err)
 	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close metadata file: %w", err)
+	}
 
 	if version.Version == len(migrateData) {
 		logger.Info("PoST is up to date, no migration needed")
