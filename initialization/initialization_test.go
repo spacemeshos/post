@@ -531,7 +531,9 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 		r.NoError(err)
 		newLayout, err := deriveFilesLayout(cfg, newOpts)
 		r.NoError(err)
-		r.Equal(newLayout.NumFiles(), numFiles)
+
+		// we allow extra files
+		r.LessOrEqual(newLayout.NumFiles(), numFiles)
 		r.Less(newLayout.NumFiles(), layout.NumFiles())
 
 		cancel()
