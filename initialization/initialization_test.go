@@ -666,6 +666,7 @@ func TestValidateMetadata(t *testing.T) {
 	r := require.New(t)
 
 	cfg, opts := getTestConfig(t)
+	opts.NumUnits++
 
 	init, err := NewInitializer(
 		WithNodeId(nodeId),
@@ -737,6 +738,19 @@ func TestValidateMetadata(t *testing.T) {
 	)
 	r.ErrorAs(err, &errConfigMismatch)
 	r.Equal("NumUnits", errConfigMismatch.Param)
+
+	// Attempt to initialize with a lower `opts.NumUnits`.
+	newOpts = opts
+	newOpts.NumUnits--
+	_, err = NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(newOpts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+	)
+	// this is allowed
+	r.NoError(err)
 }
 
 func TestStop(t *testing.T) {
