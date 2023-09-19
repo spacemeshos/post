@@ -643,6 +643,12 @@ func (init *Initializer) verifyMetadata(m *shared.PostMetadata) error {
 		}
 	}
 
+	if init.opts.NumUnits < m.NumUnits {
+		init.logger.Warn("initialization: found more units than expected, did you forget to delete some files?",
+			zap.Uint32("expected", init.opts.NumUnits),
+			zap.Uint32("found", m.NumUnits))
+	}
+
 	return nil
 }
 
