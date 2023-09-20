@@ -119,8 +119,8 @@ func TestInitialize_Migrate_Metadata(t *testing.T) {
 	// store in old metadata format
 	f, err := os.Create(filepath.Join(opts.DataDir, MetadataFileName))
 	require.NoError(t, err)
-	defer f.Close()
 	require.NoError(t, json.NewEncoder(f).Encode(old))
+	require.NoError(t, f.Close())
 
 	// just creating a new initializer should update the metadata
 	init, err = NewInitializer(
