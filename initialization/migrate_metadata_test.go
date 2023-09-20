@@ -49,6 +49,7 @@ func Fuzz_MigrateMetadata(f *testing.F) {
 		}
 
 		require.NoError(t, json.NewEncoder(f).Encode(old))
+		require.NoError(t, f.Close())
 
 		log := zaptest.NewLogger(t)
 		require.NoError(t, MigratePoST(path, log))
