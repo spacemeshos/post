@@ -104,6 +104,10 @@ func migrateV0(dir string, logger *zap.Logger) (err error) {
 		return fmt.Errorf("failed to determine metadata version: %w", err)
 	}
 
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close metadata file: %w", err)
+	}
+
 	if len(old.NodeId) != 32 {
 		return fmt.Errorf("invalid node ID length: %d", len(old.NodeId))
 	}
