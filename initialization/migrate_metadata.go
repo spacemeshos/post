@@ -157,7 +157,7 @@ func migrateV0(dir string, logger *zap.Logger) (err error) {
 
 	tmp, err := os.Create(fmt.Sprintf("%s.tmp", filename))
 	if err != nil {
-		return fmt.Errorf("create temporary file %s: %w", tmp.Name(), err)
+		return fmt.Errorf("create temporary file: %w", err)
 	}
 	defer tmp.Close()
 
@@ -170,7 +170,7 @@ func migrateV0(dir string, logger *zap.Logger) (err error) {
 	}
 
 	if err := atomic.ReplaceFile(tmp.Name(), filename); err != nil {
-		return fmt.Errorf("save file from %s, %s: %w", tmp.Name(), filename, err)
+		return fmt.Errorf("atomic replace: %w", err)
 	}
 
 	return nil

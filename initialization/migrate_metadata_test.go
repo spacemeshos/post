@@ -99,8 +99,8 @@ func Test_Migrate_Adds_NonceValue(t *testing.T) {
 	path := t.TempDir()
 	f, err := os.Create(filepath.Join(path, MetadataFileName))
 	require.NoError(t, err)
-	defer f.Close()
 	require.NoError(t, json.NewEncoder(f).Encode(old))
+	require.NoError(t, f.Close())
 
 	log := zaptest.NewLogger(t)
 	require.NoError(t, MigratePoST(path, log))
