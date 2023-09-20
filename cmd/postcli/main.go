@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 
 	"github.com/davecgh/go-spew/spew"
 	"go.uber.org/zap"
@@ -27,6 +28,27 @@ import (
 )
 
 const edKeyFileName = "key.bin"
+
+type numUnitsFlag struct {
+	set   bool
+	value uint32
+}
+
+func (nu *numUnitsFlag) Set(s string) error {
+	val, err := strconv.ParseUint(s, 10, 32)
+	if err != nil {
+		return err
+	}
+	*nu = numUnitsFlag{
+		set:   true,
+		value: uint32(val),
+	}
+	return nil
+}
+
+func (nu *numUnitsFlag) String() string {
+	return fmt.Sprintf("%d", nu.value)
+}
 
 var (
 	cfg  = config.MainnetConfig()
@@ -46,6 +68,7 @@ var (
 	commitmentAtxIdHex string
 	commitmentAtxId    []byte
 	reset              bool
+	numUnits           numUnitsFlag
 
 	logLevel zapcore.Level
 
@@ -72,7 +95,7 @@ func parseFlags() {
 	flag.BoolVar(&reset, "reset", false, "whether to reset the datadir before starting")
 	flag.StringVar(&idHex, "id", "", "miner's id (public key), in hex (will be auto-generated if not provided)")
 	flag.StringVar(&commitmentAtxIdHex, "commitmentAtxId", "", "commitment atx id, in hex (required)")
-	numUnits := flag.Uint64("numUnits", uint64(opts.NumUnits), "number of units")
+	flag.Var(&numUnits, "numUnits", "number of units")
 
 	flag.IntVar(&opts.FromFileIdx, "fromFile", 0, "index of the first file to init (inclusive)")
 	var to int
@@ -89,10 +112,19 @@ func parseFlags() {
 		*opts.ProviderID = uint32(providerID)
 	}
 
-	opts.NumUnits = uint32(*numUnits) // workaround the missing type support for uint32
+	if numUnits.set {
+		opts.NumUnits = numUnits.value
+	}
 }
 
 func processFlags() error {
+	// we require the user to explicitly pass numunits to avoid erasing existing data
+	if !numUnits.set {
+		return fmt.Errorf("-numUnits must be specified to perform initialization. to use the default value, "+
+			"run with -numUnits %d. note: if there's more than this amount of data on disk, "+
+			"THIS WILL ERASE EXISTING DATA. MAKE ABSOLUTELY SURE YOU SPECIFY THE CORRECT VALUE", opts.NumUnits)
+	}
+
 	if opts.ProviderID == nil {
 		return errors.New("-provider flag is required")
 	}
@@ -206,7 +238,7 @@ func main() {
 	case errors.Is(err, ErrKeyFileExists):
 		log.Fatalln("cli: key file already exists. This appears to be a mistake. If you're trying to initialize a new identity delete key.bin and try again otherwise specify identity with `-id` flag")
 	case err != nil:
-		log.Fatalln("failed to process flags", err)
+		log.Fatalln("failed to process flags:", err)
 	}
 
 	init, err := initialization.NewInitializer(
