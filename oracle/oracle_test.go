@@ -12,7 +12,6 @@ import (
 )
 
 func TestOracleRetryPositions(t *testing.T) {
-	t.Parallel()
 	commitment := make([]byte, 32)
 	vrfDifficulty := make([]byte, 32)
 	mockScrypter := mocks.NewMockScrypter(gomock.NewController(t))
@@ -44,7 +43,6 @@ func TestOracleRetryPositions(t *testing.T) {
 }
 
 func TestOracleErrorsOnMissingProviderID(t *testing.T) {
-	t.Parallel()
 	commitment := make([]byte, 32)
 	vrfDifficulty := make([]byte, 32)
 	o, err := New(
@@ -60,7 +58,6 @@ func TestOracleErrorsOnMissingProviderID(t *testing.T) {
 }
 
 func TestOracleFailsOnInvalidIndices(t *testing.T) {
-	t.Parallel()
 	commitment := make([]byte, 32)
 	vrfDifficulty := make([]byte, 32)
 	mockScrypter := mocks.NewMockScrypter(gomock.NewController(t))
@@ -78,7 +75,6 @@ func TestOracleFailsOnInvalidIndices(t *testing.T) {
 }
 
 func TestOracleCantInitializeAfterClose(t *testing.T) {
-	t.Parallel()
 	commitment := make([]byte, 32)
 	vrfDifficulty := make([]byte, 32)
 	mockScrypter := mocks.NewMockScrypter(gomock.NewController(t))

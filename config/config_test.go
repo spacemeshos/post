@@ -37,7 +37,6 @@ func TestTotalFiles(t *testing.T) {
 }
 
 func TestOptsValidateScryptParams(t *testing.T) {
-	t.Parallel()
 	cfg := config.DefaultConfig()
 	opts := config.DefaultInitOpts()
 	opts.ProviderID = new(uint32)
