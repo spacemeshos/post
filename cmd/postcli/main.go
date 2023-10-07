@@ -70,6 +70,9 @@ var (
 	reset              bool
 	numUnits           numUnitsFlag
 
+	nonces	uint
+	threads	uint
+
 	logLevel zapcore.Level
 
 	ErrKeyFileExists = errors.New("key file already exists")
@@ -96,6 +99,9 @@ func parseFlags() {
 	flag.StringVar(&idHex, "id", "", "miner's id (public key), in hex (will be auto-generated if not provided)")
 	flag.StringVar(&commitmentAtxIdHex, "commitmentAtxId", "", "commitment atx id, in hex (required)")
 	flag.Var(&numUnits, "numUnits", "number of units")
+
+	flag.UintVar(&nonces, "nonces", 16, "number of nonces for -genproof")
+	flag.UintVar(&threads, "threads", 1, "number of threads for -genproof")
 
 	flag.IntVar(&opts.FromFileIdx, "fromFile", 0, "index of the first file to init (inclusive)")
 	var to int
@@ -278,7 +284,7 @@ func main() {
 	if genProof {
 		log.Println("cli: generating proof as a sanity test")
 
-		proof, proofMetadata, err := proving.Generate(ctx, shared.ZeroChallenge, cfg, logger, proving.WithDataSource(cfg, id, commitmentAtxId, opts.DataDir))
+		proof, proofMetadata, err := proving.Generate(ctx, shared.ZeroChallenge, cfg, logger, proving.WithDataSource(cfg, id, commitmentAtxId, opts.DataDir), proving.WithNonces(nonces), proving.WithThreads(threads))
 		if err != nil {
 			log.Fatalln("proof generation error", err)
 		}

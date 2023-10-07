@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"log"
 
 	"go.uber.org/zap"
 
@@ -34,6 +35,8 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		provingOpts = append(provingOpts, postrs.WithPowCreator(options.powCreatorId))
 	}
 
+	log.Printf("Generating proof with: %d nonces and %d threads.\n", options.nonces, options.threads)
+	logger.Info("proving: start generating proof")
 	result, err := postrs.GenerateProof(options.datadir, ch, logger, options.nonces, options.threads, cfg.K1, cfg.K2, cfg.PowDifficulty, options.powFlags, provingOpts...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generating proof: %w", err)
