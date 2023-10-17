@@ -19,8 +19,6 @@ type option struct {
 	// How many threads to use to generate a proof.
 	// 0 - automatically detect
 	threads uint
-
-	powCreatorId []byte
 }
 
 func (o *option) validate() error {
@@ -82,16 +80,6 @@ func WithNonces(nonces uint) OptionFunc {
 func WithThreads(threads uint) OptionFunc {
 	return func(o *option) error {
 		o.threads = threads
-		return nil
-	}
-}
-
-func WithPowCreator(id []byte) OptionFunc {
-	return func(o *option) error {
-		if len(id) != 32 {
-			return errors.New("pow creator id must be 32 bytes")
-		}
-		o.powCreatorId = id
 		return nil
 	}
 }
