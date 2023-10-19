@@ -43,26 +43,7 @@ func TranslateScryptParams(n, r, p uint) ScryptParams {
 	}
 }
 
-type postOptions struct {
-	powCreatorId []byte
-}
-
-type PostOptionFunc func(*postOptions) error
-
-func WithPowCreator(id []byte) PostOptionFunc {
-	return func(opts *postOptions) error {
-		opts.powCreatorId = id
-		return nil
-	}
-}
-
-func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces, threads uint, K1, K2 uint32, powDifficulty [32]byte, powFlags PowFlags, options ...PostOptionFunc) (*shared.Proof, error) {
-	opts := postOptions{}
-	for _, o := range options {
-		if err := o(&opts); err != nil {
-			return nil, err
-		}
-	}
+func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces, threads uint, K1, K2 uint32, powDifficulty [32]byte, powFlags PowFlags) (*shared.Proof, error) {
 	if logger != nil {
 		setLogCallback(logger)
 	}
@@ -72,13 +53,6 @@ func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces,
 
 	challengePtr := C.CBytes(challenge)
 	defer C.free(challengePtr)
-
-	var powCreatorId unsafe.Pointer
-	if opts.powCreatorId != nil {
-		logger.Debug("Proving with PoW creator ID", zap.Stringer("id", HexEncoded(opts.powCreatorId)))
-		powCreatorId = C.CBytes(opts.powCreatorId)
-		defer C.free(powCreatorId)
-	}
 
 	config := C.Config{
 		k1: C.uint32_t(K1),
@@ -95,7 +69,6 @@ func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces,
 		C.size_t(nonces),
 		C.size_t(threads),
 		powFlags,
-		(*C.uchar)(powCreatorId),
 	)
 
 	if cProof == nil {
@@ -174,21 +147,7 @@ func (v *Verifier) Close() error {
 	return nil
 }
 
-func (v *Verifier) VerifyProof(
-	proof *shared.Proof,
-	metadata *shared.ProofMetadata,
-	logger *zap.Logger,
-	k1, k2, k3 uint32,
-	powDifficulty [32]byte,
-	scryptParams ScryptParams,
-	options ...PostOptionFunc,
-) error {
-	opts := postOptions{}
-	for _, o := range options {
-		if err := o(&opts); err != nil {
-			return err
-		}
-	}
+func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, logger *zap.Logger, k1, k2, k3 uint32, powDifficulty [32]byte, scryptParams ScryptParams) error {
 	if logger != nil {
 		setLogCallback(logger)
 	}
@@ -230,15 +189,6 @@ func (v *Verifier) VerifyProof(
 			len: C.size_t(len(proof.Indices)),
 			cap: C.size_t(cap(proof.Indices)),
 		},
-	}
-
-	if opts.powCreatorId != nil {
-		logger.Debug("verifying POST with PoW creator ID", zap.Stringer("id", HexEncoded(opts.powCreatorId)))
-		cProof.pow_creator = C.ArrayU8{
-			ptr: (*C.uchar)(unsafe.SliceData(opts.powCreatorId)),
-			len: C.size_t(len(opts.powCreatorId)),
-			cap: C.size_t(cap(opts.powCreatorId)),
-		}
 	}
 
 	cMetadata := C.ProofMetadata{

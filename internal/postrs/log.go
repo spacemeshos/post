@@ -17,7 +17,9 @@ import (
 )
 
 var (
-	log   *zap.Logger
+	logMux sync.RWMutex
+	log    *zap.Logger
+
 	oncer sync.Once
 
 	levelMap = map[zapcore.Level]C.Level{
@@ -42,8 +44,11 @@ var (
 func setLogCallback(logger *zap.Logger) {
 	oncer.Do(func() {
 		C.set_logging_callback(levelMap[logger.Level()], C.callback(C.logCallback))
-		log = logger
 	})
+
+	logMux.Lock()
+	defer logMux.Unlock()
+	log = logger
 }
 
 //export logCallback
@@ -55,5 +60,7 @@ func logCallback(record *C.ExternCRecord) {
 		zap.Int64("line", int64(record.line)),
 	}
 
+	logMux.RLock()
+	defer logMux.RUnlock()
 	log.Log(zapLevelMap[record.level], msg, fields...)
 }
