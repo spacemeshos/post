@@ -4,12 +4,13 @@ import (
 	"errors"
 
 	"github.com/spacemeshos/post/config"
+	"github.com/spacemeshos/post/shared"
 )
 
 type option struct {
 	powFlags config.PowFlags
 	// scrypt parameters for labels initialization
-	labelScrypt config.ScryptParams
+	labelScrypt shared.ScryptParams
 
 	powCreatorId []byte
 }
@@ -33,7 +34,7 @@ func applyOpts(options ...OptionFunc) (*option, error) {
 
 type OptionFunc func(*option) error
 
-func WithLabelScryptParams(params config.ScryptParams) OptionFunc {
+func WithLabelScryptParams(params shared.ScryptParams) OptionFunc {
 	return func(o *option) error {
 		o.labelScrypt = params
 		return nil

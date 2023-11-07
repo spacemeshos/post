@@ -8,8 +8,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/spacemeshos/post/config"
 	"github.com/spacemeshos/post/internal/postrs"
+	"github.com/spacemeshos/post/shared"
 )
 
 // ErrWorkOracleClosed is returned when calling a method on an already closed WorkOracle instance.
@@ -84,7 +84,7 @@ func WithVRFDifficulty(difficulty []byte) OptionFunc {
 
 // WithScryptParams sets the parameters for the scrypt algorithm.
 // At the moment only configuring N is supported. r and p are fixed at 1 (due to limitations in the OpenCL implementation).
-func WithScryptParams(params config.ScryptParams) OptionFunc {
+func WithScryptParams(params shared.ScryptParams) OptionFunc {
 	return func(opts *option) error {
 		if params.P != 1 || params.R != 1 {
 			return errors.New("invalid scrypt params: only r = 1, p = 1 are supported for initialization")

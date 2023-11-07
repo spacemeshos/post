@@ -2,7 +2,6 @@ package config
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -128,7 +127,7 @@ type InitOpts struct {
 	MaxFileSize uint64
 	ProviderID  *uint32
 	Throttle    bool
-	Scrypt      ScryptParams
+	Scrypt      shared.ScryptParams
 	// ComputeBatchSize must be greater than 0
 	ComputeBatchSize uint64
 
@@ -150,25 +149,8 @@ func (o *InitOpts) TotalFiles(labelsPerUnit uint64) int {
 	return int(math.Ceil(float64(o.TotalLabels(labelsPerUnit)) / float64(o.MaxFileNumLabels())))
 }
 
-type ScryptParams struct {
-	N, R, P uint
-}
-
-func (p *ScryptParams) Validate() error {
-	if p.N == 0 {
-		return errors.New("scrypt parameter N cannot be 0")
-	}
-	if p.R == 0 {
-		return errors.New("scrypt parameter r cannot be 0")
-	}
-	if p.P == 0 {
-		return errors.New("scrypt parameter p cannot be 0")
-	}
-	return nil
-}
-
-func DefaultLabelParams() ScryptParams {
-	return ScryptParams{
+func DefaultLabelParams() shared.ScryptParams {
+	return shared.ScryptParams{
 		N: 8192,
 		R: 1,
 		P: 1,
