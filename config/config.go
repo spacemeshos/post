@@ -73,17 +73,7 @@ func DefaultVerifyingPowFlags() PowFlags {
 	return RecommendedPowFlags()
 }
 
-type Config struct {
-	MinNumUnits   uint32
-	MaxNumUnits   uint32
-	LabelsPerUnit uint64
-
-	K1 uint32 // K1 specifies the difficulty for a label to be a candidate for a proof.
-	K2 uint32 // K2 is the number of labels below the required difficulty required for a proof.
-	K3 uint32 // K3 is the size of the subset of proof indices that is validated.
-
-	PowDifficulty [32]byte
-}
+type Config postrs.Config
 
 // MainnetConfig returns the default config for mainnet.
 func MainnetConfig() Config {

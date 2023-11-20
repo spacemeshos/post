@@ -343,7 +343,7 @@ func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) {
 	log.Println("cli: key.bin is valid")
 	log.Println("cli: verifying POS data")
 
-	params := postrs.TranslateScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)
+	params := postrs.NewScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)
 	verifyOpts := []postrs.VerifyPosOptionsFunc{
 		postrs.WithFraction(fraction),
 		postrs.FromFile(uint32(opts.FromFileIdx)),

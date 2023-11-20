@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"sync"
 	"unsafe"
 
@@ -20,6 +19,26 @@ import (
 
 type ScryptParams = C.ScryptParams
 
+type Config struct {
+	MinNumUnits   uint32
+	MaxNumUnits   uint32
+	LabelsPerUnit uint64
+
+	K1 uint32 // K1 specifies the difficulty for a label to be a candidate for a proof.
+	K2 uint32 // K2 is the number of labels below the required difficulty required for a proof.
+	K3 uint32 // K3 is the size of the subset of proof indices that is validated.
+
+	PowDifficulty [32]byte
+}
+
+func NewScryptParams(n, r, p uint) ScryptParams {
+	return ScryptParams{
+		n: C.ulong(n),
+		r: C.ulong(r),
+		p: C.ulong(p),
+	}
+}
+
 type HexEncoded []byte
 
 func (h HexEncoded) String() string {
@@ -28,20 +47,6 @@ func (h HexEncoded) String() string {
 
 // ErrVerifierClosed is returned when calling a method on an already closed Scrypt instance.
 var ErrVerifierClosed = errors.New("verifier has been closed")
-
-// Translate scrypt parameters expressed as N,R,P to Nfactor, Rfactor and Pfactor
-// that are understood by scrypt-jane.
-// Relation:
-// N = 1 << (nfactor + 1)
-// r = 1 << rfactor
-// p = 1 << pfactor
-func TranslateScryptParams(n, r, p uint) ScryptParams {
-	return ScryptParams{
-		nfactor: C.uint8_t(math.Log2(float64(n))) - 1,
-		rfactor: C.uint8_t(math.Log2(float64(r))),
-		pfactor: C.uint8_t(math.Log2(float64(p))),
-	}
-}
 
 func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces, threads uint, K1, K2 uint32, powDifficulty [32]byte, powFlags PowFlags) (*shared.Proof, error) {
 	if logger != nil {
@@ -54,7 +59,7 @@ func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces,
 	challengePtr := C.CBytes(challenge)
 	defer C.free(challengePtr)
 
-	config := C.Config{
+	config := C.ProofConfig{
 		k1: C.uint32_t(K1),
 		k2: C.uint32_t(K2),
 	}
@@ -147,7 +152,7 @@ func (v *Verifier) Close() error {
 	return nil
 }
 
-func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, logger *zap.Logger, k1, k2, k3 uint32, powDifficulty [32]byte, scryptParams ScryptParams) error {
+func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, logger *zap.Logger, cfg Config, scryptParams ScryptParams) error {
 	if logger != nil {
 		setLogCallback(logger)
 	}
@@ -171,14 +176,19 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 		return errors.New("proof indices are empty")
 	}
 
-	config := C.Config{
-		k1:     C.uint32_t(k1),
-		k2:     C.uint32_t(k2),
-		k3:     C.uint32_t(k3),
-		scrypt: scryptParams,
+	config := C.ProofConfig{
+		k1: C.uint32_t(cfg.K1),
+		k2: C.uint32_t(cfg.K2),
+		k3: C.uint32_t(cfg.K3),
 	}
-	for i, b := range powDifficulty {
+	for i, b := range cfg.PowDifficulty {
 		config.pow_difficulty[i] = C.uchar(b)
+	}
+	initConfig := C.InitConfig{
+		labels_per_unit: C.uint64_t(cfg.LabelsPerUnit),
+		min_num_units:   C.uint32_t(cfg.MinNumUnits),
+		max_num_units:   C.uint32_t(cfg.MaxNumUnits),
+		scrypt:          scryptParams,
 	}
 
 	cProof := C.Proof{
@@ -196,7 +206,6 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 		commitment_atx_id: *(*[32]C.uchar)(unsafe.Pointer(&metadata.CommitmentAtxId[0])),
 		challenge:         *(*[32]C.uchar)(unsafe.Pointer(&metadata.Challenge[0])),
 		num_units:         C.uint32_t(metadata.NumUnits),
-		labels_per_unit:   C.uint64_t(metadata.LabelsPerUnit),
 	}
 
 	v.mu.RLock()
@@ -210,6 +219,7 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 		cProof,
 		&cMetadata,
 		config,
+		initConfig,
 	)
 
 	switch result {

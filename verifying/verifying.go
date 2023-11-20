@@ -94,7 +94,6 @@ func (v *ProofVerifier) Verify(p *shared.Proof, m *shared.ProofMetadata, cfg con
 		return fmt.Errorf("invalid `commitmentAtxId` length; expected: 32, given: %v", len(m.CommitmentAtxId))
 	}
 
-	scryptParams := postrs.TranslateScryptParams(options.labelScrypt.N, options.labelScrypt.R, options.labelScrypt.P)
-
-	return v.VerifyProof(p, m, logger, cfg.K1, cfg.K2, cfg.K3, cfg.PowDifficulty, scryptParams)
+	scryptParams := postrs.NewScryptParams(options.labelScrypt.N, options.labelScrypt.R, options.labelScrypt.P)
+	return v.VerifyProof(p, m, logger, postrs.Config(cfg), scryptParams)
 }
