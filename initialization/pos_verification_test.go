@@ -28,14 +28,14 @@ func TestVerifyPos(t *testing.T) {
 	err = init.Initialize(context.Background())
 	require.NoError(t, err)
 
-	scryptParams := postrs.TranslateScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)
+	scryptParams := postrs.NewScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)
 
 	t.Run("valid", func(t *testing.T) {
 		err := postrs.VerifyPos(opts.DataDir, scryptParams, postrs.WithFraction(100.0))
 		require.NoError(t, err)
 	})
 	t.Run("invalid N", func(t *testing.T) {
-		wrongScrypt := postrs.TranslateScryptParams(4, opts.Scrypt.R, opts.Scrypt.P)
+		wrongScrypt := postrs.NewScryptParams(4, opts.Scrypt.R, opts.Scrypt.P)
 		err := postrs.VerifyPos(opts.DataDir, wrongScrypt, postrs.WithFraction(100.0))
 		require.ErrorIs(t, err, postrs.ErrInvalidPos)
 	})

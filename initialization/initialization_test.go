@@ -742,7 +742,7 @@ func TestStop(t *testing.T) {
 
 	cfg, opts := getTestConfig(t)
 	opts.Scrypt.N = 64 // higher difficulty for a chance at stopping before finished
-	opts.NumUnits = 10
+	opts.NumUnits = 20
 	opts.ComputeBatchSize = 1 << 10
 
 	init, err := NewInitializer(
