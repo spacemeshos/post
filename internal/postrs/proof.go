@@ -33,9 +33,9 @@ type Config struct {
 
 func NewScryptParams(n, r, p uint) ScryptParams {
 	return ScryptParams{
-		n: C.ulong(n),
-		r: C.ulong(r),
-		p: C.ulong(p),
+		n: C.size_t(n),
+		r: C.size_t(r),
+		p: C.size_t(p),
 	}
 }
 
