@@ -145,7 +145,7 @@ jobs:
             echo "OUTNAME=${{ runner.os }}" >> $GITHUB_ENV
           fi
       - name: Archive postcli artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: postcli-${{ env.OUTNAME }}.zip
           path: ./build/*
