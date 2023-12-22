@@ -23,21 +23,21 @@ var (
 	oncer sync.Once
 
 	levelMap = map[zapcore.Level]C.Level{
-		zapcore.DebugLevel:  C.Trace,
-		zapcore.InfoLevel:   C.Info,
-		zapcore.WarnLevel:   C.Warn,
-		zapcore.ErrorLevel:  C.Error,
-		zapcore.DPanicLevel: C.Error,
-		zapcore.PanicLevel:  C.Error,
-		zapcore.FatalLevel:  C.Error,
+		zapcore.DebugLevel:  C.Level_Trace,
+		zapcore.InfoLevel:   C.Level_Info,
+		zapcore.WarnLevel:   C.Level_Warn,
+		zapcore.ErrorLevel:  C.Level_Error,
+		zapcore.DPanicLevel: C.Level_Error,
+		zapcore.PanicLevel:  C.Level_Error,
+		zapcore.FatalLevel:  C.Level_Error,
 	}
 
 	zapLevelMap = map[C.Level]zapcore.Level{
-		C.Error: zapcore.ErrorLevel,
-		C.Warn:  zapcore.WarnLevel,
-		C.Info:  zapcore.InfoLevel,
-		C.Debug: zapcore.DebugLevel,
-		C.Trace: zapcore.DebugLevel,
+		C.Level_Error: zapcore.ErrorLevel,
+		C.Level_Warn:  zapcore.WarnLevel,
+		C.Level_Info:  zapcore.InfoLevel,
+		C.Level_Debug: zapcore.DebugLevel,
+		C.Level_Trace: zapcore.DebugLevel,
 	}
 )
 

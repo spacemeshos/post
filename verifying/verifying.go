@@ -61,9 +61,9 @@ type ProofVerifier struct {
 
 // NewProofVerifier creates a new proof verifier.
 // The verifier must be closed after use with Close().
-func NewProofVerifier(opts ...OptionFunc) (*ProofVerifier, error) {
+func NewProofVerifier(id []byte, opts ...OptionFunc) (*ProofVerifier, error) {
 	options := applyOpts(opts...)
-	inner, err := postrs.NewVerifier(options.powFlags)
+	inner, err := postrs.NewVerifier(id, options.powFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -82,6 +82,9 @@ func (v *ProofVerifier) Verify(p *shared.Proof, m *shared.ProofMetadata, cfg con
 	}
 
 	options := applyOpts(opts...)
+	if options.allIndices {
+		cfg.K3 = cfg.K2
+	}
 	scryptParams := postrs.NewScryptParams(options.labelScrypt.N, options.labelScrypt.R, options.labelScrypt.P)
 	return v.VerifyProof(p, m, logger, postrs.Config(cfg), scryptParams)
 }

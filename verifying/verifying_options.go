@@ -8,6 +8,8 @@ type option struct {
 	powFlags config.PowFlags
 	// scrypt parameters for labels initialization
 	labelScrypt config.ScryptParams
+	// whether to verify all indices
+	allIndices bool
 }
 
 func applyOpts(options ...OptionFunc) *option {
@@ -32,5 +34,11 @@ func WithLabelScryptParams(params config.ScryptParams) OptionFunc {
 func WithPowFlags(flags config.PowFlags) OptionFunc {
 	return func(o *option) {
 		o.powFlags = flags
+	}
+}
+
+func AllIndices() OptionFunc {
+	return func(o *option) {
+		o.allIndices = true
 	}
 }

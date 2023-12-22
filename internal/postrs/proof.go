@@ -127,14 +127,17 @@ const (
 type Verifier struct {
 	mu    sync.RWMutex
 	inner *C.Verifier
+	id    []byte
 }
 
 // Create a new verifier.
 // The verifier must be closed after use with Close().
-func NewVerifier(powFlags PowFlags) (*Verifier, error) {
-	verifier := Verifier{}
+func NewVerifier(id []byte, powFlags PowFlags) (*Verifier, error) {
+	verifier := Verifier{
+		id: id,
+	}
 	result := C.new_verifier(powFlags, &verifier.inner)
-	if result != C.Ok {
+	if result != C.VerifyResult_Ok {
 		return nil, fmt.Errorf("failed to create verifier")
 	}
 	return &verifier, nil
@@ -214,22 +217,37 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 		return ErrVerifierClosed
 	}
 
+	id := C.ArrayU8{
+		ptr: (*C.uchar)(unsafe.SliceData(v.id)),
+		len: C.size_t(len(v.id)),
+		cap: C.size_t(cap(v.id)),
+	}
 	result := C.verify_proof(
 		v.inner,
 		cProof,
 		&cMetadata,
 		config,
 		initConfig,
+		id,
 	)
 
-	switch result {
-	case C.Ok:
+	switch result.tag {
+	case C.VerifyResult_Ok:
 		return nil
-	case C.Invalid:
-		return fmt.Errorf("invalid proof")
-	case C.InvalidArgument:
+	case C.VerifyResult_InvalidIndex:
+		result := castBytes[C.VerifyResult_InvalidIndex_Body](result.anon0[:])
+		return ErrInvalidIndex{Index: int(result.index_id)}
+	case C.VerifyResult_InvalidArgument:
 		return fmt.Errorf("invalid argument")
 	default:
 		return fmt.Errorf("unknown error")
 	}
+}
+
+type ErrInvalidIndex struct {
+	Index int
+}
+
+func (e ErrInvalidIndex) Error() string {
+	return fmt.Sprintf("invalid index: %d", e.Index)
 }

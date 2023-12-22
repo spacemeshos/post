@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -64,7 +65,7 @@ func Test_Verify(t *testing.T) {
 	)
 	r.NoError(err)
 
-	verifier, err := NewProofVerifier()
+	verifier, err := NewProofVerifier([]byte{})
 	r.NoError(err)
 	defer verifier.Close()
 
@@ -100,7 +101,7 @@ func Test_Verify_NoRace_On_Close(t *testing.T) {
 	)
 	r.NoError(err)
 
-	verifier, err := NewProofVerifier()
+	verifier, err := NewProofVerifier([]byte{})
 	r.NoError(err)
 	defer verifier.Close()
 
@@ -122,7 +123,7 @@ func Test_Verify_NoRace_On_Close(t *testing.T) {
 }
 
 func Test_Verifier_NoError_On_DoubleClose(t *testing.T) {
-	verifier, err := NewProofVerifier()
+	verifier, err := NewProofVerifier([]byte{})
 	require.NoError(t, err)
 
 	require.NoError(t, verifier.Close())
@@ -131,6 +132,7 @@ func Test_Verifier_NoError_On_DoubleClose(t *testing.T) {
 
 func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	r := require.New(t)
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
 
 	nodeId := make([]byte, 32)
 	commitmentAtxId := make([]byte, 32)
@@ -150,19 +152,38 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 		context.Background(),
 		ch,
 		cfg,
-		zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
+		logger,
 		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
 	)
 	r.NoError(err)
 
-	for i := range proof.Indices {
-		proof.Indices[i] ^= 255 // flip bits in all indices
-	}
-	verifier, err := NewProofVerifier()
+	// modify one of proof.Indices by zeroing out some bits
+	index := 1
+	numLabels := proofMetadata.LabelsPerUnit * uint64(proofMetadata.NumUnits)
+	bitsPerIndex := int(math.Log2(float64(numLabels))) + 1
+	mask := byte(1<<bitsPerIndex - 1)
+	offset := index * bitsPerIndex / 8
+	proof.Indices[offset] &= ^(mask << (index * bitsPerIndex % 8))
+
+	verifier, err := NewProofVerifier([]byte{})
 	r.NoError(err)
 	defer verifier.Close()
 
-	r.ErrorContains(verifier.Verify(proof, proofMetadata, cfg, zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))), "invalid proof")
+	err = verifier.Verify(proof, proofMetadata, cfg, logger)
+	expected := postrs.ErrInvalidIndex{}
+	r.ErrorAs(err, &expected)
+	r.Equal(index, expected.Index)
+
+	// Verify only 1 index with K3 = 1, the index was empirically picked to pass verification
+	cfg.K3 = 1
+	err = verifier.Verify(proof, proofMetadata, cfg, logger)
+	require.NoError(t, err)
+
+	// Verify with AllIndices option
+	cfg.K3 = 1
+	err = verifier.Verify(proof, proofMetadata, cfg, logger, AllIndices())
+	r.ErrorAs(err, &expected)
+	r.Equal(index, expected.Index)
 }
 
 func TestVerifyPow(t *testing.T) {
@@ -211,7 +232,7 @@ func BenchmarkVerifying(b *testing.B) {
 	p, m, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
 	require.NoError(b, err)
 
-	verifier, err := NewProofVerifier()
+	verifier, err := NewProofVerifier([]byte{})
 	require.NoError(b, err)
 	defer verifier.Close()
 
@@ -256,7 +277,7 @@ func Benchmark_Verify_Fastnet(b *testing.B) {
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))
 
-	verifier, err := NewProofVerifier()
+	verifier, err := NewProofVerifier([]byte{})
 	require.NoError(b, err)
 	defer verifier.Close()
 
