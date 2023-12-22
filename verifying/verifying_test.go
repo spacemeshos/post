@@ -170,7 +170,7 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	defer verifier.Close()
 
 	err = verifier.Verify(proof, proofMetadata, cfg, logger)
-	expected := postrs.ErrInvalidIndex{}
+	expected := &ErrInvalidIndex{}
 	r.ErrorAs(err, &expected)
 	r.Equal(index, expected.Index)
 

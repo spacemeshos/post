@@ -236,7 +236,7 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 		return nil
 	case C.VerifyResult_InvalidIndex:
 		result := castBytes[C.VerifyResult_InvalidIndex_Body](result.anon0[:])
-		return ErrInvalidIndex{Index: int(result.index_id)}
+		return &ErrInvalidIndex{Index: int(result.index_id)}
 	case C.VerifyResult_InvalidArgument:
 		return fmt.Errorf("invalid argument")
 	default:
