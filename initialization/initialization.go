@@ -61,6 +61,8 @@ type option struct {
 	logger            *Logger
 	powDifficultyFunc func(uint64) []byte
 	referenceOracle   *oracle.WorkOracle
+
+	keepRedundantFiles bool
 }
 
 func (o *option) validate() error {
@@ -135,6 +137,13 @@ func WithLogger(logger *zap.Logger) OptionFunc {
 	}
 }
 
+func WithKeepRedundantFiles() OptionFunc {
+	return func(opts *option) error {
+		opts.keepRedundantFiles = true
+		return nil
+	}
+}
+
 // withDifficultyFunc sets the difficulty function for the initializer.
 // NOTE: This is an internal option for tests and should not be used by external packages.
 func withDifficultyFunc(powDifficultyFunc func(uint64) []byte) OptionFunc {
@@ -182,6 +191,8 @@ type Initializer struct {
 	logger            *Logger
 	referenceOracle   *oracle.WorkOracle
 	powDifficultyFunc func(uint64) []byte
+
+	keepRedundantFiles bool
 }
 
 func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
@@ -202,15 +213,16 @@ func NewInitializer(opts ...OptionFunc) (*Initializer, error) {
 	}
 
 	init := &Initializer{
-		cfg:               *options.cfg,
-		opts:              *options.initOpts,
-		nodeId:            options.nodeId,
-		commitmentAtxId:   options.commitmentAtxId,
-		commitment:        options.commitment,
-		diskState:         NewDiskState(options.initOpts.DataDir, uint(config.BitsPerLabel)),
-		logger:            options.logger,
-		powDifficultyFunc: options.powDifficultyFunc,
-		referenceOracle:   options.referenceOracle,
+		cfg:                *options.cfg,
+		opts:               *options.initOpts,
+		nodeId:             options.nodeId,
+		commitmentAtxId:    options.commitmentAtxId,
+		commitment:         options.commitment,
+		diskState:          NewDiskState(options.initOpts.DataDir, uint(config.BitsPerLabel)),
+		logger:             options.logger,
+		powDifficultyFunc:  options.powDifficultyFunc,
+		referenceOracle:    options.referenceOracle,
+		keepRedundantFiles: options.keepRedundantFiles,
 	}
 
 	numLabelsWritten, err := init.diskState.NumLabelsWritten()
@@ -295,7 +307,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		zap.Int("firstFileIndex", layout.FirstFileIdx),
 		zap.Int("lastFileIndex", layout.LastFileIdx),
 	)
-	if err := removeRedundantFiles(init.cfg, init.opts, init.logger); err != nil {
+	if err := checkRedundantFiles(init.cfg, init.opts, init.keepRedundantFiles, init.logger); err != nil {
 		return err
 	}
 
@@ -395,10 +407,10 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 	return fmt.Errorf("no nonce found")
 }
 
-func removeRedundantFiles(cfg config.Config, opts config.InitOpts, logger *zap.Logger) error {
-	// Go over all postdata_N.bin files in the data directory and remove the ones that are not needed.
+func checkRedundantFiles(cfg config.Config, opts config.InitOpts, keep bool, logger *zap.Logger) error {
+	// Go over all postdata_N.bin files in the data directory and check for files that are not needed.
 	// The files with indices from 0 to init.opts.TotalFiles(init.cfg.LabelsPerUnit) - 1 are preserved.
-	// The rest are redundant and can be removed.
+	// The rest are redundant.
 	maxFileIndex := opts.TotalFiles(cfg.LabelsPerUnit) - 1
 	logger.Debug("attempting to remove redundant files above index", zap.Int("maxFileIndex", maxFileIndex))
 
@@ -414,10 +426,14 @@ func removeRedundantFiles(cfg config.Config, opts config.InitOpts, logger *zap.L
 			continue
 		}
 		if fileIndex > maxFileIndex {
-			logger.Info("removing redundant file", zap.String("fileName", name))
-			path := filepath.Join(opts.DataDir, name)
-			if err := os.Remove(path); err != nil {
-				return fmt.Errorf("failed to delete file (%v): %w", path, err)
+			if keep {
+				logger.Info("ignoring redundant file", zap.String("fileName", name))
+			} else {
+				logger.Info("removing redundant file", zap.String("fileName", name))
+				path := filepath.Join(opts.DataDir, name)
+				if err := os.Remove(path); err != nil {
+					return fmt.Errorf("failed to delete file (%v): %w", path, err)
+				}
 			}
 		}
 	}
