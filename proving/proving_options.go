@@ -67,6 +67,13 @@ func WithPowFlags(flags config.PowFlags) OptionFunc {
 	}
 }
 
+func LightMode() OptionFunc {
+	return func(o *option) error {
+		o.powFlags = config.RecommendedPowFlags()
+		return nil
+	}
+}
+
 func WithNonces(nonces uint) OptionFunc {
 	return func(o *option) error {
 		if nonces == 0 {

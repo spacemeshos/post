@@ -83,7 +83,6 @@ func MainnetConfig() Config {
 		LabelsPerUnit: 4294967296, // 64GiB units
 		K1:            26,
 		K2:            37,
-		K3:            37,
 	}
 	_, err := hex.Decode(cfg.PowDifficulty[:], []byte("000dfb23b0979b4b000000000000000000000000000000000000000000000000"))
 	if err != nil {
@@ -100,7 +99,6 @@ func DefaultConfig() Config {
 		LabelsPerUnit: 512, // 8kB units
 		K1:            26,
 		K2:            37,
-		K3:            37,
 	}
 	for i := range cfg.PowDifficulty {
 		cfg.PowDifficulty[i] = 0xFF

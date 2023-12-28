@@ -26,7 +26,6 @@ type Config struct {
 
 	K1 uint32 // K1 specifies the difficulty for a label to be a candidate for a proof.
 	K2 uint32 // K2 is the number of labels below the required difficulty required for a proof.
-	K3 uint32 // K3 is the size of the subset of proof indices that is validated.
 
 	PowDifficulty [32]byte
 }
@@ -155,7 +154,43 @@ func (v *Verifier) Close() error {
 	return nil
 }
 
-func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, logger *zap.Logger, cfg Config, scryptParams ScryptParams) error {
+type verifyOptions struct {
+	mode C.Mode
+}
+
+type VerifyOptionFunc func(*verifyOptions)
+
+// Verify all indices in the proof.
+func VerifyAll() VerifyOptionFunc {
+	return func(o *verifyOptions) {
+		o.mode.tag = C.Mode_All
+	}
+}
+
+// Verify only the selected index.
+// The `ord` is the ordinal number of the index in the proof to verify.
+func VerifyOne(ord int) VerifyOptionFunc {
+	return func(o *verifyOptions) {
+		// `o.mode` is a C tagged union
+		o.mode.tag = C.Mode_One
+		o.mode.anon0 = (*(*[8]byte)(unsafe.Pointer(&C.Mode_One_Body{
+			index: C.size_t(ord),
+		})))
+	}
+}
+
+// Verify a subset of randomly selected K3 indices.
+func VerifySubset(k3 int) VerifyOptionFunc {
+	return func(o *verifyOptions) {
+		// `o.mode` is a C tagged union
+		o.mode.tag = C.Mode_Subset
+		o.mode.anon0 = (*(*[8]byte)(unsafe.Pointer(&C.Mode_Subset_Body{
+			k3: C.size_t(k3),
+		})))
+	}
+}
+
+func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, logger *zap.Logger, cfg Config, scryptParams ScryptParams, opts ...VerifyOptionFunc) error {
 	if logger != nil {
 		setLogCallback(logger)
 	}
@@ -182,7 +217,6 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 	config := C.ProofConfig{
 		k1: C.uint32_t(cfg.K1),
 		k2: C.uint32_t(cfg.K2),
-		k3: C.uint32_t(cfg.K3),
 	}
 	for i, b := range cfg.PowDifficulty {
 		config.pow_difficulty[i] = C.uchar(b)
@@ -222,6 +256,13 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 		len: C.size_t(len(v.id)),
 		cap: C.size_t(cap(v.id)),
 	}
+
+	options := verifyOptions{}
+	VerifyAll()(&options)
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	result := C.verify_proof(
 		v.inner,
 		cProof,
@@ -229,6 +270,7 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 		config,
 		initConfig,
 		id,
+		options.mode,
 	)
 
 	switch result.tag {

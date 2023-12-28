@@ -25,7 +25,6 @@ func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 
 	cfg.K1 = 3
 	cfg.K2 = 3
-	cfg.K3 = 3
 
 	opts := config.DefaultInitOpts()
 	opts.DataDir = tb.TempDir()
@@ -61,7 +60,7 @@ func Test_Verify(t *testing.T) {
 		cfg,
 		logger,
 		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
-		proving.WithPowFlags(postrs.GetRecommendedPowFlags()),
+		proving.LightMode(),
 	)
 	r.NoError(err)
 
@@ -97,7 +96,7 @@ func Test_Verify_NoRace_On_Close(t *testing.T) {
 		cfg,
 		logger,
 		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
-		proving.WithPowFlags(postrs.GetRecommendedPowFlags()),
+		proving.LightMode(),
 	)
 	r.NoError(err)
 
@@ -147,13 +146,13 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	)
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))
-
 	proof, proofMetadata, err := proving.Generate(
 		context.Background(),
 		ch,
 		cfg,
 		logger,
 		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
+		proving.LightMode(),
 	)
 	r.NoError(err)
 
@@ -169,19 +168,27 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	r.NoError(err)
 	defer verifier.Close()
 
+	// Verify selected index (valid)
+	err = verifier.Verify(proof, proofMetadata, cfg, logger, SelectedIndex(2))
+	require.NoError(t, err)
+
+	// Defaults to verifying all indices
 	err = verifier.Verify(proof, proofMetadata, cfg, logger)
 	expected := &ErrInvalidIndex{}
 	r.ErrorAs(err, &expected)
 	r.Equal(index, expected.Index)
 
-	// Verify only 1 index with K3 = 1, the index was empirically picked to pass verification
-	cfg.K3 = 1
-	err = verifier.Verify(proof, proofMetadata, cfg, logger)
+	// Verify with AllIndices option
+	err = verifier.Verify(proof, proofMetadata, cfg, logger, AllIndices())
+	r.ErrorAs(err, &expected)
+	r.Equal(index, expected.Index)
+
+	// Verify only 1 index with K3 = 1, the `index` was empirically picked to pass verification
+	err = verifier.Verify(proof, proofMetadata, cfg, logger, Subset(1))
 	require.NoError(t, err)
 
-	// Verify with AllIndices option
-	cfg.K3 = 1
-	err = verifier.Verify(proof, proofMetadata, cfg, logger, AllIndices())
+	// Verify selected index (invalid)
+	err = verifier.Verify(proof, proofMetadata, cfg, logger, SelectedIndex(index))
 	r.ErrorAs(err, &expected)
 	r.Equal(index, expected.Index)
 }

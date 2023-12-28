@@ -67,7 +67,7 @@ func Test_Generate(t *testing.T) {
 				log,
 				WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
 				WithThreads(2),
-				WithPowFlags(postrs.GetRecommendedPowFlags()),
+				LightMode(),
 			)
 			r.NoError(err, "numUnits: %d", opts.NumUnits)
 			r.NotNil(proof)
@@ -128,7 +128,7 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 			cfg,
 			zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
 			WithDataSource(cfg, newNodeId, commitmentAtxId, opts.DataDir),
-			WithPowFlags(postrs.GetRecommendedPowFlags()),
+			LightMode(),
 		)
 		var errConfigMismatch initialization.ConfigMismatchError
 		require.ErrorAs(t, err, &errConfigMismatch)
@@ -146,7 +146,7 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 			cfg,
 			zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
 			WithDataSource(cfg, nodeId, newAtxId, opts.DataDir),
-			WithPowFlags(postrs.GetRecommendedPowFlags()),
+			LightMode(),
 		)
 		var errConfigMismatch initialization.ConfigMismatchError
 		require.ErrorAs(t, err, &errConfigMismatch)

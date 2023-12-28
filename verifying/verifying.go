@@ -85,9 +85,6 @@ func (v *ProofVerifier) Verify(p *shared.Proof, m *shared.ProofMetadata, cfg con
 	}
 
 	options := applyOpts(opts...)
-	if options.allIndices {
-		cfg.K3 = cfg.K2
-	}
 	scryptParams := postrs.NewScryptParams(options.labelScrypt.N, options.labelScrypt.R, options.labelScrypt.P)
-	return v.VerifyProof(p, m, logger, postrs.Config(cfg), scryptParams)
+	return v.VerifyProof(p, m, logger, postrs.Config(cfg), scryptParams, options.internalOpts...)
 }
