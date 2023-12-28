@@ -46,9 +46,10 @@ func AllIndices() OptionFunc {
 }
 
 // Verify a subset of randomly selected K3 indices.
-func Subset(k3 int) OptionFunc {
+// The `id` is used to seed the random number generator.
+func Subset(k3 uint, seed []byte) OptionFunc {
 	return func(o *option) {
-		o.internalOpts = append(o.internalOpts, postrs.VerifySubset(k3))
+		o.internalOpts = append(o.internalOpts, postrs.VerifySubset(k3, seed))
 	}
 }
 

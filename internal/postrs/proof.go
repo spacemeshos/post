@@ -23,8 +23,8 @@ type Config struct {
 	MaxNumUnits   uint32
 	LabelsPerUnit uint64
 
-	K1 uint32 // K1 specifies the difficulty for a label to be a candidate for a proof.
-	K2 uint32 // K2 is the number of labels below the required difficulty required for a proof.
+	K1 uint // K1 specifies the difficulty for a label to be a candidate for a proof.
+	K2 uint // K2 is the number of labels below the required difficulty required for a proof.
 
 	PowDifficulty [32]byte
 }
@@ -40,7 +40,7 @@ func NewScryptParams(n, r, p uint) ScryptParams {
 // ErrVerifierClosed is returned when calling a method on an already closed Scrypt instance.
 var ErrVerifierClosed = errors.New("verifier has been closed")
 
-func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces, threads uint, K1, K2 uint32, powDifficulty [32]byte, powFlags PowFlags) (*shared.Proof, error) {
+func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces, threads, K1, K2 uint, powDifficulty [32]byte, powFlags PowFlags) (*shared.Proof, error) {
 	if logger != nil {
 		setLogCallback(logger)
 	}
@@ -119,15 +119,12 @@ const (
 type Verifier struct {
 	mu    sync.RWMutex
 	inner *C.Verifier
-	id    []byte
 }
 
 // Create a new verifier.
 // The verifier must be closed after use with Close().
-func NewVerifier(id []byte, powFlags PowFlags) (*Verifier, error) {
-	verifier := Verifier{
-		id: id,
-	}
+func NewVerifier(powFlags PowFlags) (*Verifier, error) {
+	verifier := Verifier{}
 	result := C.new_verifier(powFlags, &verifier.inner)
 	if result != C.VerifyResult_Ok {
 		return nil, fmt.Errorf("failed to create verifier")
@@ -148,7 +145,7 @@ func (v *Verifier) Close() error {
 }
 
 type verifyOptions struct {
-	mode C.Mode
+	mode C.VerifyMode
 }
 
 type VerifyOptionFunc func(*verifyOptions)
@@ -156,7 +153,7 @@ type VerifyOptionFunc func(*verifyOptions)
 // Verify all indices in the proof.
 func VerifyAll() VerifyOptionFunc {
 	return func(o *verifyOptions) {
-		o.mode.tag = C.Mode_All
+		o.mode.tag = C.VerifyMode_All
 	}
 }
 
@@ -165,20 +162,26 @@ func VerifyAll() VerifyOptionFunc {
 func VerifyOne(ord int) VerifyOptionFunc {
 	return func(o *verifyOptions) {
 		// `o.mode` is a C tagged union
-		o.mode.tag = C.Mode_One
-		o.mode.anon0 = (*(*[8]byte)(unsafe.Pointer(&C.Mode_One_Body{
+		o.mode.tag = C.VerifyMode_One
+		o.mode.anon0 = (*(*[32]byte)(unsafe.Pointer(&C.VerifyMode_One_Body{
 			index: C.size_t(ord),
 		})))
 	}
 }
 
 // Verify a subset of randomly selected K3 indices.
-func VerifySubset(k3 int) VerifyOptionFunc {
+// The `seed` is used to randomize the selection of indices.
+func VerifySubset(k3 uint, seed []byte) VerifyOptionFunc {
 	return func(o *verifyOptions) {
 		// `o.mode` is a C tagged union
-		o.mode.tag = C.Mode_Subset
-		o.mode.anon0 = (*(*[8]byte)(unsafe.Pointer(&C.Mode_Subset_Body{
+		o.mode.tag = C.VerifyMode_Subset
+		o.mode.anon0 = (*(*[32]byte)(unsafe.Pointer(&C.VerifyMode_Subset_Body{
 			k3: C.size_t(k3),
+			seed: C.ArrayU8{
+				ptr: (*C.uchar)(unsafe.SliceData(seed)),
+				len: C.size_t(len(seed)),
+				cap: C.size_t(cap(seed)),
+			},
 		})))
 	}
 }
@@ -244,12 +247,6 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 		return ErrVerifierClosed
 	}
 
-	id := C.ArrayU8{
-		ptr: (*C.uchar)(unsafe.SliceData(v.id)),
-		len: C.size_t(len(v.id)),
-		cap: C.size_t(cap(v.id)),
-	}
-
 	options := verifyOptions{}
 	VerifyAll()(&options)
 	for _, opt := range opts {
@@ -262,7 +259,6 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 		&cMetadata,
 		config,
 		initConfig,
-		id,
 		options.mode,
 	)
 

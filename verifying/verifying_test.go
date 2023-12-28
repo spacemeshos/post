@@ -64,7 +64,7 @@ func Test_Verify(t *testing.T) {
 	)
 	r.NoError(err)
 
-	verifier, err := NewProofVerifier([]byte{})
+	verifier, err := NewProofVerifier()
 	r.NoError(err)
 	defer verifier.Close()
 
@@ -100,7 +100,7 @@ func Test_Verify_NoRace_On_Close(t *testing.T) {
 	)
 	r.NoError(err)
 
-	verifier, err := NewProofVerifier([]byte{})
+	verifier, err := NewProofVerifier()
 	r.NoError(err)
 	defer verifier.Close()
 
@@ -122,7 +122,7 @@ func Test_Verify_NoRace_On_Close(t *testing.T) {
 }
 
 func Test_Verifier_NoError_On_DoubleClose(t *testing.T) {
-	verifier, err := NewProofVerifier([]byte{})
+	verifier, err := NewProofVerifier()
 	require.NoError(t, err)
 
 	require.NoError(t, verifier.Close())
@@ -164,7 +164,7 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	offset := index * bitsPerIndex / 8
 	proof.Indices[offset] &= ^(mask << (index * bitsPerIndex % 8))
 
-	verifier, err := NewProofVerifier([]byte{})
+	verifier, err := NewProofVerifier()
 	r.NoError(err)
 	defer verifier.Close()
 
@@ -184,7 +184,7 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	r.Equal(index, expected.Index)
 
 	// Verify only 1 index with K3 = 1, the `index` was empirically picked to pass verification
-	err = verifier.Verify(proof, proofMetadata, cfg, logger, Subset(1))
+	err = verifier.Verify(proof, proofMetadata, cfg, logger, Subset(1, nodeId))
 	require.NoError(t, err)
 
 	// Verify selected index (invalid)
@@ -239,17 +239,17 @@ func BenchmarkVerifying(b *testing.B) {
 	p, m, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir), proving.LightMode())
 	require.NoError(b, err)
 
-	verifier, err := NewProofVerifier([]byte{})
+	verifier, err := NewProofVerifier()
 	require.NoError(b, err)
 	defer verifier.Close()
 
-	for _, k3 := range []int{5, 25, 50, 100} {
+	for _, k3 := range []uint{5, 25, 50, 100} {
 		testName := fmt.Sprintf("k3=%d", k3)
 
 		b.Run(testName, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				start := time.Now()
-				err := verifier.Verify(p, m, cfg, zaptest.NewLogger(b), Subset(k3))
+				err := verifier.Verify(p, m, cfg, zaptest.NewLogger(b), Subset(k3, nodeId))
 				require.NoError(b, err)
 				b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
 			}

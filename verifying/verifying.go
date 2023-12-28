@@ -64,9 +64,9 @@ type ProofVerifier struct {
 
 // NewProofVerifier creates a new proof verifier.
 // The verifier must be closed after use with Close().
-func NewProofVerifier(id []byte, opts ...OptionFunc) (*ProofVerifier, error) {
+func NewProofVerifier(opts ...OptionFunc) (*ProofVerifier, error) {
 	options := applyOpts(opts...)
-	inner, err := postrs.NewVerifier(id, options.powFlags)
+	inner, err := postrs.NewVerifier(options.powFlags)
 	if err != nil {
 		return nil, err
 	}
