@@ -236,67 +236,23 @@ func BenchmarkVerifying(b *testing.B) {
 
 	ch := make(shared.Challenge, 32)
 	rand.Read(ch)
-	p, m, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+	p, m, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir), proving.LightMode())
 	require.NoError(b, err)
 
 	verifier, err := NewProofVerifier([]byte{})
 	require.NoError(b, err)
 	defer verifier.Close()
 
-	for _, k3 := range []uint32{5, 25, 50, 100} {
+	for _, k3 := range []int{5, 25, 50, 100} {
 		testName := fmt.Sprintf("k3=%d", k3)
-
-		cfg.K3 = k3
 
 		b.Run(testName, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				start := time.Now()
-				err := verifier.Verify(p, m, cfg, zaptest.NewLogger(b))
+				err := verifier.Verify(p, m, cfg, zaptest.NewLogger(b), Subset(k3))
 				require.NoError(b, err)
 				b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
 			}
 		})
-	}
-}
-
-func Benchmark_Verify_Fastnet(b *testing.B) {
-	r := require.New(b)
-	nodeId := make([]byte, 32)
-	commitmentAtxId := make([]byte, 32)
-	ch := make(shared.Challenge, 32)
-
-	cfg, opts := getTestConfig(b)
-	cfg.K1 = 12
-	cfg.K2 = 4
-	cfg.K3 = 2
-	cfg.LabelsPerUnit = 32
-	cfg.MaxNumUnits = 4
-	cfg.MinNumUnits = 2
-
-	opts.NumUnits = cfg.MinNumUnits
-
-	init, err := initialization.NewInitializer(
-		initialization.WithNodeId(nodeId),
-		initialization.WithCommitmentAtxId(commitmentAtxId),
-		initialization.WithConfig(cfg),
-		initialization.WithInitOpts(opts),
-	)
-	r.NoError(err)
-	r.NoError(init.Initialize(context.Background()))
-
-	verifier, err := NewProofVerifier([]byte{})
-	require.NoError(b, err)
-	defer verifier.Close()
-
-	for i := 0; i < b.N; i++ {
-		rand.Read(ch)
-		proof, proofMetadata, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
-		r.NoError(err)
-
-		b.StartTimer()
-		start := time.Now()
-		r.NoError(verifier.Verify(proof, proofMetadata, cfg, zaptest.NewLogger(b)))
-		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
-		b.StopTimer()
 	}
 }

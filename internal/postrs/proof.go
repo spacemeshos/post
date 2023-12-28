@@ -6,7 +6,6 @@ package postrs
 import "C"
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -36,12 +35,6 @@ func NewScryptParams(n, r, p uint) ScryptParams {
 		r: C.size_t(r),
 		p: C.size_t(p),
 	}
-}
-
-type HexEncoded []byte
-
-func (h HexEncoded) String() string {
-	return hex.EncodeToString(h)
 }
 
 // ErrVerifierClosed is returned when calling a method on an already closed Scrypt instance.
