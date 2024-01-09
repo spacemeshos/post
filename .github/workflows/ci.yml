@@ -60,7 +60,7 @@ jobs:
           - ubuntu-latest
           - [self-hosted, linux, arm64]
           - macos-latest
-          - [self-hosted, macos, arm64]
+          - macos-13-xlarge
           - windows-latest
     steps:
       - name: Add OpenCL support - Ubuntu
@@ -107,11 +107,11 @@ jobs:
       fail-fast: false
       matrix:
         os:
-        - ubuntu-latest
-        - [self-hosted, linux, arm64]
-        - macos-latest
-        - [self-hosted, macos, arm64]
-        - windows-latest
+          - ubuntu-latest
+          - [self-hosted, linux, arm64]
+          - macos-latest
+          - macos-13-xlarge
+          - windows-latest
     steps:
       - name: Add OpenCL support - Ubuntu
         if: ${{ matrix.os == 'ubuntu-latest' }}
