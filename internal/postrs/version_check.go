@@ -3,6 +3,7 @@ package postrs
 // #cgo LDFLAGS: -lpost
 // #include "post.h"
 import "C"
+
 import (
 	"fmt"
 	"os"
