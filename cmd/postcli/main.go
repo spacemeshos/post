@@ -9,11 +9,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 
 	"github.com/davecgh/go-spew/spew"
 	"go.uber.org/zap"
@@ -28,27 +26,6 @@ import (
 )
 
 const edKeyFileName = "key.bin"
-
-type numUnitsFlag struct {
-	set   bool
-	value uint32
-}
-
-func (nu *numUnitsFlag) Set(s string) error {
-	val, err := strconv.ParseUint(s, 10, 32)
-	if err != nil {
-		return err
-	}
-	*nu = numUnitsFlag{
-		set:   true,
-		value: uint32(val),
-	}
-	return nil
-}
-
-func (nu *numUnitsFlag) String() string {
-	return fmt.Sprintf("%d", nu.value)
-}
 
 var (
 	cfg  = config.MainnetConfig()
@@ -68,9 +45,12 @@ var (
 	commitmentAtxIdHex string
 	commitmentAtxId    []byte
 	reset              bool
-	numUnits           numUnitsFlag
+	numUnits           uint64
 
+	yes      bool
 	logLevel zapcore.Level
+
+	flagSet = make(map[string]bool)
 
 	ErrKeyFileExists = errors.New("key file already exists")
 )
@@ -79,6 +59,7 @@ func parseFlags() {
 	flag.BoolVar(&verifyPos, "verify", false, "verify initialized data")
 	flag.Float64Var(&fraction, "fraction", 0.2, "how much % of POS data to verify. Sane values are < 1.0")
 
+	flag.BoolVar(&yes, "yes", false, "confirm potentially dangerous actions")
 	flag.TextVar(&logLevel, "logLevel", zapcore.InfoLevel, "log level (debug, info, warn, error, dpanic, panic, fatal)")
 
 	flag.BoolVar(&searchForNonce, "searchForNonce", false, "search for VRF nonce in already initialized files")
@@ -90,52 +71,80 @@ func parseFlags() {
 	flag.StringVar(&opts.DataDir, "datadir", opts.DataDir, "filesystem datadir path")
 	flag.Uint64Var(&opts.MaxFileSize, "maxFileSize", opts.MaxFileSize, "max file size")
 	var providerID uint64
-	flag.Uint64Var(&providerID, "provider", math.MaxUint64, "compute provider id (required)")
+	flag.Uint64Var(&providerID, "provider", 0, "compute provider id (required)")
 	flag.Uint64Var(&cfg.LabelsPerUnit, "labelsPerUnit", cfg.LabelsPerUnit, "the number of labels per unit")
+	flag.UintVar(&opts.Scrypt.N, "scryptN", opts.Scrypt.N, "scrypt N parameter")
 	flag.BoolVar(&reset, "reset", false, "whether to reset the datadir before starting")
 	flag.StringVar(&idHex, "id", "", "miner's id (public key), in hex (will be auto-generated if not provided)")
 	flag.StringVar(&commitmentAtxIdHex, "commitmentAtxId", "", "commitment atx id, in hex (required)")
-	flag.Var(&numUnits, "numUnits", "number of units")
+	flag.Uint64Var(&numUnits, "numUnits", 0, "number of units (required)")
 
 	flag.IntVar(&opts.FromFileIdx, "fromFile", 0, "index of the first file to init (inclusive)")
 	var to int
-	flag.IntVar(&to, "toFile", math.MaxInt, "index of the last file to init (inclusive). Will init to the end of declared space if not provided.")
+	flag.IntVar(&to, "toFile", 0, "index of the last file to init (inclusive). Will init to the end of declared space if not provided.")
 	flag.Parse()
 
-	// A workaround to simulate an optional value w/o a default ¯\_(ツ)_/¯
-	// The default will be known later, after parsing the flags.
-	if to != math.MaxInt {
+	flag.Visit(func(f *flag.Flag) {
+		flagSet[f.Name] = true
+	})
+
+	if flagSet["toFile"] {
 		opts.ToFileIdx = &to
 	}
-	if providerID != math.MaxUint64 {
-		opts.ProviderID = new(uint32)
-		*opts.ProviderID = uint32(providerID)
-	}
 
-	if numUnits.set {
-		opts.NumUnits = numUnits.value
-	}
+	opts.ProviderID = new(uint32)
+	*opts.ProviderID = uint32(providerID)
+	opts.NumUnits = uint32(numUnits)
 }
 
 func processFlags() error {
-	// we require the user to explicitly pass numunits to avoid erasing existing data
-	if !numUnits.set {
+	// we require the user to explicitly pass numUnits to avoid erasing existing data
+	if !flagSet["numUnits"] {
 		return fmt.Errorf("-numUnits must be specified to perform initialization. to use the default value, "+
 			"run with -numUnits %d. note: if there's more than this amount of data on disk, "+
 			"THIS WILL ERASE EXISTING DATA. MAKE ABSOLUTELY SURE YOU SPECIFY THE CORRECT VALUE", opts.NumUnits)
 	}
 
-	if opts.ProviderID == nil {
+	if flagSet["numUnits"] && (numUnits < uint64(cfg.MinNumUnits) || numUnits > uint64(cfg.MaxNumUnits)) {
+		fmt.Println("WARNING: numUnits is outside of range valid for mainnet (min:",
+			cfg.MinNumUnits, "max:", cfg.MaxNumUnits, ")")
+		if !yes {
+			fmt.Println("If you're sure you want to continue, please run with -yes")
+			os.Exit(1)
+		}
+		cfg.MinNumUnits = uint32(numUnits)
+		cfg.MaxNumUnits = uint32(numUnits)
+	}
+
+	if !flagSet["provider"] {
 		return errors.New("-provider flag is required")
 	}
 
-	if commitmentAtxIdHex == "" {
+	if !flagSet["commitmentAtxId"] {
 		return errors.New("-commitmentAtxId flag is required")
 	}
 	var err error
 	commitmentAtxId, err = hex.DecodeString(commitmentAtxIdHex)
 	if err != nil {
 		return fmt.Errorf("invalid commitmentAtxId: %w", err)
+	}
+
+	if flagSet["labelsPerUnit"] && (cfg.LabelsPerUnit != config.MainnetConfig().LabelsPerUnit) {
+		fmt.Println("WARNING: labelsPerUnit is set to a non-default value. This makes the initialization incompatible " +
+			"with mainnet. If you're trying to initialize for mainnet, please remove the -labelsPerUnit flag")
+		if !yes {
+			fmt.Println("If you're sure you want to continue, please run with -yes")
+			os.Exit(1)
+		}
+	}
+
+	if flagSet["scryptN"] {
+		fmt.Println("WARNING: scryptN is set to a non-default value. This makes the initialization incompatible " +
+			"with mainnet. If you're trying to initialize for mainnet, please remove the -scryptN flag")
+		if !yes {
+			fmt.Println("If you're sure you want to continue, please run with -yes")
+			os.Exit(1)
+		}
 	}
 
 	if (opts.FromFileIdx != 0 || opts.ToFileIdx != nil) && idHex == "" {
