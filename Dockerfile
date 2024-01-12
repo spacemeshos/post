@@ -24,25 +24,17 @@ RUN --mount=type=cache,id=build,target=/root/.cache/go-build make build
 FROM ubuntu:22.04 AS postcli
 ENV DEBIAN_FRONTEND noninteractive
 ENV SHELL /bin/bash
-ARG TZ=Etc/UTC
-ENV TZ $TZ
 USER root
 RUN set -ex \
     && apt-get update --fix-missing \
     && apt-get install -qy --no-install-recommends \
-    ca-certificates \
-    tzdata \
     locales \
-    procps \
-    net-tools \
-    file \
     ocl-icd-libopencl1 clinfo \
     pocl-opencl-icd libpocl2 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && locale-gen en_US.UTF-8 \
-    && update-locale LANG=en_US.UTF-8 \
-    && echo "$TZ" > /etc/timezone
+    && update-locale LANG=en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US.UTF-8
 ENV LC_ALL en_US.UTF-8
