@@ -16,11 +16,11 @@ make postcli
 Alternatively you can use the `postcli` docker image:
 
 ```bash
-docker pull spacemeshos/postcli:v0.6.5
+docker pull spacemeshos/postcli:v0.10.4
 ```
 
 Replace the version with the latest version. You can find the latest version on the
-[releases page](https://github.com/spacemeshos/post/releases). Do not use the `latest` tag since it can be
+[releases page](https://github.com/spacemeshos/post/releases). Avoid using the `latest` tag since it can be
 unstable/untested.
 
 ## Usage
