@@ -106,7 +106,7 @@ func askForConfirmation() {
 
 	var answer string
 	_, err := fmt.Scanln(&answer)
-	if err != nil || (answer != "y" && answer != "Y") {
+	if err != nil || !(answer == "y" || answer == "Y") {
 		fmt.Println("Aborting")
 		os.Exit(1)
 	}
