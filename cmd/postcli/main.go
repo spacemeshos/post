@@ -97,6 +97,21 @@ func parseFlags() {
 	opts.NumUnits = uint32(numUnits)
 }
 
+func askForConfirmation() {
+	if yes {
+		return
+	}
+
+	fmt.Println("Are you sure you want to continue (y/N)?")
+
+	var answer string
+	_, err := fmt.Scanln(&answer)
+	if err != nil || (answer != "y" && answer != "Y") {
+		fmt.Println("Aborting")
+		os.Exit(1)
+	}
+}
+
 func processFlags() error {
 	// we require the user to explicitly pass numUnits to avoid erasing existing data
 	if !flagSet["numUnits"] {
@@ -108,10 +123,7 @@ func processFlags() error {
 	if flagSet["numUnits"] && (numUnits < uint64(cfg.MinNumUnits) || numUnits > uint64(cfg.MaxNumUnits)) {
 		fmt.Println("WARNING: numUnits is outside of range valid for mainnet (min:",
 			cfg.MinNumUnits, "max:", cfg.MaxNumUnits, ")")
-		if !yes {
-			fmt.Println("If you're sure you want to continue, please run with -yes")
-			os.Exit(1)
-		}
+		askForConfirmation()
 		cfg.MinNumUnits = uint32(numUnits)
 		cfg.MaxNumUnits = uint32(numUnits)
 	}
@@ -132,19 +144,13 @@ func processFlags() error {
 	if flagSet["labelsPerUnit"] && (cfg.LabelsPerUnit != config.MainnetConfig().LabelsPerUnit) {
 		fmt.Println("WARNING: labelsPerUnit is set to a non-default value. This makes the initialization incompatible " +
 			"with mainnet. If you're trying to initialize for mainnet, please remove the -labelsPerUnit flag")
-		if !yes {
-			fmt.Println("If you're sure you want to continue, please run with -yes")
-			os.Exit(1)
-		}
+		askForConfirmation()
 	}
 
 	if flagSet["scryptN"] {
 		fmt.Println("WARNING: scryptN is set to a non-default value. This makes the initialization incompatible " +
 			"with mainnet. If you're trying to initialize for mainnet, please remove the -scryptN flag")
-		if !yes {
-			fmt.Println("If you're sure you want to continue, please run with -yes")
-			os.Exit(1)
-		}
+		askForConfirmation()
 	}
 
 	if (opts.FromFileIdx != 0 || opts.ToFileIdx != nil) && idHex == "" {
