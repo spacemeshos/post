@@ -51,7 +51,7 @@ else
 endif
 
 # Also update 'SUPPORTED_VERSION' in internal/postrs/version_check.go
-POSTRS_SETUP_REV = 0.7.0-rc4-distributed-verification
+POSTRS_SETUP_REV = 0.7.0-rc6-distributed-verification
 POSTRS_SETUP_ZIP = libpost-$(platform)-v$(POSTRS_SETUP_REV).zip
 POSTRS_SETUP_URL_ZIP ?= https://github.com/spacemeshos/post-rs/releases/download/v$(POSTRS_SETUP_REV)/$(POSTRS_SETUP_ZIP)
 ifeq ($(platform), windows)

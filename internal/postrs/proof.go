@@ -145,7 +145,19 @@ func (v *Verifier) Close() error {
 }
 
 type verifyOptions struct {
-	mode C.VerifyMode
+	// one of verifyAllT, verifySubsetT, verifyOneT
+	mode any
+}
+
+type verifyAllT struct{}
+
+type verifySubsetT struct {
+	k3   uint
+	seed []byte
+}
+
+type verifyOneT struct {
+	ord int
 }
 
 type VerifyOptionFunc func(*verifyOptions)
@@ -153,7 +165,7 @@ type VerifyOptionFunc func(*verifyOptions)
 // Verify all indices in the proof.
 func VerifyAll() VerifyOptionFunc {
 	return func(o *verifyOptions) {
-		o.mode.tag = C.VerifyMode_All
+		o.mode = verifyAllT{}
 	}
 }
 
@@ -161,11 +173,7 @@ func VerifyAll() VerifyOptionFunc {
 // The `ord` is the ordinal number of the index in the proof to verify.
 func VerifyOne(ord int) VerifyOptionFunc {
 	return func(o *verifyOptions) {
-		// `o.mode` is a C tagged union
-		o.mode.tag = C.VerifyMode_One
-		o.mode.anon0 = (*(*[32]byte)(unsafe.Pointer(&C.VerifyMode_One_Body{
-			index: C.size_t(ord),
-		})))
+		o.mode = verifyOneT{ord: ord}
 	}
 }
 
@@ -173,16 +181,7 @@ func VerifyOne(ord int) VerifyOptionFunc {
 // The `seed` is used to randomize the selection of indices.
 func VerifySubset(k3 uint, seed []byte) VerifyOptionFunc {
 	return func(o *verifyOptions) {
-		// `o.mode` is a C tagged union
-		o.mode.tag = C.VerifyMode_Subset
-		o.mode.anon0 = (*(*[32]byte)(unsafe.Pointer(&C.VerifyMode_Subset_Body{
-			k3: C.size_t(k3),
-			seed: C.ArrayU8{
-				ptr: (*C.uchar)(unsafe.SliceData(seed)),
-				len: C.size_t(len(seed)),
-				cap: C.size_t(cap(seed)),
-			},
-		})))
+		o.mode = verifySubsetT{k3: k3, seed: seed}
 	}
 }
 
@@ -247,20 +246,46 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 		return ErrVerifierClosed
 	}
 
-	options := verifyOptions{}
-	VerifyAll()(&options)
+	options := verifyOptions{
+		mode: verifyAllT{},
+	}
 	for _, opt := range opts {
 		opt(&options)
 	}
 
-	result := C.verify_proof(
-		v.inner,
-		cProof,
-		&cMetadata,
-		config,
-		initConfig,
-		options.mode,
-	)
+	var result C.VerifyResult
+	switch t := options.mode.(type) {
+	case verifyAllT:
+		result = C.verify_proof(
+			v.inner,
+			cProof,
+			&cMetadata,
+			config,
+			initConfig,
+		)
+	case verifySubsetT:
+		seed := C.CBytes(t.seed)
+		defer C.free(seed)
+		result = C.verify_proof_subset(
+			v.inner,
+			cProof,
+			&cMetadata,
+			config,
+			initConfig,
+			C.size_t(t.k3),
+			(*C.uchar)(seed),
+			C.size_t(len(t.seed)),
+		)
+	case verifyOneT:
+		result = C.verify_proof_index(
+			v.inner,
+			cProof,
+			&cMetadata,
+			config,
+			initConfig,
+			C.size_t(t.ord),
+		)
+	}
 
 	switch result.tag {
 	case C.VerifyResult_Ok:
