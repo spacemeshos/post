@@ -7,6 +7,7 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
 	"unsafe"
 
 	"go.uber.org/zap"
@@ -70,14 +71,24 @@ func VerifyPos(dataDir string, scryptParams ScryptParams, o ...VerifyPosOptionsF
 	defer C.free(unsafe.Pointer(dataDirPtr))
 
 	result := C.verify_pos(dataDirPtr, (*C.uint32_t)(opts.fromFile), (*C.uint32_t)(opts.toFile), C.double(opts.fraction), scryptParams)
-	switch result {
-	case C.Ok:
+	switch result.tag {
+	case C.VerifyResult_Ok:
 		return nil
-	case C.Invalid:
-		return ErrInvalidPos
-	case C.InvalidArgument:
+	case C.VerifyResult_Invalid:
+		result := castBytes[C.VerifyPosResult_Invalid_Body](result.anon0[:])
+		return fmt.Errorf("%w: file %d contains invalid label at offset %d", ErrInvalidPos, result.file, result.offset)
+	case C.VerifyResult_InvalidArgument:
 		return ErrInvalidArgument
 	default:
 		return ErrUnknown
 	}
+}
+
+// cast bytes to a pointer of type T
+func castBytes[T any](body []byte) *T {
+	var v T
+	if len(body) < int(unsafe.Sizeof(v)) {
+		panic("invalid size")
+	}
+	return (*T)(unsafe.Pointer(&body[0]))
 }

@@ -6,7 +6,6 @@ package postrs
 import "C"
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -24,9 +23,8 @@ type Config struct {
 	MaxNumUnits   uint32
 	LabelsPerUnit uint64
 
-	K1 uint32 // K1 specifies the difficulty for a label to be a candidate for a proof.
-	K2 uint32 // K2 is the number of labels below the required difficulty required for a proof.
-	K3 uint32 // K3 is the size of the subset of proof indices that is validated.
+	K1 uint // K1 specifies the difficulty for a label to be a candidate for a proof.
+	K2 uint // K2 is the number of labels below the required difficulty required for a proof.
 
 	PowDifficulty [32]byte
 }
@@ -39,16 +37,10 @@ func NewScryptParams(n, r, p uint) ScryptParams {
 	}
 }
 
-type HexEncoded []byte
-
-func (h HexEncoded) String() string {
-	return hex.EncodeToString(h)
-}
-
 // ErrVerifierClosed is returned when calling a method on an already closed Scrypt instance.
 var ErrVerifierClosed = errors.New("verifier has been closed")
 
-func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces, threads uint, K1, K2 uint32, powDifficulty [32]byte, powFlags PowFlags) (*shared.Proof, error) {
+func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces, threads, K1, K2 uint, powDifficulty [32]byte, powFlags PowFlags) (*shared.Proof, error) {
 	if logger != nil {
 		setLogCallback(logger)
 	}
@@ -134,7 +126,7 @@ type Verifier struct {
 func NewVerifier(powFlags PowFlags) (*Verifier, error) {
 	verifier := Verifier{}
 	result := C.new_verifier(powFlags, &verifier.inner)
-	if result != C.Ok {
+	if result != C.VerifyResult_Ok {
 		return nil, fmt.Errorf("failed to create verifier")
 	}
 	return &verifier, nil
@@ -152,7 +144,48 @@ func (v *Verifier) Close() error {
 	return nil
 }
 
-func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, logger *zap.Logger, cfg Config, scryptParams ScryptParams) error {
+type verifyOptions struct {
+	// one of verifyAllT, verifySubsetT, verifyOneT
+	mode any
+}
+
+type verifyAllT struct{}
+
+type verifySubsetT struct {
+	k3   uint
+	seed []byte
+}
+
+type verifyOneT struct {
+	ord int
+}
+
+type VerifyOptionFunc func(*verifyOptions)
+
+// Verify all indices in the proof.
+func VerifyAll() VerifyOptionFunc {
+	return func(o *verifyOptions) {
+		o.mode = verifyAllT{}
+	}
+}
+
+// Verify only the selected index.
+// The `ord` is the ordinal number of the index in the proof to verify.
+func VerifyOne(ord int) VerifyOptionFunc {
+	return func(o *verifyOptions) {
+		o.mode = verifyOneT{ord: ord}
+	}
+}
+
+// Verify a subset of randomly selected K3 indices.
+// The `seed` is used to randomize the selection of indices.
+func VerifySubset(k3 uint, seed []byte) VerifyOptionFunc {
+	return func(o *verifyOptions) {
+		o.mode = verifySubsetT{k3: k3, seed: seed}
+	}
+}
+
+func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, logger *zap.Logger, cfg Config, scryptParams ScryptParams, opts ...VerifyOptionFunc) error {
 	if logger != nil {
 		setLogCallback(logger)
 	}
@@ -179,7 +212,6 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 	config := C.ProofConfig{
 		k1: C.uint32_t(cfg.K1),
 		k2: C.uint32_t(cfg.K2),
-		k3: C.uint32_t(cfg.K3),
 	}
 	for i, b := range cfg.PowDifficulty {
 		config.pow_difficulty[i] = C.uchar(b)
@@ -214,22 +246,64 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 		return ErrVerifierClosed
 	}
 
-	result := C.verify_proof(
-		v.inner,
-		cProof,
-		&cMetadata,
-		config,
-		initConfig,
-	)
+	options := verifyOptions{
+		mode: verifyAllT{},
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
 
-	switch result {
-	case C.Ok:
+	var result C.VerifyResult
+	switch t := options.mode.(type) {
+	case verifyAllT:
+		result = C.verify_proof(
+			v.inner,
+			cProof,
+			&cMetadata,
+			config,
+			initConfig,
+		)
+	case verifySubsetT:
+		seed := C.CBytes(t.seed)
+		defer C.free(seed)
+		result = C.verify_proof_subset(
+			v.inner,
+			cProof,
+			&cMetadata,
+			config,
+			initConfig,
+			C.size_t(t.k3),
+			(*C.uchar)(seed),
+			C.size_t(len(t.seed)),
+		)
+	case verifyOneT:
+		result = C.verify_proof_index(
+			v.inner,
+			cProof,
+			&cMetadata,
+			config,
+			initConfig,
+			C.size_t(t.ord),
+		)
+	}
+
+	switch result.tag {
+	case C.VerifyResult_Ok:
 		return nil
-	case C.Invalid:
-		return fmt.Errorf("invalid proof")
-	case C.InvalidArgument:
+	case C.VerifyResult_InvalidIndex:
+		result := castBytes[C.VerifyResult_InvalidIndex_Body](result.anon0[:])
+		return &ErrInvalidIndex{Index: int(result.index_id)}
+	case C.VerifyResult_InvalidArgument:
 		return fmt.Errorf("invalid argument")
 	default:
 		return fmt.Errorf("unknown error")
 	}
+}
+
+type ErrInvalidIndex struct {
+	Index int
+}
+
+func (e ErrInvalidIndex) Error() string {
+	return fmt.Sprintf("invalid index: %d", e.Index)
 }

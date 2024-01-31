@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -24,7 +25,6 @@ func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 
 	cfg.K1 = 3
 	cfg.K2 = 3
-	cfg.K3 = 3
 
 	opts := config.DefaultInitOpts()
 	opts.DataDir = tb.TempDir()
@@ -60,7 +60,7 @@ func Test_Verify(t *testing.T) {
 		cfg,
 		logger,
 		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
-		proving.WithPowFlags(postrs.GetRecommendedPowFlags()),
+		proving.LightMode(),
 	)
 	r.NoError(err)
 
@@ -96,7 +96,7 @@ func Test_Verify_NoRace_On_Close(t *testing.T) {
 		cfg,
 		logger,
 		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
-		proving.WithPowFlags(postrs.GetRecommendedPowFlags()),
+		proving.LightMode(),
 	)
 	r.NoError(err)
 
@@ -131,6 +131,7 @@ func Test_Verifier_NoError_On_DoubleClose(t *testing.T) {
 
 func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	r := require.New(t)
+	logger := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
 
 	nodeId := make([]byte, 32)
 	commitmentAtxId := make([]byte, 32)
@@ -145,24 +146,51 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	)
 	r.NoError(err)
 	r.NoError(init.Initialize(context.Background()))
-
 	proof, proofMetadata, err := proving.Generate(
 		context.Background(),
 		ch,
 		cfg,
-		zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
+		logger,
 		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
+		proving.LightMode(),
 	)
 	r.NoError(err)
 
-	for i := range proof.Indices {
-		proof.Indices[i] ^= 255 // flip bits in all indices
-	}
+	// modify one of proof.Indices by zeroing out some bits
+	index := 1
+	numLabels := proofMetadata.LabelsPerUnit * uint64(proofMetadata.NumUnits)
+	bitsPerIndex := int(math.Log2(float64(numLabels))) + 1
+	mask := byte(1<<bitsPerIndex - 1)
+	offset := index * bitsPerIndex / 8
+	proof.Indices[offset] &= ^(mask << (index * bitsPerIndex % 8))
+
 	verifier, err := NewProofVerifier()
 	r.NoError(err)
 	defer verifier.Close()
 
-	r.ErrorContains(verifier.Verify(proof, proofMetadata, cfg, zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))), "invalid proof")
+	// Verify selected index (valid)
+	err = verifier.Verify(proof, proofMetadata, cfg, logger, SelectedIndex(2))
+	require.NoError(t, err)
+
+	// Defaults to verifying all indices
+	err = verifier.Verify(proof, proofMetadata, cfg, logger)
+	expected := &ErrInvalidIndex{}
+	r.ErrorAs(err, &expected)
+	r.Equal(index, expected.Index)
+
+	// Verify with AllIndices option
+	err = verifier.Verify(proof, proofMetadata, cfg, logger, AllIndices())
+	r.ErrorAs(err, &expected)
+	r.Equal(index, expected.Index)
+
+	// Verify only 1 index with K3 = 1, the `index` was empirically picked to pass verification
+	err = verifier.Verify(proof, proofMetadata, cfg, logger, Subset(1, nodeId))
+	require.NoError(t, err)
+
+	// Verify selected index (invalid)
+	err = verifier.Verify(proof, proofMetadata, cfg, logger, SelectedIndex(index))
+	r.ErrorAs(err, &expected)
+	r.Equal(index, expected.Index)
 }
 
 func TestVerifyPow(t *testing.T) {
@@ -208,67 +236,23 @@ func BenchmarkVerifying(b *testing.B) {
 
 	ch := make(shared.Challenge, 32)
 	rand.Read(ch)
-	p, m, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
+	p, m, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir), proving.LightMode())
 	require.NoError(b, err)
 
 	verifier, err := NewProofVerifier()
 	require.NoError(b, err)
 	defer verifier.Close()
 
-	for _, k3 := range []uint32{5, 25, 50, 100} {
+	for _, k3 := range []uint{5, 25, 50, 100} {
 		testName := fmt.Sprintf("k3=%d", k3)
-
-		cfg.K3 = k3
 
 		b.Run(testName, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				start := time.Now()
-				err := verifier.Verify(p, m, cfg, zaptest.NewLogger(b))
+				err := verifier.Verify(p, m, cfg, zaptest.NewLogger(b), Subset(k3, nodeId))
 				require.NoError(b, err)
 				b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
 			}
 		})
-	}
-}
-
-func Benchmark_Verify_Fastnet(b *testing.B) {
-	r := require.New(b)
-	nodeId := make([]byte, 32)
-	commitmentAtxId := make([]byte, 32)
-	ch := make(shared.Challenge, 32)
-
-	cfg, opts := getTestConfig(b)
-	cfg.K1 = 12
-	cfg.K2 = 4
-	cfg.K3 = 2
-	cfg.LabelsPerUnit = 32
-	cfg.MaxNumUnits = 4
-	cfg.MinNumUnits = 2
-
-	opts.NumUnits = cfg.MinNumUnits
-
-	init, err := initialization.NewInitializer(
-		initialization.WithNodeId(nodeId),
-		initialization.WithCommitmentAtxId(commitmentAtxId),
-		initialization.WithConfig(cfg),
-		initialization.WithInitOpts(opts),
-	)
-	r.NoError(err)
-	r.NoError(init.Initialize(context.Background()))
-
-	verifier, err := NewProofVerifier()
-	require.NoError(b, err)
-	defer verifier.Close()
-
-	for i := 0; i < b.N; i++ {
-		rand.Read(ch)
-		proof, proofMetadata, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir))
-		r.NoError(err)
-
-		b.StartTimer()
-		start := time.Now()
-		r.NoError(verifier.Verify(proof, proofMetadata, cfg, zaptest.NewLogger(b)))
-		b.ReportMetric(time.Since(start).Seconds(), "sec/proof")
-		b.StopTimer()
 	}
 }

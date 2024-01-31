@@ -12,6 +12,9 @@ import (
 	"github.com/spacemeshos/post/shared"
 )
 
+// Reexport from internal pkg.
+type ErrInvalidIndex = postrs.ErrInvalidIndex
+
 // VerifyVRFNonce ensures the validity of a nonce for a given node.
 // AtxId is the id of the ATX that was selected by the node for its commitment.
 func VerifyVRFNonce(nonce *uint64, m *shared.VRFNonceMetadata, opts ...OptionFunc) error {
@@ -83,5 +86,5 @@ func (v *ProofVerifier) Verify(p *shared.Proof, m *shared.ProofMetadata, cfg con
 
 	options := applyOpts(opts...)
 	scryptParams := postrs.NewScryptParams(options.labelScrypt.N, options.labelScrypt.R, options.labelScrypt.P)
-	return v.VerifyProof(p, m, logger, postrs.Config(cfg), scryptParams)
+	return v.VerifyProof(p, m, logger, postrs.Config(cfg), scryptParams, options.internalOpts...)
 }

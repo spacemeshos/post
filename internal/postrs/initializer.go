@@ -19,8 +19,8 @@ type DeviceClass int
 
 const (
 	ClassUnspecified = 0
-	ClassCPU         = DeviceClass((C.DeviceClass)(C.CPU))
-	ClassGPU         = DeviceClass((C.DeviceClass)(C.GPU))
+	ClassCPU         = DeviceClass((C.DeviceClass)(C.DeviceClass_CPU))
+	ClassGPU         = DeviceClass((C.DeviceClass)(C.DeviceClass_GPU))
 )
 
 // Provider is a struct that contains information about an OpenCL provider.
@@ -60,17 +60,17 @@ const (
 // InitResultToError converts the return value of the C.initialize() function to a Go error.
 func InitResultToError(retVal uint32) error {
 	switch retVal {
-	case C.InitializeOk:
+	case C.InitializeResult_Ok:
 		return nil
-	case C.InitializeOkNonceNotFound:
+	case C.InitializeResult_OkNonceNotFound:
 		return nil
-	case C.InitializeInvalidLabelsRange:
+	case C.InitializeResult_InvalidLabelsRange:
 		return ErrInvalidLabelsRange
-	case C.InitializeError:
+	case C.InitializeResult_Error:
 		return ErrInitializationFailed
-	case C.InitializeInvalidArgument:
+	case C.InitializeResult_InvalidArgument:
 		return ErrInvalidArgument
-	case C.InitializeFailedToGetProviders:
+	case C.InitializeResult_FailedToGetProviders:
 		return ErrFetchProviders
 	default:
 		return ErrUnknown
@@ -121,7 +121,7 @@ func cScryptPositions(init *C.Initializer, opt *option, start, end uint64) ([]by
 
 	output := C.GoBytes(cOut, C.int(cOutputSize))
 
-	if retVal == C.InitializeOkNonceNotFound {
+	if retVal == C.InitializeResult_OkNonceNotFound {
 		return output, nil, nil
 	}
 

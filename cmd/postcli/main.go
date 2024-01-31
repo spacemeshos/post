@@ -302,7 +302,7 @@ func main() {
 			log.Fatalln("failed to create verifier", err)
 		}
 		defer verifier.Close()
-		err = verifier.Verify(proof, proofMetadata, cfg, logger, verifying.WithLabelScryptParams(opts.Scrypt))
+		err = verifier.Verify(proof, proofMetadata, cfg, logger, verifying.WithLabelScryptParams(opts.Scrypt), verifying.AllIndices())
 		if err != nil {
 			log.Fatalln("failed to verify test proof", err)
 		}
