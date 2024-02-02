@@ -54,6 +54,7 @@ endif
 POSTRS_SETUP_REV = 0.7.0
 POSTRS_SETUP_ZIP = libpost-$(platform)-v$(POSTRS_SETUP_REV).zip
 POSTRS_SETUP_URL_ZIP ?= https://github.com/spacemeshos/post-rs/releases/download/v$(POSTRS_SETUP_REV)/$(POSTRS_SETUP_ZIP)
+
 ifeq ($(platform), windows)
 	POSTRS_SETUP_LIBS = post.h post.dll
 else
@@ -65,10 +66,16 @@ else
 endif
 
 BINDIR_POSTRS_SETUP_LIBS = $(foreach X,$(POSTRS_SETUP_LIBS),$(BIN_DIR)$(X))
-$(BINDIR_POSTRS_SETUP_LIBS): $(PROJ_DIR)$(POSTRS_SETUP_ZIP)
+
+# file marking libpost version
+$(BIN_DIR).libpost.version.$(POSTRS_SETUP_REV): $(PROJ_DIR)$(POSTRS_SETUP_ZIP)
+	rm -f $(BIN_DIR).libpost.version.*
 	mkdir -p $(dir $@)
-	unzip -o -j $(PROJ_DIR)$(POSTRS_SETUP_ZIP) -d $(dir $@) $(notdir $@)
 	touch $@
+
+$(BINDIR_POSTRS_SETUP_LIBS): $(BIN_DIR).libpost.version.$(POSTRS_SETUP_REV)
+	mkdir -p $(dir $@)
+	unzip -DD -o -j $(PROJ_DIR)$(POSTRS_SETUP_ZIP) -d $(dir $@) $(notdir $@)
 
 CURL_OPTIONS = --retry 10 --retry-max-time 120
 CURL_VERSION = $(shell curl --version 2>/dev/null | head -n 1 | cut -d' ' -f2)
@@ -79,7 +86,7 @@ endif
 $(PROJ_DIR)$(POSTRS_SETUP_ZIP):
 	curl -sSL $(CURL_OPTIONS) $(POSTRS_SETUP_URL_ZIP) -o $(PROJ_DIR)$(POSTRS_SETUP_ZIP)
 
-get-postrs-lib: $(PROJ_DIR)$(POSTRS_SETUP_ZIP) $(BINDIR_POSTRS_SETUP_LIBS)
+get-postrs-lib: $(BINDIR_POSTRS_SETUP_LIBS)
 
 go-env: get-postrs-lib
 	go env -w CGO_CFLAGS="$(CGO_CFLAGS)"
