@@ -114,8 +114,7 @@ func processFlags() {
 	switch {
 	case errors.Is(err, initialization.ErrStateMetadataFileMissing):
 	case err != nil:
-		log.Println("failed to load metadata:", err)
-		os.Exit(1)
+		log.Fatalln("failed to load metadata:", err)
 	default:
 		if idHex == "" {
 			idHex = hex.EncodeToString(meta.NodeId)
@@ -154,8 +153,7 @@ func processFlags() {
 
 	// we require the user to explicitly pass numUnits to avoid erasing existing data
 	if !flagSet["numUnits"] && meta != nil {
-		log.Println("-numUnits must be specified to perform initialization.")
-		os.Exit(1)
+		log.Fatalln("-numUnits must be specified to perform initialization.")
 	}
 
 	if flagSet["numUnits"] && numUnits != uint64(meta.NumUnits) {
@@ -180,8 +178,7 @@ func processFlags() {
 	}
 
 	if !flagSet["commitmentAtxId"] && meta != nil {
-		log.Println("-commitmentAtxId must be specified to perform initialization.")
-		os.Exit(1)
+		log.Fatalln("-commitmentAtxId must be specified to perform initialization.")
 	}
 
 	if flagSet["commitmentAtxId"] {
@@ -202,8 +199,7 @@ func processFlags() {
 	}
 
 	if !flagSet["provider"] {
-		log.Println("-provider flag is required")
-		os.Exit(1)
+		log.Fatalln("-provider flag is required")
 	}
 
 	if flagSet["labelsPerUnit"] && (cfg.LabelsPerUnit != config.MainnetConfig().LabelsPerUnit) {
