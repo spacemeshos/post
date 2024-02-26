@@ -25,7 +25,7 @@ import (
 	"github.com/spacemeshos/post/verifying"
 )
 
-const edKeyFileName = "key.bin"
+const edKeyFileName = "identity.key"
 
 var (
 	cfg  = config.MainnetConfig()
@@ -41,9 +41,7 @@ var (
 	fraction  float64
 
 	idHex              string
-	id                 []byte
 	commitmentAtxIdHex string
-	commitmentAtxId    []byte
 	reset              bool
 	numUnits           uint64
 
@@ -102,75 +100,147 @@ func askForConfirmation() {
 		return
 	}
 
-	fmt.Println("Are you sure you want to continue (y/N)?")
+	log.Println("Are you sure you want to continue (y/N)?")
 
 	var answer string
 	_, err := fmt.Scanln(&answer)
 	if err != nil || !(answer == "y" || answer == "Y") {
-		fmt.Println("Aborting")
-		os.Exit(1)
+		log.Fatal("Aborting")
 	}
 }
 
-func processFlags() error {
+func processFlags() {
+	meta, err := initialization.LoadMetadata(opts.DataDir)
+	switch {
+	case errors.Is(err, initialization.ErrStateMetadataFileMissing):
+	case err != nil:
+		log.Println("failed to load metadata:", err)
+		os.Exit(1)
+	default:
+		if idHex == "" {
+			idHex = hex.EncodeToString(meta.NodeId)
+		} else if idHex != hex.EncodeToString(meta.NodeId) {
+			log.Println("WARNING: it appears that", opts.DataDir, "was previously initialized with a different `id` value.")
+			log.Println("\tCurrent value:", hex.EncodeToString(meta.NodeId))
+			log.Println("\tValue passed to postcli:", idHex)
+			if !yes {
+				log.Println("CONTINUING MIGHT ERASE EXISTING DATA. MAKE ABSOLUTELY SURE YOU SPECIFY THE CORRECT VALUE.")
+			}
+			askForConfirmation()
+		}
+	}
+
+	key, err := loadKey()
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+	case err != nil:
+		log.Fatalln("failed to load key:", err)
+	case meta != nil && !bytes.Equal(meta.NodeId, key):
+		log.Fatalln("WARNING: inconsistent state:", edKeyFileName, "file does not match metadata in", opts.DataDir)
+	default:
+		if idHex == "" {
+			idHex = hex.EncodeToString(key)
+		} else if idHex != hex.EncodeToString(key) {
+			log.Println("WARNING: it appears that", opts.DataDir, "was previously initialized with a generated key.")
+			log.Println("The provided id does not match the generated key.")
+			log.Println("\tCurrent value:", hex.EncodeToString(key))
+			log.Println("\tValue passed to postcli:", idHex)
+			if !yes {
+				log.Println("CONTINUING MIGHT ERASE EXISTING DATA. MAKE ABSOLUTELY SURE YOU SPECIFY THE CORRECT VALUE.")
+			}
+			askForConfirmation()
+		}
+	}
+
 	// we require the user to explicitly pass numUnits to avoid erasing existing data
-	if !flagSet["numUnits"] {
-		return fmt.Errorf("-numUnits must be specified to perform initialization. to use the default value, "+
-			"run with -numUnits %d. note: if there's more than this amount of data on disk, "+
-			"THIS WILL ERASE EXISTING DATA. MAKE ABSOLUTELY SURE YOU SPECIFY THE CORRECT VALUE", opts.NumUnits)
+	if !flagSet["numUnits"] && meta != nil {
+		log.Println("-numUnits must be specified to perform initialization.")
+		os.Exit(1)
+	}
+
+	if flagSet["numUnits"] && numUnits != uint64(meta.NumUnits) {
+		log.Println("WARNING: it appears that", opts.DataDir, "was previously initialized with a different `numUnits` value.")
+		log.Println("\tCurrent value:", meta.NumUnits)
+		log.Println("\tValue passed to postcli:", numUnits)
+		if (numUnits < uint64(meta.NumUnits)) && !yes {
+			log.Println("CONTINUING MIGHT ERASE EXISTING DATA. MAKE ABSOLUTELY SURE YOU SPECIFY THE CORRECT VALUE.")
+		}
+		askForConfirmation()
 	}
 
 	if flagSet["numUnits"] && (numUnits < uint64(cfg.MinNumUnits) || numUnits > uint64(cfg.MaxNumUnits)) {
-		fmt.Println("WARNING: numUnits is outside of range valid for mainnet (min:",
+		log.Println("WARNING: numUnits is outside of range valid for mainnet (min:",
 			cfg.MinNumUnits, "max:", cfg.MaxNumUnits, ")")
+		if !yes {
+			log.Println("CONTINUING WILL INITIALIZE DATA INCOMPATIBLE WITH MAINNET. MAKE ABSOLUTELY SURE YOU WANT TO DO THIS.")
+		}
 		askForConfirmation()
 		cfg.MinNumUnits = uint32(numUnits)
 		cfg.MaxNumUnits = uint32(numUnits)
 	}
 
-	if !flagSet["provider"] {
-		return errors.New("-provider flag is required")
+	if !flagSet["commitmentAtxId"] && meta != nil {
+		log.Println("-commitmentAtxId must be specified to perform initialization.")
+		os.Exit(1)
 	}
 
-	if !flagSet["commitmentAtxId"] {
-		return errors.New("-commitmentAtxId flag is required")
+	if flagSet["commitmentAtxId"] {
+		commitmentAtxId, err := hex.DecodeString(commitmentAtxIdHex)
+		if err != nil {
+			log.Println("invalid commitmentAtxId:", err)
+		}
+		if meta != nil && !bytes.Equal(commitmentAtxId, meta.CommitmentAtxId) {
+			log.Println("WARNING: it appears that", opts.DataDir, "was previously initialized with a different `commitmentAtxId` value.")
+			log.Println("\tCurrent value:", hex.EncodeToString(meta.CommitmentAtxId))
+			log.Println("\tValue passed to postcli:", commitmentAtxIdHex)
+			if !yes {
+				log.Println("CONTINUING MIGHT ERASE EXISTING DATA. MAKE ABSOLUTELY SURE YOU SPECIFY THE CORRECT VALUE.")
+			}
+			askForConfirmation()
+			commitmentAtxIdHex = hex.EncodeToString(meta.CommitmentAtxId)
+		}
 	}
-	var err error
-	commitmentAtxId, err = hex.DecodeString(commitmentAtxIdHex)
-	if err != nil {
-		return fmt.Errorf("invalid commitmentAtxId: %w", err)
+
+	if !flagSet["provider"] {
+		log.Println("-provider flag is required")
+		os.Exit(1)
 	}
 
 	if flagSet["labelsPerUnit"] && (cfg.LabelsPerUnit != config.MainnetConfig().LabelsPerUnit) {
-		fmt.Println("WARNING: labelsPerUnit is set to a non-default value. This makes the initialization incompatible " +
-			"with mainnet. If you're trying to initialize for mainnet, please remove the -labelsPerUnit flag")
+		log.Println("WARNING: labelsPerUnit is set to a non-default value.")
+		log.Println("If you're trying to initialize for mainnet, please remove the -labelsPerUnit flag")
+		if !yes {
+			log.Println("CONTINUING WILL INITIALIZE DATA INCOMPATIBLE WITH MAINNET. MAKE ABSOLUTELY SURE YOU WANT TO DO THIS.")
+		}
 		askForConfirmation()
 	}
 
-	if flagSet["scryptN"] {
-		fmt.Println("WARNING: scryptN is set to a non-default value. This makes the initialization incompatible " +
-			"with mainnet. If you're trying to initialize for mainnet, please remove the -scryptN flag")
+	if flagSet["scryptN"] && (opts.Scrypt.N != config.MainnetInitOpts().Scrypt.N) {
+		log.Println("WARNING: scryptN is set to a non-default value.")
+		log.Println("If you're trying to initialize for mainnet, please remove the -scryptN flag")
+		if !yes {
+			log.Println("CONTINUING WILL INITIALIZE DATA INCOMPATIBLE WITH MAINNET. MAKE ABSOLUTELY SURE YOU WANT TO DO THIS.")
+		}
 		askForConfirmation()
 	}
 
 	if (opts.FromFileIdx != 0 || opts.ToFileIdx != nil) && idHex == "" {
-		return errors.New("-id flag is required when using -fromFile or -toFile")
+		log.Fatalln("-id flag is required when using -fromFile or -toFile")
 	}
 
 	if idHex == "" {
+		log.Println("cli: generating new identity")
 		pub, priv, err := ed25519.GenerateKey(nil)
 		if err != nil {
-			return fmt.Errorf("failed to generate identity: %w", err)
+			log.Fatalln("failed to generate identity:", err)
 		}
-		id = pub
-		log.Printf("cli: generated id %x\n", id)
-		return saveKey(priv)
+		if err := saveKey(priv); err != nil {
+			log.Fatalln("failed to save identity:", err)
+		}
+		idHex = hex.EncodeToString(pub)
+		log.Println("cli: generated key in", edKeyFileName)
+		return
 	}
-	id, err = hex.DecodeString(idHex)
-	if err != nil {
-		return fmt.Errorf("invalid id: %w", err)
-	}
-	return nil
 }
 
 func main() {
@@ -187,7 +257,7 @@ func main() {
 
 	if printNumFiles {
 		totalFiles := opts.TotalFiles(cfg.LabelsPerUnit)
-		fmt.Println(totalFiles)
+		log.Println(totalFiles)
 		return
 	}
 
@@ -248,12 +318,16 @@ func main() {
 		return
 	}
 
-	err = processFlags()
-	switch {
-	case errors.Is(err, ErrKeyFileExists):
-		log.Fatalln("cli: key file already exists. This appears to be a mistake. If you're trying to initialize a new identity delete key.bin and try again otherwise specify identity with `-id` flag")
-	case err != nil:
-		log.Fatalln("failed to process flags:", err)
+	processFlags()
+
+	id, err := hex.DecodeString(idHex)
+	if err != nil {
+		log.Fatalf("failed to decode id %s: %s\n", idHex, err)
+	}
+
+	commitmentAtxId, err := hex.DecodeString(commitmentAtxIdHex)
+	if err != nil {
+		log.Fatalf("failed to decode commitmentAtxId %s: %s\n", commitmentAtxIdHex, err)
 	}
 
 	init, err := initialization.NewInitializer(
@@ -277,11 +351,8 @@ func main() {
 
 	err = init.Initialize(ctx)
 	switch {
-	case errors.Is(err, shared.ErrInitCompleted):
-		log.Panic(err.Error())
-		return
 	case errors.Is(err, context.Canceled):
-		log.Println("cli: initialization interrupted")
+		log.Fatalln("cli: initialization interrupted")
 		return
 	case err != nil:
 		log.Println("cli: initialization error", err)
@@ -327,13 +398,11 @@ func saveKey(key ed25519.PrivateKey) error {
 	return nil
 }
 
-func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) {
-	log.Println("cli: verifying key.bin")
-
+func loadKey() (ed25519.PublicKey, error) {
 	keyPath := filepath.Join(opts.DataDir, edKeyFileName)
 	data, err := os.ReadFile(keyPath)
 	if err != nil {
-		log.Fatalf("could not read private key from %s: %s\n", keyPath, err)
+		return nil, fmt.Errorf("could not read private key from %s: %w\n", keyPath, err)
 	}
 
 	dst := make([]byte, ed25519.PrivateKeySize)
@@ -344,19 +413,27 @@ func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) {
 	if n != ed25519.PrivateKeySize {
 		log.Fatalf("size of key (%d) not expected size %d\n", n, ed25519.PrivateKeySize)
 	}
-	pub := ed25519.NewKeyFromSeed(dst[:ed25519.SeedSize]).Public().(ed25519.PublicKey)
+	return ed25519.NewKeyFromSeed(dst[:ed25519.SeedSize]).Public().(ed25519.PublicKey), nil
+}
 
-	metafile := filepath.Join(opts.DataDir, initialization.MetadataFileName)
+func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) {
+	log.Println("cli: verifying", edKeyFileName)
+	pub, err := loadKey()
+	if err != nil {
+		log.Fatalf("failed to load public key from %s: %s\n", edKeyFileName, err)
+	}
+
+	metaFile := filepath.Join(opts.DataDir, initialization.MetadataFileName)
 	meta, err := initialization.LoadMetadata(opts.DataDir)
 	if err != nil {
 		log.Fatalf("failed to load metadata from %s: %s\n", opts.DataDir, err)
 	}
 
 	if !bytes.Equal(meta.NodeId, pub) {
-		log.Fatalf("NodeID in %s (%x) does not match public key from key.bin (%x)", metafile, meta.NodeId, pub)
+		log.Fatalf("NodeID in %s (%x) does not match public key from %s (%x)", metaFile, meta.NodeId, edKeyFileName, pub)
 	}
 
-	log.Println("cli: key.bin is valid")
+	log.Println("cli:", edKeyFileName, "is valid")
 	log.Println("cli: verifying POS data")
 
 	params := postrs.NewScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)
