@@ -238,7 +238,8 @@ func processFlags() {
 			log.Fatalln("failed to save identity:", err)
 		}
 		idHex = hex.EncodeToString(pub)
-		log.Println("cli: generated key in", edKeyFileName)
+		log.Println("generated key in", edKeyFileName)
+		log.Println("copy this file to the `data/identities` directory of your node")
 		return
 	}
 }
