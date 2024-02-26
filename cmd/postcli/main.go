@@ -399,7 +399,7 @@ func loadKey() (ed25519.PublicKey, error) {
 	keyPath := filepath.Join(opts.DataDir, edKeyFileName)
 	data, err := os.ReadFile(keyPath)
 	if err != nil {
-		return nil, fmt.Errorf("could not read private key from %s: %w\n", keyPath, err)
+		return nil, fmt.Errorf("could not read private key from %s: %w", keyPath, err)
 	}
 
 	dst := make([]byte, ed25519.PrivateKeySize)
