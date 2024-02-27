@@ -1,6 +1,8 @@
 package initialization
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 
 	"github.com/spacemeshos/post/shared"
@@ -49,10 +51,10 @@ func (d *DiskState) NumFilesWritten() (int, error) {
 
 func GetFiles(dir string, predicate func(os.FileInfo) bool) ([]os.FileInfo, error) {
 	allFiles, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return nil, nil
+	case err != nil:
 		return nil, err
 	}
 

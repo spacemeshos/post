@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"os/signal"
@@ -128,7 +129,7 @@ func processFlags() {
 
 	key, err := loadKey()
 	switch {
-	case errors.Is(err, os.ErrNotExist):
+	case errors.Is(err, fs.ErrNotExist):
 	case err != nil:
 		log.Fatalln("failed to load key:", err)
 	case meta != nil && !bytes.Equal(meta.NodeId, key):
@@ -370,7 +371,10 @@ func main() {
 }
 
 func saveKey(key ed25519.PrivateKey) error {
-	if err := os.MkdirAll(opts.DataDir, 0o700); err != nil && !os.IsExist(err) {
+	err := os.MkdirAll(opts.DataDir, 0o700)
+	switch {
+	case errors.Is(err, os.ErrExist):
+	case err != nil:
 		return fmt.Errorf("mkdir error: %w", err)
 	}
 
@@ -407,8 +411,7 @@ func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) {
 	log.Println("cli: verifying", edKeyFileName)
 	pub, err := loadKey()
 	switch {
-	case errors.Is(err, os.ErrNotExist):
-		log.Println("cli:", edKeyFileName, "does not exist. Skipping verification")
+	case errors.Is(err, fs.ErrNotExist):
 	case err != nil:
 		log.Fatalf("failed to load public key from %s: %s\n", edKeyFileName, err)
 	default:
