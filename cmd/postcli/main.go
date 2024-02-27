@@ -122,10 +122,7 @@ func processFlags() {
 			log.Println("WARNING: it appears that", opts.DataDir, "was previously initialized with a different `id` value.")
 			log.Println("\tCurrent value:", hex.EncodeToString(meta.NodeId))
 			log.Println("\tValue passed to postcli:", idHex)
-			if !yes {
-				log.Println("CONTINUING MIGHT ERASE EXISTING DATA. MAKE ABSOLUTELY SURE YOU SPECIFY THE CORRECT VALUE.")
-			}
-			askForConfirmation()
+			log.Fatalln("aborting")
 		}
 	}
 
@@ -144,10 +141,7 @@ func processFlags() {
 			log.Println("The provided id does not match the generated key.")
 			log.Println("\tCurrent value:", hex.EncodeToString(key))
 			log.Println("\tValue passed to postcli:", idHex)
-			if !yes {
-				log.Println("CONTINUING MIGHT ERASE EXISTING DATA. MAKE ABSOLUTELY SURE YOU SPECIFY THE CORRECT VALUE.")
-			}
-			askForConfirmation()
+			log.Fatalln("aborting")
 		}
 	}
 
@@ -190,11 +184,7 @@ func processFlags() {
 			log.Println("WARNING: it appears that", opts.DataDir, "was previously initialized with a different `commitmentAtxId` value.")
 			log.Println("\tCurrent value:", hex.EncodeToString(meta.CommitmentAtxId))
 			log.Println("\tValue passed to postcli:", commitmentAtxIdHex)
-			if !yes {
-				log.Println("CONTINUING MIGHT ERASE EXISTING DATA. MAKE ABSOLUTELY SURE YOU SPECIFY THE CORRECT VALUE.")
-			}
-			askForConfirmation()
-			commitmentAtxIdHex = hex.EncodeToString(meta.CommitmentAtxId)
+			log.Fatalln("aborting")
 		}
 	}
 
@@ -416,23 +406,25 @@ func loadKey() (ed25519.PublicKey, error) {
 func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) {
 	log.Println("cli: verifying", edKeyFileName)
 	pub, err := loadKey()
-	if err != nil {
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		log.Println("cli:", edKeyFileName, "does not exist. Skipping verification")
+	case err != nil:
 		log.Fatalf("failed to load public key from %s: %s\n", edKeyFileName, err)
+	default:
+		metaFile := filepath.Join(opts.DataDir, initialization.MetadataFileName)
+		meta, err := initialization.LoadMetadata(opts.DataDir)
+		if err != nil {
+			log.Fatalf("failed to load metadata from %s: %s\n", opts.DataDir, err)
+		}
+
+		if !bytes.Equal(meta.NodeId, pub) {
+			log.Fatalf("NodeID in %s (%x) does not match public key from %s (%x)", metaFile, meta.NodeId, edKeyFileName, pub)
+		}
+		log.Println("cli:", edKeyFileName, "is valid")
 	}
 
-	metaFile := filepath.Join(opts.DataDir, initialization.MetadataFileName)
-	meta, err := initialization.LoadMetadata(opts.DataDir)
-	if err != nil {
-		log.Fatalf("failed to load metadata from %s: %s\n", opts.DataDir, err)
-	}
-
-	if !bytes.Equal(meta.NodeId, pub) {
-		log.Fatalf("NodeID in %s (%x) does not match public key from %s (%x)", metaFile, meta.NodeId, edKeyFileName, pub)
-	}
-
-	log.Println("cli:", edKeyFileName, "is valid")
 	log.Println("cli: verifying POS data")
-
 	params := postrs.NewScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)
 	verifyOpts := []postrs.VerifyPosOptionsFunc{
 		postrs.WithFraction(fraction),
