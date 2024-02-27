@@ -23,7 +23,7 @@ install: get-postrs-lib
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.54.2
 	go install gotest.tools/gotestsum@v1.10.1
 	go install honnef.co/go/tools/cmd/staticcheck@v0.4.5
-	go install go.uber.org/mock/mockgen@v0.3.0
+	go install go.uber.org/mock/mockgen@v0.4.0
 .PHONY: install
 
 tidy:

@@ -3,7 +3,9 @@ package initialization
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -16,7 +18,9 @@ const MetadataFileName = "postdata_metadata.json"
 
 func SaveMetadata(dir string, v *shared.PostMetadata) error {
 	err := os.MkdirAll(dir, shared.OwnerReadWriteExec)
-	if err != nil && !os.IsExist(err) {
+	switch {
+	case errors.Is(err, fs.ErrExist):
+	case err != nil:
 		return fmt.Errorf("dir creation failure: %w", err)
 	}
 
@@ -35,10 +39,10 @@ func SaveMetadata(dir string, v *shared.PostMetadata) error {
 func LoadMetadata(dir string) (*shared.PostMetadata, error) {
 	filename := filepath.Join(dir, MetadataFileName)
 	data, err := os.ReadFile(filename)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, ErrStateMetadataFileMissing
-		}
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return nil, ErrStateMetadataFileMissing
+	case err != nil:
 		return nil, fmt.Errorf("read file failure: %w", err)
 	}
 

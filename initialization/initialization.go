@@ -338,7 +338,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 			fileNumLabels = layout.LastFileNumLabels
 		}
 
-		if err := init.initFile(ctx, wo, woReference, i, batchSize, fileOffset, fileNumLabels, difficulty); err != nil {
+		if err := init.initFile(ctx, wo, woReference, i, batchSize, fileOffset, fileNumLabels); err != nil {
 			return err
 		}
 	}
@@ -493,7 +493,7 @@ func (init *Initializer) Status() Status {
 	return StatusNotStarted
 }
 
-func (init *Initializer) initFile(ctx context.Context, wo, woReference *oracle.WorkOracle, fileIndex int, batchSize, fileOffset, fileNumLabels uint64, difficulty []byte) error {
+func (init *Initializer) initFile(ctx context.Context, wo, woReference *oracle.WorkOracle, fileIndex int, batchSize, fileOffset, fileNumLabels uint64) error {
 	fileTargetPosition := fileOffset + fileNumLabels
 
 	// Initialize the labels file writer.

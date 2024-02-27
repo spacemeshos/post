@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -969,11 +970,11 @@ func TestInitializeSubset(t *testing.T) {
 
 	// Verify that the subset contains files 3 and 4, but not 0-2 and 5
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_0.bin"))
-	require.ErrorIs(t, err, os.ErrNotExist)
+	require.ErrorIs(t, err, fs.ErrNotExist)
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_1.bin"))
-	require.ErrorIs(t, err, os.ErrNotExist)
+	require.ErrorIs(t, err, fs.ErrNotExist)
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_2.bin"))
-	require.ErrorIs(t, err, os.ErrNotExist)
+	require.ErrorIs(t, err, fs.ErrNotExist)
 
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_3.bin"))
 	require.NoError(t, err)
@@ -981,7 +982,7 @@ func TestInitializeSubset(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = os.Stat(filepath.Join(optsSubset.DataDir, "postdata_5.bin"))
-	require.ErrorIs(t, err, os.ErrNotExist)
+	require.ErrorIs(t, err, fs.ErrNotExist)
 
 	// Verify that postdata_3.bin from both initializations contain the same data
 	fullPostdata3, err := os.ReadFile(filepath.Join(opts.DataDir, "postdata_3.bin"))
