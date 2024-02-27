@@ -81,28 +81,37 @@ apt install nvidia-opencl-icd
 Example
 
 ```bash
-./postcli -provider=2 -id=c230c51669d1fcd35860131e438e234726b2bd5f9adbbd91bd88a718e7e98ecb \
+./postcli -provider=2 -numUnits=4 -id=c230c51669d1fcd35860131e438e234726b2bd5f9adbbd91bd88a718e7e98ecb \
     -commitmentAtxId=c230c51669d1fcd35860131e438e234726b2bd5f9adbbd91bd88a718e7e98ecb -genproof
 ```
 
 ### Remarks
 
-* Both `-id` and `-commitmentAtxId` are needed to generate the PoST data.
-* If `-id` isn't provided a new identity will be auto-generated. Its private key will be stored in `key.bin` in
-`-datadir` with the PoST data. This file then **must** to be copied/moved with the PoST data to run a node with this
-generated identity.
-**NOTE:** The generated PoST data is ONLY valid for this identity!
-If a public key is provided with the `-id` flag, the `key.bin` file will be NOT created. Make sure that the key file
-that belongs to the identity provided to `postcli` is available in the PoST directory **before** running a node with it.
-* `-commitmentAtxId`: it is recommended to look up the highest ATX by querying it from a synced node with
-`grpcurl -plaintext -d '' 0.0.0.0:9093 spacemesh.v1.ActivationService.Highest | jq -r '.atx.id.id' | base64 -d | xxd -p -c 64`.
-The node can be operated in "non-smeshing" mode during synchronization and when querying the highest ATX.
+* Both `-numUnits` and `-commitmentAtxId` are needed to generate PoST data.
+  * an already started initialization can be continued without providing these flags.
+  * `-commitmentAtxId`: it is recommended to look up the highest ATX by querying it from a synced node with
+
+    ```shell
+    grpcurl -plaintext -d '' 0.0.0.0:9093 spacemesh.v1.ActivationService.Highest | jq -r '.atx.id.id' | base64 -d | xxd -p -c 64`
+    ```
+
+    The node can be operated in "non-smeshing" mode during synchronization and when querying the highest ATX.
+
+    Alternatively you can pick an ATX from the current epoch from the explorer: <https://explorer.spacemesh.io/epochs>
+* If `-id` isn't provided a new identity will be auto-generated. Its private key will be stored in `identity.key` in
+`-datadir` next to the PoST data. This file then **must** to be copied/moved to the `data/identities` directory of
+the node managing this identity.
+  * **NOTE:** The generated PoST data is ONLY valid for this identity!
+  * If a public key is provided with the `-id` flag, the `identities.key` file will be NOT created. Make sure that the
+    key file that belongs to the identity provided to `postcli` is available in the `data/identities` directory for a
+    PoST service using the generated data to be able to connect to the node.
+
 * The `-reset` flag can be used to clean up a previous initialization. **Careful**: This will delete data that won't be
 recoverable.
 
 ## Initializing a subset of PoST data
 
-It is possible to initialize only subset of the files. This feature is intended to be used to split initialization
+It is possible to initialize only subset of the files. This feature is intended to allow splitting initialization
 between many machines.
 
 ### Example - split initialization between 2 machines
@@ -195,11 +204,11 @@ confidence but still completes verification in a reasonable time. Suggested valu
 
 To verify POS data:
 
-1. locate the directory of the POS data. It should contain postdata_metadata.json and postdata_N.bin files.
+1. locate the directory of the POS data. It should contain `postdata_metadata.json` and `postdata_N.bin` files.
 2. run `postcli -verify -datadir <path to POS directory> -fraction <% of data to verify>`.
 
 For example, `postcli -verify -datadir ~/post/data -fraction 0.1` will verify 0.1% of data. No additional arguments
-(i.e `-id`) are required. The postcli will read all required information from postdata_metadata.json
+(i.e `-id`) are required. The postcli will read all required information from `postdata_metadata.json`
 
 If the POS data is found to be invalid, `postcli` will exit with status 1 and print the index of file and offset of the
 label found to be invalid. If verification completes successfully, `postcli` exits with 0.
@@ -213,8 +222,8 @@ re-initializing the data. Postcli will need to **read** the entire POS data and 
 
 To find a lost nonce:
 
-1. locate the directory of the POS data. It should contain postdata_metadata.json and postdata_N.bin files.
+1. locate the directory of the POS data. It should contain `postdata_metadata.json` and `postdata_N.bin` files.
 2. run `postcli -searchForNonce -datadir <path to POS directory>`.
 
-The postcli will read the metadata from postdata_metadata.json and then look for the nonce in all postdata_N.bin files
-one by one. If the nonce is found it will update the metadata file.
+The postcli will read the metadata from `postdata_metadata.json` and then look for the nonce in all `postdata_N.bin`
+files one by one. If the nonce is found it will update the metadata file.
