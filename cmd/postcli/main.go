@@ -151,7 +151,7 @@ func processFlags() {
 		log.Fatalln("-numUnits must be specified to perform initialization.")
 	}
 
-	if flagSet["numUnits"] && numUnits != uint64(meta.NumUnits) {
+	if flagSet["numUnits"] && meta != nil && numUnits != uint64(meta.NumUnits) {
 		log.Println("WARNING: it appears that", opts.DataDir, "was previously initialized with a different `numUnits` value.")
 		log.Println("\tCurrent value:", meta.NumUnits)
 		log.Println("\tValue passed to postcli:", numUnits)

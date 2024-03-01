@@ -161,8 +161,9 @@ ls -la ./data/*.bin | wc -l
 1600
 ```
 
-**Merging postmeta_data.json**: Every subset will create its own `postmeta_data.json`. These files MUST be merged manually.
-During initialization a VRF nonce is searched that represents the index of the **the label with the smallest value**.
+**Merging postdata_metadata.json**: Every subset will create its own `postdata_metadata.json`. These files MUST be
+merged manually. During initialization a VRF nonce is searched that represents the index of the
+**the label with the smallest value**.
 
 When `postcli` initializes in chunks, each subset can find a valid VRF nonce, which represents the local minimum in the
 initialized subset. It is **necessary** to manually select the best one (the global minimum) when merging the subsets.
