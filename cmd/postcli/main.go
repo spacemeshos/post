@@ -26,8 +26,6 @@ import (
 	"github.com/spacemeshos/post/verifying"
 )
 
-const edKeyFileName = "identity.key"
-
 var (
 	cfg  = config.MainnetConfig()
 	opts = config.MainnetInitOpts()
@@ -127,7 +125,11 @@ func processFlags() {
 		}
 	}
 
-	key, err := loadKey()
+	edKeyFileName, err := findKeyFile(opts.DataDir)
+	if err != nil {
+		log.Fatalln("failed to find identity file:", err)
+	}
+	key, err := loadKey(edKeyFileName)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 	case err != nil:
@@ -221,7 +223,8 @@ func processFlags() {
 		if err != nil {
 			log.Fatalln("failed to generate identity:", err)
 		}
-		if err := saveKey(priv); err != nil {
+		edKeyFileName, err := saveKey(priv)
+		if err != nil {
 			log.Fatalln("failed to save identity:", err)
 		}
 		idHex = hex.EncodeToString(pub)
@@ -370,26 +373,59 @@ func main() {
 	}
 }
 
-func saveKey(key ed25519.PrivateKey) error {
+func saveKey(key ed25519.PrivateKey) (string, error) {
 	err := os.MkdirAll(opts.DataDir, 0o700)
 	switch {
 	case errors.Is(err, os.ErrExist):
 	case err != nil:
-		return fmt.Errorf("mkdir error: %w", err)
+		return "", fmt.Errorf("mkdir error: %w", err)
 	}
 
-	filename := filepath.Join(opts.DataDir, edKeyFileName)
+	pub := key.Public().(ed25519.PublicKey)
+	filename := filepath.Join(opts.DataDir, fmt.Sprintf("%s.key", hex.EncodeToString(pub[:3])))
 	if _, err := os.Stat(filename); err == nil {
-		return ErrKeyFileExists
+		return "", ErrKeyFileExists
 	}
 
 	if err := os.WriteFile(filename, []byte(hex.EncodeToString(key)), 0o600); err != nil {
-		return fmt.Errorf("key write to disk error: %w", err)
+		return "", fmt.Errorf("key write to disk error: %w", err)
 	}
-	return nil
+	return filename, nil
 }
 
-func loadKey() (ed25519.PublicKey, error) {
+func findKeyFile(dataDir string) (string, error) {
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		return "", fmt.Errorf("failed to create directory at %s: %w", dataDir, err)
+	}
+	edKeyFileName := ""
+	err := filepath.WalkDir(dataDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("failed to walk directory at %s: %w", path, err)
+		}
+
+		// skip subdirectories and files in them
+		if d.IsDir() && path != dataDir {
+			return fs.SkipDir
+		}
+
+		// skip files that are not identity files
+		if filepath.Ext(path) != ".key" {
+			return nil
+		}
+
+		if edKeyFileName != "" {
+			return fmt.Errorf("multiple identity files found: %w", fs.ErrExist)
+		}
+		edKeyFileName = d.Name()
+		return nil
+	})
+	return edKeyFileName, err
+}
+
+func loadKey(edKeyFileName string) (ed25519.PublicKey, error) {
+	if edKeyFileName == "" {
+		return nil, fs.ErrNotExist
+	}
 	keyPath := filepath.Join(opts.DataDir, edKeyFileName)
 	data, err := os.ReadFile(keyPath)
 	if err != nil {
@@ -408,23 +444,29 @@ func loadKey() (ed25519.PublicKey, error) {
 }
 
 func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) {
-	log.Println("cli: verifying", edKeyFileName)
-	pub, err := loadKey()
-	switch {
-	case errors.Is(err, fs.ErrNotExist):
-	case err != nil:
-		log.Fatalf("failed to load public key from %s: %s\n", edKeyFileName, err)
-	default:
-		metaFile := filepath.Join(opts.DataDir, initialization.MetadataFileName)
-		meta, err := initialization.LoadMetadata(opts.DataDir)
-		if err != nil {
-			log.Fatalf("failed to load metadata from %s: %s\n", opts.DataDir, err)
-		}
+	edKeyFileName, err := findKeyFile(opts.DataDir)
+	if err != nil {
+		log.Fatalf("failed to find identity file: %s\n", err)
+	}
+	if edKeyFileName != "" {
+		log.Println("cli: verifying", edKeyFileName)
+		pub, err := loadKey(edKeyFileName)
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+		case err != nil:
+			log.Fatalf("failed to load public key from %s: %s\n", edKeyFileName, err)
+		default:
+			metaFile := filepath.Join(opts.DataDir, initialization.MetadataFileName)
+			meta, err := initialization.LoadMetadata(opts.DataDir)
+			if err != nil {
+				log.Fatalf("failed to load metadata from %s: %s\n", opts.DataDir, err)
+			}
 
-		if !bytes.Equal(meta.NodeId, pub) {
-			log.Fatalf("NodeID in %s (%x) does not match public key from %s (%x)", metaFile, meta.NodeId, edKeyFileName, pub)
+			if !bytes.Equal(meta.NodeId, pub) {
+				log.Fatalf("NodeID in %s (%x) does not match public key from %s (%x)", metaFile, meta.NodeId, edKeyFileName, pub)
+			}
+			log.Println("cli:", edKeyFileName, "is valid")
 		}
-		log.Println("cli:", edKeyFileName, "is valid")
 	}
 
 	log.Println("cli: verifying POS data")
