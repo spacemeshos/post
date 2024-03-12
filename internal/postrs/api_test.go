@@ -49,34 +49,36 @@ func TestScryptPositions(t *testing.T) {
 	var prevOutput []byte
 	var nonce *uint64
 	for _, p := range providers {
-		scrypt, err := NewScrypt(
-			WithProviderID(p.ID),
-			WithCommitment(commitment),
-			WithVRFDifficulty(vrfDifficulty),
-			WithScryptN(32),
-			WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
-		)
-		require.NoError(t, err)
-		require.NotNil(t, scrypt)
-		defer scrypt.Close()
+		t.Run(p.Model, func(t *testing.T) {
+			scrypt, err := NewScrypt(
+				WithProviderID(p.ID),
+				WithCommitment(commitment),
+				WithVRFDifficulty(vrfDifficulty),
+				WithScryptN(32),
+				WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
+			)
+			require.NoError(t, err)
+			require.NotNil(t, scrypt)
+			defer scrypt.Close()
 
-		res, err := scrypt.Positions(start, end)
-		require.NoError(t, err)
-		require.NotNil(t, res)
-		require.NotNil(t, res.Output)
+			res, err := scrypt.Positions(start, end)
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			require.NotNil(t, res.Output)
 
-		// assert that output content is equal between different providers.
-		if prevOutput == nil {
-			prevOutput = res.Output
-		} else {
-			require.Equal(t, prevOutput, res.Output, fmt.Sprintf("not equal: provider: %+v", p))
-		}
+			// assert that output content is equal between different providers.
+			if prevOutput == nil {
+				prevOutput = res.Output
+			} else {
+				require.Equal(t, prevOutput, res.Output, fmt.Sprintf("not equal: provider: %+v", p))
+			}
 
-		if nonce == nil {
-			nonce = res.IdxSolution
-		} else {
-			require.Equal(t, *nonce, *res.IdxSolution)
-		}
+			if nonce == nil {
+				nonce = res.IdxSolution
+			} else {
+				require.Equal(t, *nonce, *res.IdxSolution)
+			}
+		})
 	}
 
 	require.NotNil(t, prevOutput)
