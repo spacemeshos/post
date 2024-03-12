@@ -151,6 +151,9 @@ func NewScrypt(opts ...OptionFunc) (*Scrypt, error) {
 
 // Close closes the Scrypt instance.
 func (s *Scrypt) Close() error {
+	if s == nil {
+		return nil
+	}
 	if s.init == nil {
 		return ErrScryptClosed
 	}

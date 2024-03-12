@@ -216,3 +216,8 @@ func Test_ScryptPositions_NoPow(t *testing.T) {
 		})
 	}
 }
+
+func TestCloseNilScrypt(t *testing.T) {
+	var scrypt *Scrypt
+	scrypt.Close()
+}
