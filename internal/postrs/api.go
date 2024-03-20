@@ -181,7 +181,7 @@ func (s *Scrypt) Positions(start, end uint64) (ScryptPositionsResult, error) {
 		return ScryptPositionsResult{}, err
 	}
 
-	output, idxSolution, err := cScryptPositions(s.init, s.options, start, end)
+	output, idxSolution, err := cScryptPositions(s.init, start, end)
 	return ScryptPositionsResult{
 		Output:      output,
 		IdxSolution: idxSolution,

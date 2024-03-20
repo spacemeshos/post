@@ -105,7 +105,7 @@ func cFreeInitializer(init *C.Initializer) {
 
 // cScryptPositions calls the C functions from libpostrs that create the labels
 // and VRF proofs.
-func cScryptPositions(init *C.Initializer, opt *option, start, end uint64) ([]byte, *uint64, error) {
+func cScryptPositions(init *C.Initializer, start, end uint64) ([]byte, *uint64, error) {
 	outputSize := LabelLength * (end - start + 1)
 	cStartPosition := C.uint64_t(start)
 	cEndPosition := C.uint64_t(end)
