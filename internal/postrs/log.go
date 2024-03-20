@@ -42,13 +42,19 @@ var (
 )
 
 func setLogCallback(logger *zap.Logger) {
-	oncer.Do(func() {
-		C.set_logging_callback(levelMap[logger.Level()], C.callback(C.logCallback))
-	})
+	level, ok := levelMap[logger.Level()]
+	if !ok {
+		logger.Error("failed to map zap log level to C log level", zap.Stringer("level", logger.Level()))
+		return
+	}
 
 	logMux.Lock()
-	defer logMux.Unlock()
 	log = logger
+	logMux.Unlock()
+
+	oncer.Do(func() {
+		C.set_logging_callback(level, C.callback(C.logCallback))
+	})
 }
 
 //export logCallback
