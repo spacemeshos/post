@@ -20,5 +20,10 @@ type ErrReferenceLabelMismatch struct {
 }
 
 func (e ErrReferenceLabelMismatch) Error() string {
-	return fmt.Sprintf("reference label mismatch at %d with commitment %x: expected %x, actual %x", e.Index, e.Commitment, e.Expected, e.Actual)
+	return fmt.Sprintf("reference label mismatch at %d with commitment %x: expected %x, actual %x",
+		e.Index,
+		e.Commitment,
+		e.Expected,
+		e.Actual,
+	)
 }

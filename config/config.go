@@ -84,7 +84,9 @@ func MainnetConfig() Config {
 		K1:            26,
 		K2:            37,
 	}
-	_, err := hex.Decode(cfg.PowDifficulty[:], []byte("000dfb23b0979b4b000000000000000000000000000000000000000000000000"))
+	_, err := hex.Decode(cfg.PowDifficulty[:],
+		[]byte("000dfb23b0979b4b000000000000000000000000000000000000000000000000"),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -205,14 +207,16 @@ func Validate(cfg Config, opts InitOpts) error {
 	}
 
 	if res := shared.Uint64MulOverflow(cfg.LabelsPerUnit, uint64(opts.NumUnits)); res {
-		return fmt.Errorf("uint64 overflow: `cfg.LabelsPerUnit` (%v) * `opts.NumUnits` (%v) exceeds the range allowed by uint64",
-			cfg.LabelsPerUnit, opts.NumUnits)
+		return fmt.Errorf("uint64 overflow: `cfg.LabelsPerUnit` (%v) * `opts.NumUnits` (%v) exceeds uint64",
+			cfg.LabelsPerUnit, opts.NumUnits,
+		)
 	}
 
 	numLabels := cfg.LabelsPerUnit * uint64(opts.NumUnits)
 	if res := shared.Uint64MulOverflow(numLabels, uint64(cfg.K1)); res {
-		return fmt.Errorf("uint64 overflow: `cfg.LabelsPerUnit` * `opts.NumUnits` (%v) * `cfg.K1` (%v) exceeds the range allowed by uint64",
-			numLabels, cfg.K1)
+		return fmt.Errorf("uint64 overflow: `cfg.LabelsPerUnit` * `opts.NumUnits` (%v) * `cfg.K1` (%v) exceeds uint64",
+			numLabels, cfg.K1,
+		)
 	}
 
 	if err := opts.Scrypt.Validate(); err != nil {

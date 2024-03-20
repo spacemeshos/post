@@ -83,7 +83,8 @@ func WithVRFDifficulty(difficulty []byte) OptionFunc {
 }
 
 // WithScryptParams sets the parameters for the scrypt algorithm.
-// At the moment only configuring N is supported. r and p are fixed at 1 (due to limitations in the OpenCL implementation).
+// At the moment only configuring N is supported. r and p are fixed at 1 (due to limitations in the OpenCL
+// implementation).
 func WithScryptParams(params config.ScryptParams) OptionFunc {
 	return func(opts *option) error {
 		if params.P != 1 || params.R != 1 {
@@ -229,7 +230,8 @@ func (w *WorkOracle) Positions(start, end uint64) (WorkOracleResult, error) {
 	}
 
 	if start > end {
-		return WorkOracleResult{}, fmt.Errorf("invalid `start` and `end`; expected: start <= end, given: %v > %v", start, end)
+		return WorkOracleResult{},
+			fmt.Errorf("invalid `start` and `end`; expected: start <= end, given: %v > %v", start, end)
 	}
 
 	tries := 0

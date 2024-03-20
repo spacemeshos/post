@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 
@@ -177,7 +178,8 @@ type Initializer struct {
 	numLabelsWritten atomic.Uint64
 
 	diskState *DiskState
-	mtx       sync.RWMutex // TODO(mafa): instead of a RWMutex we should lock with a lock file to prevent other processes from initializing/modifying the data
+	// TODO(mafa): we should lock with a lock file to prevent other processes from modifying the data concurrently
+	mtx sync.RWMutex
 
 	logger            *Logger
 	referenceOracle   *oracle.WorkOracle
@@ -392,7 +394,7 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 		}
 	}
 
-	return fmt.Errorf("no nonce found")
+	return errors.New("no nonce found")
 }
 
 func removeRedundantFiles(cfg config.Config, opts config.InitOpts, logger *zap.Logger) error {
@@ -493,7 +495,12 @@ func (init *Initializer) Status() Status {
 	return StatusNotStarted
 }
 
-func (init *Initializer) initFile(ctx context.Context, wo, woReference *oracle.WorkOracle, fileIndex int, batchSize, fileOffset, fileNumLabels uint64) error {
+func (init *Initializer) initFile(
+	ctx context.Context,
+	wo, woReference *oracle.WorkOracle,
+	fileIndex int,
+	batchSize, fileOffset, fileNumLabels uint64,
+) error {
 	fileTargetPosition := fileOffset + fileNumLabels
 
 	// Initialize the labels file writer.
@@ -633,8 +640,8 @@ func (init *Initializer) verifyMetadata(m *shared.PostMetadata) error {
 	if !bytes.Equal(init.nodeId, m.NodeId) {
 		return ConfigMismatchError{
 			Param:    "NodeId",
-			Expected: fmt.Sprintf("%x", init.nodeId),
-			Found:    fmt.Sprintf("%x", m.NodeId),
+			Expected: hex.EncodeToString(init.nodeId),
+			Found:    hex.EncodeToString(m.NodeId),
 			DataDir:  init.opts.DataDir,
 		}
 	}
@@ -642,8 +649,8 @@ func (init *Initializer) verifyMetadata(m *shared.PostMetadata) error {
 	if !bytes.Equal(init.commitmentAtxId, m.CommitmentAtxId) {
 		return ConfigMismatchError{
 			Param:    "CommitmentAtxId",
-			Expected: fmt.Sprintf("%x", init.commitmentAtxId),
-			Found:    fmt.Sprintf("%x", m.CommitmentAtxId),
+			Expected: hex.EncodeToString(init.commitmentAtxId),
+			Found:    hex.EncodeToString(m.CommitmentAtxId),
 			DataDir:  init.opts.DataDir,
 		}
 	}
@@ -651,8 +658,8 @@ func (init *Initializer) verifyMetadata(m *shared.PostMetadata) error {
 	if init.cfg.LabelsPerUnit != m.LabelsPerUnit {
 		return ConfigMismatchError{
 			Param:    "LabelsPerUnit",
-			Expected: fmt.Sprintf("%d", init.cfg.LabelsPerUnit),
-			Found:    fmt.Sprintf("%d", m.LabelsPerUnit),
+			Expected: strconv.FormatUint(init.cfg.LabelsPerUnit, 10),
+			Found:    strconv.FormatUint(m.LabelsPerUnit, 10),
 			DataDir:  init.opts.DataDir,
 		}
 	}
@@ -660,8 +667,8 @@ func (init *Initializer) verifyMetadata(m *shared.PostMetadata) error {
 	if init.opts.MaxFileSize != m.MaxFileSize {
 		return ConfigMismatchError{
 			Param:    "MaxFileSize",
-			Expected: fmt.Sprintf("%d", init.opts.MaxFileSize),
-			Found:    fmt.Sprintf("%d", m.MaxFileSize),
+			Expected: strconv.FormatUint(init.opts.MaxFileSize, 10),
+			Found:    strconv.FormatUint(m.MaxFileSize, 10),
 			DataDir:  init.opts.DataDir,
 		}
 	}
@@ -670,7 +677,7 @@ func (init *Initializer) verifyMetadata(m *shared.PostMetadata) error {
 		return ConfigMismatchError{
 			Param:    "NumUnits",
 			Expected: fmt.Sprintf(">= %d", init.opts.NumUnits),
-			Found:    fmt.Sprintf("%d", m.NumUnits),
+			Found:    strconv.FormatUint(uint64(m.NumUnits), 10),
 			DataDir:  init.opts.DataDir,
 		}
 	}

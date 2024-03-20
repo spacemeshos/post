@@ -176,12 +176,12 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	err = verifier.Verify(proof, proofMetadata, cfg, logger)
 	expected := &ErrInvalidIndex{}
 	r.ErrorAs(err, &expected)
-	r.Equal(index, expected.Index)
+	r.Equal(expected.Index, index)
 
 	// Verify with AllIndices option
 	err = verifier.Verify(proof, proofMetadata, cfg, logger, AllIndices())
 	r.ErrorAs(err, &expected)
-	r.Equal(index, expected.Index)
+	r.Equal(expected.Index, index)
 
 	// Verify only 1 index with K3 = 1, the `index` was empirically picked to pass verification
 	err = verifier.Verify(proof, proofMetadata, cfg, logger, Subset(1, nodeId))
@@ -190,7 +190,7 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 	// Verify selected index (invalid)
 	err = verifier.Verify(proof, proofMetadata, cfg, logger, SelectedIndex(index))
 	r.ErrorAs(err, &expected)
-	r.Equal(index, expected.Index)
+	r.Equal(expected.Index, index)
 }
 
 func TestVerifyPow(t *testing.T) {
@@ -236,7 +236,13 @@ func BenchmarkVerifying(b *testing.B) {
 
 	ch := make(shared.Challenge, 32)
 	rand.Read(ch)
-	p, m, err := proving.Generate(context.Background(), ch, cfg, zaptest.NewLogger(b), proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir), proving.LightMode())
+	p, m, err := proving.Generate(
+		context.Background(),
+		ch, cfg,
+		zaptest.NewLogger(b),
+		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),
+		proving.LightMode(),
+	)
 	require.NoError(b, err)
 
 	verifier, err := NewProofVerifier()

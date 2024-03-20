@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 
 	"go.uber.org/zap"
 
@@ -14,7 +15,13 @@ import (
 	"github.com/spacemeshos/post/shared"
 )
 
-func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logger *zap.Logger, opts ...OptionFunc) (*shared.Proof, *shared.ProofMetadata, error) {
+func Generate(
+	ctx context.Context,
+	ch shared.Challenge,
+	cfg config.Config,
+	logger *zap.Logger,
+	opts ...OptionFunc,
+) (*shared.Proof, *shared.ProofMetadata, error) {
 	options := option{
 		threads:  1,
 		nonces:   16,
@@ -29,7 +36,14 @@ func Generate(ctx context.Context, ch shared.Challenge, cfg config.Config, logge
 		return nil, nil, err
 	}
 
-	result, err := postrs.GenerateProof(options.datadir, ch, logger, options.nonces, options.threads, cfg.K1, cfg.K2, cfg.PowDifficulty, options.powFlags)
+	result, err := postrs.GenerateProof(
+		options.datadir,
+		ch, logger,
+		options.nonces,
+		options.threads,
+		cfg.K1, cfg.K2,
+		cfg.PowDifficulty, options.powFlags,
+	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generating proof: %w", err)
 	}
@@ -55,8 +69,8 @@ func verifyMetadata(m *shared.PostMetadata, cfg config.Config, datadir string, n
 	if !bytes.Equal(nodeId, m.NodeId) {
 		return shared.ConfigMismatchError{
 			Param:    "NodeId",
-			Expected: fmt.Sprintf("%x", nodeId),
-			Found:    fmt.Sprintf("%x", m.NodeId),
+			Expected: hex.EncodeToString(nodeId),
+			Found:    hex.EncodeToString(m.NodeId),
 			DataDir:  datadir,
 		}
 	}
@@ -64,8 +78,8 @@ func verifyMetadata(m *shared.PostMetadata, cfg config.Config, datadir string, n
 	if !bytes.Equal(commitmentAtxId, m.CommitmentAtxId) {
 		return shared.ConfigMismatchError{
 			Param:    "CommitmentAtxId",
-			Expected: fmt.Sprintf("%x", commitmentAtxId),
-			Found:    fmt.Sprintf("%x", m.CommitmentAtxId),
+			Expected: hex.EncodeToString(commitmentAtxId),
+			Found:    hex.EncodeToString(m.CommitmentAtxId),
 			DataDir:  datadir,
 		}
 	}
@@ -73,8 +87,8 @@ func verifyMetadata(m *shared.PostMetadata, cfg config.Config, datadir string, n
 	if cfg.LabelsPerUnit != m.LabelsPerUnit {
 		return shared.ConfigMismatchError{
 			Param:    "LabelsPerUnit",
-			Expected: fmt.Sprintf("%d", cfg.LabelsPerUnit),
-			Found:    fmt.Sprintf("%d", m.LabelsPerUnit),
+			Expected: strconv.FormatUint(cfg.LabelsPerUnit, 10),
+			Found:    strconv.FormatUint(m.LabelsPerUnit, 10),
 			DataDir:  datadir,
 		}
 	}

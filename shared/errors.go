@@ -19,5 +19,10 @@ type ConfigMismatchError struct {
 }
 
 func (err ConfigMismatchError) Error() string {
-	return fmt.Sprintf("`%v` config mismatch; expected: %v, found: %v, datadir: %v", err.Param, err.Expected, err.Found, err.DataDir)
+	return fmt.Sprintf("`%v` config mismatch; expected: %v, found: %v, datadir: %v",
+		err.Param,
+		err.Expected,
+		err.Found,
+		err.DataDir,
+	)
 }

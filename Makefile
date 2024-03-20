@@ -1,6 +1,12 @@
 export CGO_ENABLED := 1
 include Makefile.Inc
 
+GOLANGCI_LINT_VERSION := v1.57.0
+STATICCHECK_VERSION := v0.4.7
+GOTESTSUM_VERSION := v1.11.0
+GOSCALE_VERSION := v1.1.13
+MOCKGEN_VERSION := v0.4.0
+
 build: postcli
 .PHONY: build
 
@@ -20,10 +26,10 @@ endif
 
 install: get-postrs-lib
 	go mod download
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.54.2
-	go install gotest.tools/gotestsum@v1.10.1
-	go install honnef.co/go/tools/cmd/staticcheck@v0.4.5
-	go install go.uber.org/mock/mockgen@v0.4.0
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION)
+	go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION)
+	go install honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION)
+	go install go.uber.org/mock/mockgen@$(MOCKGEN_VERSION)
 .PHONY: install
 
 tidy:

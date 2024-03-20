@@ -70,7 +70,12 @@ func VerifyPos(dataDir string, scryptParams ScryptParams, o ...VerifyPosOptionsF
 	dataDirPtr := C.CString(dataDir)
 	defer C.free(unsafe.Pointer(dataDirPtr))
 
-	result := C.verify_pos(dataDirPtr, (*C.uint32_t)(opts.fromFile), (*C.uint32_t)(opts.toFile), C.double(opts.fraction), scryptParams)
+	result := C.verify_pos(
+		dataDirPtr,
+		(*C.uint32_t)(opts.fromFile),
+		(*C.uint32_t)(opts.toFile),
+		C.double(opts.fraction), scryptParams,
+	)
 	switch result.tag {
 	case C.VerifyResult_Ok:
 		return nil

@@ -40,7 +40,14 @@ func NewScryptParams(n, r, p uint) ScryptParams {
 // ErrVerifierClosed is returned when calling a method on an already closed Scrypt instance.
 var ErrVerifierClosed = errors.New("verifier has been closed")
 
-func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces, threads, K1, K2 uint, powDifficulty [32]byte, powFlags PowFlags) (*shared.Proof, error) {
+func GenerateProof(
+	dataDir string,
+	challenge []byte,
+	logger *zap.Logger,
+	nonces, threads, K1, K2 uint,
+	powDifficulty [32]byte,
+	powFlags PowFlags,
+) (*shared.Proof, error) {
 	if logger != nil {
 		setLogCallback(logger)
 	}
@@ -69,7 +76,7 @@ func GenerateProof(dataDir string, challenge []byte, logger *zap.Logger, nonces,
 	)
 
 	if cProof == nil {
-		return nil, fmt.Errorf("got nil")
+		return nil, errors.New("got nil")
 	}
 	defer C.free_proof(cProof)
 
@@ -127,7 +134,7 @@ func NewVerifier(powFlags PowFlags) (*Verifier, error) {
 	verifier := Verifier{}
 	result := C.new_verifier(powFlags, &verifier.inner)
 	if result != C.VerifyResult_Ok {
-		return nil, fmt.Errorf("failed to create verifier")
+		return nil, errors.New("failed to create verifier")
 	}
 	return &verifier, nil
 }
@@ -185,7 +192,14 @@ func VerifySubset(k3 uint, seed []byte) VerifyOptionFunc {
 	}
 }
 
-func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetadata, logger *zap.Logger, cfg Config, scryptParams ScryptParams, opts ...VerifyOptionFunc) error {
+func (v *Verifier) VerifyProof(
+	proof *shared.Proof,
+	metadata *shared.ProofMetadata,
+	logger *zap.Logger,
+	cfg Config,
+	scryptParams ScryptParams,
+	opts ...VerifyOptionFunc,
+) error {
 	if logger != nil {
 		setLogCallback(logger)
 	}
@@ -294,9 +308,9 @@ func (v *Verifier) VerifyProof(proof *shared.Proof, metadata *shared.ProofMetada
 		result := castBytes[C.VerifyResult_InvalidIndex_Body](result.anon0[:])
 		return &ErrInvalidIndex{Index: int(result.index_id)}
 	case C.VerifyResult_InvalidArgument:
-		return fmt.Errorf("invalid argument")
+		return errors.New("invalid argument")
 	default:
-		return fmt.Errorf("unknown error")
+		return errors.New("unknown error")
 	}
 }
 

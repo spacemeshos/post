@@ -842,9 +842,9 @@ func TestWrongLabelsDetected(t *testing.T) {
 	require.Equal(t, uint64(cfg.LabelsPerUnit-1), errWrongLabels.Index)
 	reference, err := init.referenceOracle.Position(errWrongLabels.Index)
 	require.NoError(t, err)
-	require.Equal(t, reference.Output, errWrongLabels.Expected)
-	require.Equal(t, len(reference.Output), len(errWrongLabels.Actual))
-	require.NotEqual(t, reference.Output, errWrongLabels.Actual)
+	require.Equal(t, errWrongLabels.Expected, reference.Output)
+	require.Equal(t, len(errWrongLabels.Actual), len(reference.Output))
+	require.NotEqual(t, errWrongLabels.Actual, reference.Output)
 
 	require.Equal(t, uint64(0), init.NumLabelsWritten())
 }

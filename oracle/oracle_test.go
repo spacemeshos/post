@@ -24,19 +24,22 @@ func TestOracleRetryPositions(t *testing.T) {
 	)
 
 	t.Run("retries max time and quits", func(t *testing.T) {
-		mockScrypter.EXPECT().Positions(uint64(0), uint64(10)).Return(postrs.ScryptPositionsResult{}, postrs.ErrInitializationFailed).Times(3)
+		mockScrypter.EXPECT().Positions(uint64(0), uint64(10)).
+			Return(postrs.ScryptPositionsResult{}, postrs.ErrInitializationFailed).Times(3)
 		require.NoError(t, err)
 		_, err = o.Positions(0, 10)
 		require.Error(t, err)
 	})
 	t.Run("eventually succeeds", func(t *testing.T) {
-		mockScrypter.EXPECT().Positions(uint64(0), uint64(10)).Return(postrs.ScryptPositionsResult{}, postrs.ErrInitializationFailed).Times(2)
+		mockScrypter.EXPECT().Positions(uint64(0), uint64(10)).
+			Return(postrs.ScryptPositionsResult{}, postrs.ErrInitializationFailed).Times(2)
 		mockScrypter.EXPECT().Positions(uint64(0), uint64(10)).Return(postrs.ScryptPositionsResult{}, nil).Times(1)
 		_, err = o.Positions(0, 10)
 		require.NoError(t, err)
 	})
 	t.Run("does not retry on unknown error", func(t *testing.T) {
-		mockScrypter.EXPECT().Positions(uint64(0), uint64(10)).Return(postrs.ScryptPositionsResult{}, errors.New("unknown error")).Times(1)
+		mockScrypter.EXPECT().Positions(uint64(0), uint64(10)).
+			Return(postrs.ScryptPositionsResult{}, errors.New("unknown error")).Times(1)
 		_, err = o.Positions(0, 10)
 		require.Error(t, err)
 	})
