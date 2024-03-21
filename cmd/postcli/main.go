@@ -80,7 +80,9 @@ func parseFlags() {
 
 	flag.IntVar(&opts.FromFileIdx, "fromFile", 0, "index of the first file to init (inclusive)")
 	var to int
-	flag.IntVar(&to, "toFile", 0, "index of the last file to init (inclusive). Will init to the end of declared space if not provided.")
+	flag.IntVar(&to, "toFile", 0,
+		"index of the last file to init (inclusive). Will init to the end of declared space if not provided.",
+	)
 	flag.Parse()
 
 	flag.Visit(func(f *flag.Flag) {
@@ -120,7 +122,9 @@ func processFlags() {
 		if idHex == "" {
 			idHex = hex.EncodeToString(meta.NodeId)
 		} else if idHex != hex.EncodeToString(meta.NodeId) {
-			log.Println("WARNING: it appears that", opts.DataDir, "was previously initialized with a different `id` value.")
+			log.Println("WARNING: it appears that", opts.DataDir,
+				"was previously initialized with a different `id` value.",
+			)
 			log.Println("\tCurrent value:", hex.EncodeToString(meta.NodeId))
 			log.Println("\tValue passed to postcli:", idHex)
 			log.Fatalln("aborting")
@@ -152,7 +156,9 @@ func processFlags() {
 	}
 
 	if flagSet["numUnits"] && meta != nil && numUnits != uint64(meta.NumUnits) {
-		log.Println("WARNING: it appears that", opts.DataDir, "was previously initialized with a different `numUnits` value.")
+		log.Println("WARNING: it appears that", opts.DataDir,
+			"was previously initialized with a different `numUnits` value.",
+		)
 		log.Println("\tCurrent value:", meta.NumUnits)
 		log.Println("\tValue passed to postcli:", numUnits)
 		if (numUnits < uint64(meta.NumUnits)) && !yes {
@@ -165,7 +171,9 @@ func processFlags() {
 		log.Println("WARNING: numUnits is outside of range valid for mainnet (min:",
 			cfg.MinNumUnits, "max:", cfg.MaxNumUnits, ")")
 		if !yes {
-			log.Println("CONTINUING WILL INITIALIZE DATA INCOMPATIBLE WITH MAINNET. MAKE ABSOLUTELY SURE YOU WANT TO DO THIS.")
+			log.Println(
+				"CONTINUING WILL INITIALIZE DATA INCOMPATIBLE WITH MAINNET. MAKE ABSOLUTELY SURE YOU WANT THIS.",
+			)
 		}
 		askForConfirmation()
 		cfg.MinNumUnits = uint32(numUnits)
@@ -182,7 +190,9 @@ func processFlags() {
 			log.Println("invalid commitmentAtxId:", err)
 		}
 		if meta != nil && !bytes.Equal(commitmentAtxId, meta.CommitmentAtxId) {
-			log.Println("WARNING: it appears that", opts.DataDir, "was previously initialized with a different `commitmentAtxId` value.")
+			log.Println("WARNING: it appears that", opts.DataDir,
+				"was previously initialized with a different `commitmentAtxId` value.",
+			)
 			log.Println("\tCurrent value:", hex.EncodeToString(meta.CommitmentAtxId))
 			log.Println("\tValue passed to postcli:", commitmentAtxIdHex)
 			log.Fatalln("aborting")
@@ -197,7 +207,9 @@ func processFlags() {
 		log.Println("WARNING: labelsPerUnit is set to a non-default value.")
 		log.Println("If you're trying to initialize for mainnet, please remove the -labelsPerUnit flag")
 		if !yes {
-			log.Println("CONTINUING WILL INITIALIZE DATA INCOMPATIBLE WITH MAINNET. MAKE ABSOLUTELY SURE YOU WANT TO DO THIS.")
+			log.Println(
+				"CONTINUING WILL INITIALIZE DATA INCOMPATIBLE WITH MAINNET. MAKE ABSOLUTELY SURE YOU WANT THIS.",
+			)
 		}
 		askForConfirmation()
 	}
@@ -206,7 +218,9 @@ func processFlags() {
 		log.Println("WARNING: scryptN is set to a non-default value.")
 		log.Println("If you're trying to initialize for mainnet, please remove the -scryptN flag")
 		if !yes {
-			log.Println("CONTINUING WILL INITIALIZE DATA INCOMPATIBLE WITH MAINNET. MAKE ABSOLUTELY SURE YOU WANT TO DO THIS.")
+			log.Println(
+				"CONTINUING WILL INITIALIZE DATA INCOMPATIBLE WITH MAINNET. MAKE ABSOLUTELY SURE YOU WANT THIS.",
+			)
 		}
 		askForConfirmation()
 	}
@@ -352,7 +366,13 @@ func main() {
 	if genProof {
 		log.Println("cli: generating proof as a sanity test")
 
-		proof, proofMetadata, err := proving.Generate(ctx, shared.ZeroChallenge, cfg, logger, proving.WithDataSource(cfg, id, commitmentAtxId, opts.DataDir))
+		proof, proofMetadata, err := proving.Generate(
+			ctx,
+			shared.ZeroChallenge,
+			cfg,
+			logger,
+			proving.WithDataSource(cfg, id, commitmentAtxId, opts.DataDir),
+		)
 		if err != nil {
 			log.Fatalln("proof generation error", err)
 		}
@@ -361,7 +381,14 @@ func main() {
 			log.Fatalln("failed to create verifier", err)
 		}
 		defer verifier.Close()
-		err = verifier.Verify(proof, proofMetadata, cfg, logger, verifying.WithLabelScryptParams(opts.Scrypt), verifying.AllIndices())
+		err = verifier.Verify(
+			proof,
+			proofMetadata,
+			cfg,
+			logger,
+			verifying.WithLabelScryptParams(opts.Scrypt),
+			verifying.AllIndices(),
+		)
 		if err != nil {
 			log.Fatalln("failed to verify test proof", err)
 		}
@@ -422,7 +449,12 @@ func cmdVerifyPos(opts config.InitOpts, fraction float64, logger *zap.Logger) {
 		}
 
 		if !bytes.Equal(meta.NodeId, pub) {
-			log.Fatalf("NodeID in %s (%x) does not match public key from %s (%x)", metaFile, meta.NodeId, edKeyFileName, pub)
+			log.Fatalf("NodeID in %s (%x) does not match public key from %s (%x)",
+				metaFile,
+				meta.NodeId,
+				edKeyFileName,
+				pub,
+			)
 		}
 		log.Println("cli:", edKeyFileName, "is valid")
 	}

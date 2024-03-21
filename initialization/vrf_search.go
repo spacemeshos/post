@@ -44,7 +44,12 @@ func searchWithPowDifficultyFunc(powDifficultyFunc func(uint64) []byte) searchFo
 // SearchForNonce is searches for a nonce in the already initialized data.
 // Will return ErrNonceNotFound if no nonce was found.
 // Otherwise, it will return the nonce the 16B of label it points to.
-func SearchForNonce(ctx context.Context, cfg Config, initOpts InitOpts, opts ...searchForNonceOpt) (nonce uint64, nonceValue []byte, err error) {
+func SearchForNonce(
+	ctx context.Context,
+	cfg Config,
+	initOpts InitOpts,
+	opts ...searchForNonceOpt,
+) (nonce uint64, nonceValue []byte, err error) {
 	options := searchForNonceOpts{
 		logger:            zap.NewNop(),
 		powDifficultyFunc: shared.PowDifficulty,
@@ -130,7 +135,10 @@ func SearchForNonce(ctx context.Context, cfg Config, initOpts InitOpts, opts ...
 
 		switch {
 		case errors.Is(err, context.Canceled):
-			logger.Info("search for nonce interrupted", zap.Uint64("nonce", nonce), zap.String("nonceValue", hex.EncodeToString(nonceValue)))
+			logger.Info("search for nonce interrupted",
+				zap.Uint64("nonce", nonce),
+				zap.String("nonceValue", hex.EncodeToString(nonceValue)),
+			)
 			return nonce, nonceValue, err
 		case err != nil:
 			return 0, nil, fmt.Errorf("failed to search for nonce: %w", err)
@@ -143,7 +151,10 @@ func SearchForNonce(ctx context.Context, cfg Config, initOpts InitOpts, opts ...
 }
 
 func persistNonce(nonce uint64, label []byte, metadata *shared.PostMetadata, datadir string, logger *zap.Logger) error {
-	logger.Info("found nonce: updating postdata_metadata.json", zap.Uint64("nonce", nonce), zap.String("NonceValue", hex.EncodeToString(label)))
+	logger.Info("found nonce: updating postdata_metadata.json",
+		zap.Uint64("nonce", nonce),
+		zap.String("NonceValue", hex.EncodeToString(label)),
+	)
 	metadata.Nonce = &nonce
 	metadata.NonceValue = shared.NonceValue(label)
 	if err := SaveMetadata(datadir, metadata); err != nil {
@@ -153,7 +164,12 @@ func persistNonce(nonce uint64, label []byte, metadata *shared.PostMetadata, dat
 }
 
 // searchForNonce searches for a nonce in the given reader.
-func searchForNonce(ctx context.Context, r io.Reader, difficulty []byte, oracle *oracle.WorkOracle) (nonce uint64, nonceValue []byte, err error) {
+func searchForNonce(
+	ctx context.Context,
+	r io.Reader,
+	difficulty []byte,
+	oracle *oracle.WorkOracle,
+) (nonce uint64, nonceValue []byte, err error) {
 	labelBuf := make([]byte, postrs.LabelLength)
 
 	for labelIndex := uint64(0); ; labelIndex++ {

@@ -76,7 +76,13 @@ func NewProofVerifier(opts ...OptionFunc) (*ProofVerifier, error) {
 
 // Verify ensures the validity of a proof in respect to its metadata.
 // It returns nil if the proof is valid or an error describing the failure, otherwise.
-func (v *ProofVerifier) Verify(p *shared.Proof, m *shared.ProofMetadata, cfg config.Config, logger *zap.Logger, opts ...OptionFunc) error {
+func (v *ProofVerifier) Verify(
+	p *shared.Proof,
+	m *shared.ProofMetadata,
+	cfg config.Config,
+	logger *zap.Logger,
+	opts ...OptionFunc,
+) error {
 	if len(m.NodeId) != 32 {
 		return fmt.Errorf("invalid `nodeId` length; expected: 32, given: %v", len(m.NodeId))
 	}

@@ -173,14 +173,15 @@ func (s *Scrypt) Positions(start, end uint64) (ScryptPositionsResult, error) {
 	}
 
 	if start > end {
-		return ScryptPositionsResult{}, fmt.Errorf("invalid `start` and `end`; expected: start <= end, given: %v > %v", start, end)
+		return ScryptPositionsResult{},
+			fmt.Errorf("invalid `start` and `end`; expected: start <= end, given: %v > %v", start, end)
 	}
 
 	if err := s.options.validate(); err != nil {
 		return ScryptPositionsResult{}, err
 	}
 
-	output, idxSolution, err := cScryptPositions(s.init, s.options, start, end)
+	output, idxSolution, err := cScryptPositions(s.init, start, end)
 	return ScryptPositionsResult{
 		Output:      output,
 		IdxSolution: idxSolution,
