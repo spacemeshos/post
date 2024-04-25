@@ -21,7 +21,7 @@ COPY . .
 # And compile the project
 RUN --mount=type=cache,id=build,target=/root/.cache/go-build make build
 
-FROM ubuntu:22.04 AS postcli
+FROM ubuntu:24.04 AS postcli
 ENV DEBIAN_FRONTEND noninteractive
 ENV SHELL /bin/bash
 USER root
