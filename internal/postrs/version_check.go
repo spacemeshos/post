@@ -15,11 +15,11 @@ const (
 	// regexp matching supported versions of post-rs library
 	SUPPORTED_VERSION = `0\.7\.(\d+)` // 0.7.*
 	// Set this env variable to "true" or "1" to disable version check.
-	DISABLE_CKECK_ENV = "LIBPOST_DISABLE_VERSION_CHECK"
+	DISABLE_CHECK_ENV = "LIBPOST_DISABLE_VERSION_CHECK"
 )
 
 func init() {
-	checkDisabledEnv := strings.ToLower(os.Getenv(DISABLE_CKECK_ENV))
+	checkDisabledEnv := strings.ToLower(os.Getenv(DISABLE_CHECK_ENV))
 	if checkDisabledEnv == "true" || checkDisabledEnv == "1" {
 		return
 	}
