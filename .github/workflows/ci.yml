@@ -10,7 +10,7 @@ on:
 
 jobs:
   quicktests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
       - name: checkout
@@ -32,7 +32,7 @@ jobs:
         run: make staticcheck
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
       - name: checkout
@@ -57,21 +57,21 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest
+          - ubuntu-22.04
           - [self-hosted, linux, arm64]
           - macos-13
           - [self-hosted, macos, arm64]
-          - windows-latest
+          - windows-2022
     steps:
       - name: Add OpenCL support - Ubuntu
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
         run: sudo apt-get update -q && sudo apt-get install -qy ocl-icd-opencl-dev libpocl2
       - name: disable Windows Defender - Windows
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: ${{ matrix.os == 'windows-2022' }}
         run: |
           Set-MpPreference -DisableRealtimeMonitoring $true
       - name: Add OpenCL support - Windows
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: ${{ matrix.os == 'windows-2022' }}
         run: choco install opencl-intel-cpu-runtime
       - name: checkout
         uses: actions/checkout@v4
@@ -107,17 +107,17 @@ jobs:
       fail-fast: false
       matrix:
         os:
-        - ubuntu-latest
+        - ubuntu-22.04
         - [self-hosted, linux, arm64]
         - macos-13
         - [self-hosted, macos, arm64]
-        - windows-latest
+        - windows-2022
     steps:
       - name: Add OpenCL support - Ubuntu
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
         run: sudo apt-get update -q && sudo apt-get install -qy ocl-icd-opencl-dev libpocl2
       - name: disable Windows Defender - Windows
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: ${{ matrix.os == 'windows-2022' }}
         run: |
           Set-MpPreference -DisableRealtimeMonitoring $true
       - name: checkout
@@ -155,7 +155,7 @@ jobs:
     name: Publish release
     if: github.event_name == 'push' && github.ref_type == 'tag'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -176,7 +176,7 @@ jobs:
           fail_on_unmatched_files: true
 
   coverage:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     needs:
       - quicktests
