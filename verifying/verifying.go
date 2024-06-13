@@ -52,7 +52,7 @@ func VerifyVRFNonce(nonce *uint64, m *shared.VRFNonceMetadata, opts ...OptionFun
 	}
 
 	if res.Nonce == nil || *res.Nonce != *nonce {
-		return fmt.Errorf("nonce %v is not valid for node %v", *nonce, m.NodeId)
+		return fmt.Errorf("nonce %v is not valid for node %x", *nonce, m.NodeId)
 	}
 
 	return nil
