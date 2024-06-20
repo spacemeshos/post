@@ -10,7 +10,12 @@ type option struct {
 	// scrypt parameters for labels initialization
 	labelScrypt config.ScryptParams
 
+	prioritised  bool
 	internalOpts []postrs.VerifyOptionFunc
+}
+
+func (o *option) IsPrioritised() bool {
+	return o.prioritised
 }
 
 func applyOpts(options ...OptionFunc) *option {
@@ -29,6 +34,12 @@ type OptionFunc func(*option)
 func WithLabelScryptParams(params config.ScryptParams) OptionFunc {
 	return func(o *option) {
 		o.labelScrypt = params
+	}
+}
+
+func PrioritisedCall() OptionFunc {
+	return func(o *option) {
+		o.prioritised = true
 	}
 }
 
