@@ -58,13 +58,13 @@ jobs:
       matrix:
         os:
           - ubuntu-22.04
-          - [self-hosted, linux, arm64]
+          - ubuntu-latest-arm-8-cores
           - macos-13
           - [self-hosted, macos, arm64]
           - windows-2022
     steps:
       - name: Add OpenCL support - Ubuntu
-        if: ${{ matrix.os == 'ubuntu-22.04' }}
+        if: ${{ matrix.os == 'ubuntu-22.04' || matrix.os == 'ubuntu-latest-arm-8-cores' }}
         run: sudo apt-get update -q && sudo apt-get install -qy ocl-icd-opencl-dev libpocl2
       - name: disable Windows Defender - Windows
         if: ${{ matrix.os == 'windows-2022' }}
@@ -108,13 +108,13 @@ jobs:
       matrix:
         os:
         - ubuntu-22.04
-        - [self-hosted, linux, arm64]
+        - ubuntu-latest-arm-8-cores
         - macos-13
         - [self-hosted, macos, arm64]
         - windows-2022
     steps:
       - name: Add OpenCL support - Ubuntu
-        if: ${{ matrix.os == 'ubuntu-22.04' }}
+        if: ${{ matrix.os == 'ubuntu-22.04' || matrix.os == 'ubuntu-latest-arm-8-cores'}}
         run: sudo apt-get update -q && sudo apt-get install -qy ocl-icd-opencl-dev libpocl2
       - name: disable Windows Defender - Windows
         if: ${{ matrix.os == 'windows-2022' }}
