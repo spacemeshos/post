@@ -87,7 +87,7 @@ test-generate:
 .PHONY: test-generate
 
 postcli: get-postrs-lib
-	go build -o $(BIN_DIR)$@$(EXE) ./cmd/postcli
+	go build -x -o $(BIN_DIR)$@$(EXE) ./cmd/postcli
 .PHONY: postcli
 
 bench:
