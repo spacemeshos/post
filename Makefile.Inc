@@ -37,7 +37,7 @@ else
 		else
 				platform := macos
 		endif
-		CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,@loader_path
+		export GOFLAGS := '-ldflags=-extldflags=-Wl,-ld_classic'
 	else
 		ifeq ($(GOARCH),arm64)
 				platform := linux-arm64

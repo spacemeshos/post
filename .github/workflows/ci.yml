@@ -138,16 +138,17 @@ jobs:
           cp ./cmd/postcli/README.md ./build/
       - name: Set name of release archive
         shell: bash
+        id: release-name
         run: |
           if [[ ${{ runner.arch }} == "ARM64" ]]; then
-            echo "OUTNAME=${{ runner.os }}_${{ runner.arch }}" >> $GITHUB_ENV
+            echo "name=${{ runner.os }}_${{ runner.arch }}" >> "$GITHUB_OUTPUT"
           else
-            echo "OUTNAME=${{ runner.os }}" >> $GITHUB_ENV
+            echo "name=${{ runner.os }}" >> "$GITHUB_OUTPUT"
           fi
       - name: Archive postcli artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: postcli-${{ env.OUTNAME }}.zip
+          name: postcli-${{ steps.release-name.outputs.name }}.zip
           path: ./build/*
           if-no-files-found: error
 

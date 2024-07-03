@@ -1,6 +1,5 @@
 package postrs
 
-// #cgo LDFLAGS: -lpost
 // #include <stdlib.h>
 // #include "post.h"
 import "C"
