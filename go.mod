@@ -1,6 +1,6 @@
 module github.com/spacemeshos/post
 
-go 1.22.2
+go 1.22.4
 
 require (
 	github.com/davecgh/go-spew v1.1.1

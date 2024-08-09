@@ -28,8 +28,6 @@ jobs:
           make test-fmt
           make test-tidy
           make test-generate
-      - name: staticcheck
-        run: make staticcheck
 
   lint:
     runs-on: ubuntu-22.04
