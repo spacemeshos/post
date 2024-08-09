@@ -1,10 +1,8 @@
 export CGO_ENABLED := 1
 include Makefile.Inc
 
-GOLANGCI_LINT_VERSION := v1.57.0
-STATICCHECK_VERSION := v0.4.7
-GOTESTSUM_VERSION := v1.11.0
-GOSCALE_VERSION := v1.1.13
+GOLANGCI_LINT_VERSION := v1.59.0
+GOTESTSUM_VERSION := v1.12.0
 MOCKGEN_VERSION := v0.4.0
 
 build: postcli
@@ -28,7 +26,6 @@ install: get-postrs-lib
 	go mod download
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION)
 	go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION)
-	go install honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION)
 	go install go.uber.org/mock/mockgen@$(MOCKGEN_VERSION)
 .PHONY: install
 
@@ -71,10 +68,6 @@ lint-github-action: get-postrs-lib
 cover: get-postrs-lib
 	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go test -coverprofile=cover.out -timeout 0 -p 1 -coverpkg=./... ./...
 .PHONY: cover
-
-staticcheck: get-postrs-lib
-	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" staticcheck ./...
-.PHONY: staticcheck
 
 generate: get-postrs-lib
 	@$(ULIMIT) CGO_LDFLAGS="$(CGO_TEST_LDFLAGS)" go generate ./...
