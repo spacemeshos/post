@@ -1,4 +1,4 @@
-FROM golang:1.22 as builder
+FROM golang:1.23 as builder
 RUN set -ex \
     && apt-get update --fix-missing \
     && apt-get install -qy --no-install-recommends \
