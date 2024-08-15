@@ -6,7 +6,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/natefinch/atomic v1.0.1
 	github.com/stretchr/testify v1.9.0
-	github.com/zeebo/blake3 v0.2.3
+	github.com/zeebo/blake3 v0.2.4
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.8.0
