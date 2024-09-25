@@ -28,7 +28,6 @@ endif
 ifeq ($(GOOS),windows)
 	platform := windows
 	export PATH := $(PATH):$(PROJ_DIR)build
-	EXE := .exe
 	CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-Bstatic -lpthread -Wl,-Bdynamic
 else
 	TEMP := /tmp
@@ -39,7 +38,6 @@ else
 				platform := macos
 		endif
 		CGO_LDFLAGS := $(CGO_LDFLAGS) -Wl,-rpath,@loader_path
-		ULIMIT := ulimit -n 9999;
 	else
 		ifeq ($(GOARCH),arm64)
 				platform := linux-arm64

@@ -1,6 +1,14 @@
 export CGO_ENABLED := 1
 include Makefile.Inc
 
+# Set the correct extension for the executable based on the OS
+# and set the correct ulimit command for the OS
+ifeq ($(OS),Windows_NT)
+	EXE := .exe
+else
+	ULIMIT := ulimit -n 4096;
+endif
+
 GOLANGCI_LINT_VERSION := v1.59.0
 GOTESTSUM_VERSION := v1.12.0
 MOCKGEN_VERSION := v0.4.0
