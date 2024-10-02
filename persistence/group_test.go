@@ -18,9 +18,9 @@ func TestGroup(t *testing.T) {
 	// Split the labels into 3 separate writers.
 	writers := make([]*sliceWriter, 3)
 	slices := make([][][]byte, 3)
-	writers[0] = newSliceWriter(&slices[0], labelSize)
-	writers[1] = newSliceWriter(&slices[1], labelSize)
-	writers[2] = newSliceWriter(&slices[2], labelSize)
+	writers[0] = newSliceWriter(&slices[0])
+	writers[1] = newSliceWriter(&slices[1])
+	writers[2] = newSliceWriter(&slices[2])
 	_ = writers[0].Write(labels[0])
 	_ = writers[0].Write(labels[1])
 	_ = writers[0].Write(labels[2])
@@ -33,9 +33,9 @@ func TestGroup(t *testing.T) {
 
 	// Create group reader.
 	readers := make([]Reader, 3)
-	readers[0] = newSliceReader(slices[0], labelSize)
-	readers[1] = newSliceReader(slices[1], labelSize)
-	readers[2] = newSliceReader(slices[2], labelSize)
+	readers[0] = newSliceReader(slices[0])
+	readers[1] = newSliceReader(slices[1])
+	readers[2] = newSliceReader(slices[2])
 	reader, err := Group(readers)
 	r.NoError(err)
 
@@ -69,9 +69,9 @@ func TestGroupWithShorterLastLayer(t *testing.T) {
 	// Split the labels into 3 separate writers.
 	writers := make([]*sliceWriter, 3)
 	slices := make([][][]byte, 3)
-	writers[0] = newSliceWriter(&slices[0], labelSize)
-	writers[1] = newSliceWriter(&slices[1], labelSize)
-	writers[2] = newSliceWriter(&slices[2], labelSize)
+	writers[0] = newSliceWriter(&slices[0])
+	writers[1] = newSliceWriter(&slices[1])
+	writers[2] = newSliceWriter(&slices[2])
 	_ = writers[0].Write(labels[0])
 	_ = writers[0].Write(labels[1])
 	_ = writers[0].Write(labels[2])
@@ -82,9 +82,9 @@ func TestGroupWithShorterLastLayer(t *testing.T) {
 
 	// Create group reader.
 	readers := make([]Reader, 3)
-	readers[0] = newSliceReader(slices[0], labelSize)
-	readers[1] = newSliceReader(slices[1], labelSize)
-	readers[2] = newSliceReader(slices[2], labelSize)
+	readers[0] = newSliceReader(slices[0])
+	readers[1] = newSliceReader(slices[1])
+	readers[2] = newSliceReader(slices[2])
 	reader, err := Group(readers)
 	r.NoError(err)
 
@@ -111,9 +111,9 @@ func TestGroupWithShorterLastLayer(t *testing.T) {
 
 	// Test last reader with 0 width.
 	readers = make([]Reader, 3)
-	readers[0] = newSliceReader(slices[0], labelSize)
-	readers[1] = newSliceReader(slices[1], labelSize)
-	readers[2] = newSliceReader([][]byte{}, labelSize)
+	readers[0] = newSliceReader(slices[0])
+	readers[1] = newSliceReader(slices[1])
+	readers[2] = newSliceReader([][]byte{})
 	_, err = Group(readers)
 	r.EqualError(err, "0 labels readers are not allowed")
 }
@@ -127,9 +127,9 @@ func TestGroupWithShorterMidReader(t *testing.T) {
 	// Split the labels into 3 separate writers.
 	writers := make([]*sliceWriter, 3)
 	slices := make([][][]byte, 3)
-	writers[0] = newSliceWriter(&slices[0], labelSize)
-	writers[1] = newSliceWriter(&slices[1], labelSize)
-	writers[2] = newSliceWriter(&slices[2], labelSize)
+	writers[0] = newSliceWriter(&slices[0])
+	writers[1] = newSliceWriter(&slices[1])
+	writers[2] = newSliceWriter(&slices[2])
 	_ = writers[0].Write(labels[0])
 	_ = writers[0].Write(labels[1])
 	_ = writers[0].Write(labels[2])
@@ -140,9 +140,9 @@ func TestGroupWithShorterMidReader(t *testing.T) {
 
 	// Create group reader.
 	readers := make([]Reader, 3)
-	readers[0] = newSliceReader(slices[0], labelSize)
-	readers[1] = newSliceReader(slices[1], labelSize)
-	readers[2] = newSliceReader(slices[2], labelSize)
+	readers[0] = newSliceReader(slices[0])
+	readers[1] = newSliceReader(slices[1])
+	readers[2] = newSliceReader(slices[2])
 	_, err := Group(readers)
 	r.EqualError(err, "readers' number of labels mismatch")
 }
@@ -162,14 +162,12 @@ func NewLabelFromUint64(i uint64, labelSize uint) []byte {
 }
 
 type sliceWriter struct {
-	slice    *[][]byte
-	itemSize uint
+	slice *[][]byte
 }
 
-func newSliceWriter(slice *[][]byte, itemSize uint) *sliceWriter {
+func newSliceWriter(slice *[][]byte) *sliceWriter {
 	return &sliceWriter{
-		slice:    slice,
-		itemSize: itemSize,
+		slice: slice,
 	}
 }
 
@@ -189,16 +187,14 @@ func (s *sliceWriter) Close() (*os.FileInfo, error) {
 type sliceReader struct {
 	slice    [][]byte
 	position uint64
-	itemSize uint
 }
 
 // A compile time check to ensure that sliceReader fully implements the Reader interface.
 var _ Reader = (*sliceReader)(nil)
 
-func newSliceReader(slice [][]byte, itemSize uint) *sliceReader {
+func newSliceReader(slice [][]byte) *sliceReader {
 	return &sliceReader{
-		slice:    slice,
-		itemSize: itemSize,
+		slice: slice,
 	}
 }
 
