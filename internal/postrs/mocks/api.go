@@ -20,6 +20,7 @@ import (
 type MockScrypter struct {
 	ctrl     *gomock.Controller
 	recorder *MockScrypterMockRecorder
+	isgomock struct{}
 }
 
 // MockScrypterMockRecorder is the mock recorder for MockScrypter.
@@ -78,18 +79,18 @@ func (c *MockScrypterCloseCall) DoAndReturn(f func() error) *MockScrypterCloseCa
 }
 
 // Positions mocks base method.
-func (m *MockScrypter) Positions(arg0, arg1 uint64) (postrs.ScryptPositionsResult, error) {
+func (m *MockScrypter) Positions(start, end uint64) (postrs.ScryptPositionsResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Positions", arg0, arg1)
+	ret := m.ctrl.Call(m, "Positions", start, end)
 	ret0, _ := ret[0].(postrs.ScryptPositionsResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Positions indicates an expected call of Positions.
-func (mr *MockScrypterMockRecorder) Positions(arg0, arg1 any) *MockScrypterPositionsCall {
+func (mr *MockScrypterMockRecorder) Positions(start, end any) *MockScrypterPositionsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Positions", reflect.TypeOf((*MockScrypter)(nil).Positions), arg0, arg1)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Positions", reflect.TypeOf((*MockScrypter)(nil).Positions), start, end)
 	return &MockScrypterPositionsCall{Call: call}
 }
 
