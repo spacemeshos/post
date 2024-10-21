@@ -53,7 +53,11 @@ func MigratePoST(dir string, logger *zap.Logger) (err error) {
 	}
 
 	if version.Version > len(migrateData) {
-		return fmt.Errorf("PoST metadata version %d is newer than the latest supported version %d", version.Version, len(migrateData))
+		return fmt.Errorf(
+			"PoST metadata version %d is newer than the latest supported version %d",
+			version.Version,
+			len(migrateData),
+		)
 	}
 
 	logger.Info("determined PoST version", zap.Int("version", version.Version))
@@ -84,10 +88,11 @@ type postMetadataV0 struct {
 
 // migrateV0 upgrades PoST from version 0 to version 1.
 //
-// - add version field to postdata_metadata.json (missing in version 0)
-// - add NonceValue field to postdata_metadata.json if missing (was introduced before migrations, not every PoST version 0 metadata file has it)
-// - re-encode NodeId and CommitmentAtxId as hex strings.
-// - add Scrypt field to postdata_metadata.json (missing in version 0), assume default mainnet values.
+//   - add version field to postdata_metadata.json (missing in version 0)
+//   - add NonceValue field to postdata_metadata.json if missing (was introduced before migrations,
+//     not every PoST version 0 metadata file has it)
+//   - re-encode NodeId and CommitmentAtxId as hex strings.
+//   - add Scrypt field to postdata_metadata.json (missing in version 0), assume default mainnet values.
 func migrateV0(dir string, logger *zap.Logger) (err error) {
 	filename := filepath.Join(dir, MetadataFileName)
 	file, err := os.Open(filename)
@@ -125,7 +130,7 @@ func migrateV0(dir string, logger *zap.Logger) (err error) {
 		LabelsPerUnit: old.LabelsPerUnit,
 		NumUnits:      old.NumUnits,
 		MaxFileSize:   old.MaxFileSize,
-		Scrypt:        config.DefaultLabelParams(), // we don't know the scrypt params, but on mainnet they are the default ones
+		Scrypt:        config.DefaultLabelParams(), // we don't know the scrypt params, so use mainnet defaults
 
 		Nonce:        old.Nonce,
 		NonceValue:   old.NonceValue,

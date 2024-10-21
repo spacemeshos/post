@@ -18,10 +18,38 @@ func Fuzz_MigrateMetadata(f *testing.F) {
 	commitmentAtxId := make([]byte, 32)
 	rand.Read(commitmentAtxId)
 
-	f.Add(make([]byte, 32), make([]byte, 32), []byte{1}, uint64(67), uint64(1024), uint64(1024*1024), uint64(1024), uint32(4))
-	f.Add(nodeId, commitmentAtxId, []byte{1, 23}, uint64(128), uint64(1024*1024), uint64(1024*1024*1024), uint64(2389712), uint32(16))
+	f.Add(
+		make([]byte, 32),
+		make([]byte, 32),
+		[]byte{1},
+		uint64(67),
+		uint64(1024),
+		uint64(1024*1024),
+		uint64(1024),
+		uint32(4),
+	)
+	f.Add(
+		nodeId,
+		commitmentAtxId,
+		[]byte{1, 23},
+		uint64(128),
+		uint64(1024*1024),
+		uint64(1024*1024*1024),
+		uint64(2389712),
+		uint32(16),
+	)
 
-	f.Fuzz(func(t *testing.T, nodeId, commitmentAtxId, nonceValue []byte, nonce, labelsPerUnit, maxFileSize, lastPosition uint64, numUnits uint32) {
+	f.Fuzz(func(
+		t *testing.T,
+		nodeId,
+		commitmentAtxId,
+		nonceValue []byte,
+		nonce,
+		labelsPerUnit,
+		maxFileSize,
+		lastPosition uint64,
+		numUnits uint32,
+	) {
 		if len(nodeId) != 32 || len(commitmentAtxId) != 32 {
 			return
 		}

@@ -83,7 +83,8 @@ func WithVRFDifficulty(difficulty []byte) OptionFunc {
 }
 
 // WithScryptParams sets the parameters for the scrypt algorithm.
-// At the moment only configuring N is supported. r and p are fixed at 1 (due to limitations in the OpenCL implementation).
+// At the moment only configuring N is supported. r and p are fixed at 1 (due to limitations in the OpenCL
+// implementation).
 func WithScryptParams(params shared.ScryptParams) OptionFunc {
 	return func(opts *option) error {
 		if params.P != 1 || params.R != 1 {
