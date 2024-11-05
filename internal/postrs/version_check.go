@@ -13,7 +13,7 @@ import (
 
 const (
 	// regexp matching supported versions of post-rs library
-	SUPPORTED_VERSION = `0\.7\.(\d+)` // 0.7.*
+	SUPPORTED_VERSION = `0\.8\.(\d+)` // 0.7.*
 	// Set this env variable to "true" or "1" to disable version check.
 	DISABLE_CHECK_ENV = "LIBPOST_DISABLE_VERSION_CHECK"
 )
