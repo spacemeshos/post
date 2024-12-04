@@ -9,7 +9,7 @@ require (
 	github.com/zeebo/blake3 v0.2.4
 	go.uber.org/mock v0.5.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/sync v0.9.0
+	golang.org/x/sync v0.10.0
 )
 
 require (
