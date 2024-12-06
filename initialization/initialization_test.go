@@ -3,6 +3,7 @@ package initialization
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
@@ -39,7 +40,6 @@ func getTestConfig(tb testing.TB) (config.Config, config.InitOpts) {
 	opts.NumUnits = cfg.MinNumUnits
 	opts.ProviderID = new(uint32)
 	*opts.ProviderID = CPUProviderID()
-	opts.ComputeBatchSize = 1 << 14
 	return cfg, opts
 }
 
@@ -65,7 +65,51 @@ func TestInitialize(t *testing.T) {
 		cancel()
 		eg.Wait()
 	}
-	require.Equal(t, uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+	require.Equal(t, uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+
+	m := &shared.VRFNonceMetadata{
+		NodeId:          nodeId,
+		CommitmentAtxId: commitmentAtxId,
+		NumUnits:        opts.NumUnits,
+		LabelsPerUnit:   cfg.LabelsPerUnit,
+	}
+	require.NoError(t, verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
+}
+
+func TestInitialize_NotStuck_If_No_Nonce_found(t *testing.T) {
+	// test for fixing #316
+	cfg := config.DefaultConfig()
+	cfg.LabelsPerUnit = 1024
+
+	opts := config.DefaultInitOpts()
+	opts.Scrypt.N = 8192
+	opts.DataDir = t.TempDir()
+	opts.NumUnits = 8
+	opts.ProviderID = new(uint32)
+	*opts.ProviderID = CPUProviderID()
+	opts.ComputeBatchSize = 1 << 20
+
+	nodeId, err := hex.DecodeString("9f8ec26c6f422eb435b9f9deaaa3338ba8e87a73f95aeedf37dc972a1f92df78")
+	require.NoError(t, err)
+
+	commitmentAtxId, err := hex.DecodeString("c852ff9e4172a556c4789188f5a00876c050843d793e1c5878bbe2bc7f876c20")
+	require.NoError(t, err)
+
+	init, err := NewInitializer(
+		WithNodeId(nodeId),
+		WithCommitmentAtxId(commitmentAtxId),
+		WithConfig(cfg),
+		WithInitOpts(opts),
+		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.InfoLevel))),
+	)
+	require.NoError(t, err)
+
+	{
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		require.NoError(t, init.Initialize(ctx))
+	}
+	require.Equal(t, uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m := &shared.VRFNonceMetadata{
 		NodeId:          nodeId,
@@ -146,7 +190,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	r.NoError(err)
 
 	r.NoError(init.Initialize(context.Background()))
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m := &shared.VRFNonceMetadata{
 		NodeId:          nodeId,
@@ -157,7 +201,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	r.NoError(verifying.VerifyVRFNonce(init.Nonce(), m, verifying.WithLabelScryptParams(opts.Scrypt)))
 
 	// check that the found nonce is outside of the range for calculating labels
-	r.GreaterOrEqual(*init.Nonce(), uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit)
+	r.GreaterOrEqual(*init.Nonce(), uint64(opts.NumUnits)*cfg.LabelsPerUnit)
 }
 
 func TestInitialize_ContinueWithLastPos(t *testing.T) {
@@ -175,7 +219,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(err)
 
 	r.NoError(init.Initialize(context.Background()))
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	meta := &shared.VRFNonceMetadata{
 		NodeId:          nodeId,
@@ -198,7 +242,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(err)
 
 	r.NoError(init.Initialize(context.Background()))
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err := LoadMetadata(opts.DataDir)
 	r.NoError(err)
@@ -208,7 +252,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 
 	// lastPos lower than numLabels is ignored
 	m.LastPosition = new(uint64)
-	*m.LastPosition = uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit - 10
+	*m.LastPosition = uint64(opts.NumUnits)*cfg.LabelsPerUnit - 10
 	r.NoError(SaveMetadata(opts.DataDir, m))
 
 	init, err = NewInitializer(
@@ -221,7 +265,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(err)
 
 	r.NoError(init.Initialize(context.Background()))
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err = LoadMetadata(opts.DataDir)
 	r.NoError(err)
@@ -245,15 +289,15 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(err)
 
 	r.NoError(init.Initialize(context.Background()))
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err = LoadMetadata(opts.DataDir)
 	r.NoError(err)
 	r.NotNil(m.Nonce)
 	r.NotNil(m.NonceValue)
 	r.NotNil(m.LastPosition)
-	r.LessOrEqual(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.LastPosition)
-	r.LessOrEqual(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, *m.Nonce)
+	r.LessOrEqual(uint64(opts.NumUnits)*cfg.LabelsPerUnit, *m.LastPosition)
+	r.LessOrEqual(uint64(opts.NumUnits)*cfg.LabelsPerUnit, *m.Nonce)
 
 	meta = &shared.VRFNonceMetadata{
 		NodeId:          nodeId,
@@ -279,7 +323,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	r.NoError(err)
 
 	r.NoError(init.Initialize(context.Background()))
-	r.Equal(uint64(cfg.MinNumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
+	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err = LoadMetadata(opts.DataDir)
 	r.NoError(err)
