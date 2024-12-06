@@ -303,7 +303,10 @@ func (init *Initializer) Initialize(ctx context.Context) error {
 
 	numLabels := uint64(init.opts.NumUnits) * init.cfg.LabelsPerUnit
 	difficulty := init.powDifficultyFunc(numLabels)
-	batchSize := init.opts.ComputeBatchSize
+
+	// avoid a large batch size for small numLabels
+	// this prevents the oracle from running a really long time if no vrf nonce is found during initialization
+	batchSize := min(init.opts.ComputeBatchSize, numLabels)
 
 	wo, err := oracle.New(
 		oracle.WithProviderID(init.opts.ProviderID),
