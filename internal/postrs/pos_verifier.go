@@ -89,7 +89,7 @@ func VerifyPos(dataDir string, scryptParams ScryptParams, o ...VerifyPosOptionsF
 	}
 }
 
-// cast bytes to a pointer of type T
+// cast bytes to a pointer of type T.
 func castBytes[T any](body []byte) *T {
 	var v T
 	if len(body) < int(unsafe.Sizeof(v)) {

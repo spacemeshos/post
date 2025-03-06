@@ -1,7 +1,6 @@
 package initialization
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -25,7 +24,7 @@ func TestVerifyPos(t *testing.T) {
 		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	require.NoError(t, err)
-	err = init.Initialize(context.Background())
+	err = init.Initialize(t.Context())
 	require.NoError(t, err)
 
 	scryptParams := postrs.NewScryptParams(opts.Scrypt.N, opts.Scrypt.R, opts.Scrypt.P)

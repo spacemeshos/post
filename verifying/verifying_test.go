@@ -1,7 +1,6 @@
 package verifying
 
 import (
-	"context"
 	"crypto/rand"
 	"fmt"
 	"math"
@@ -52,10 +51,10 @@ func Test_Verify(t *testing.T) {
 		initialization.WithLogger(logger),
 	)
 	r.NoError(err)
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 
 	proof, proofMetadata, err := proving.Generate(
-		context.Background(),
+		t.Context(),
 		ch,
 		cfg,
 		logger,
@@ -88,10 +87,10 @@ func Test_Verify_NoRace_On_Close(t *testing.T) {
 		initialization.WithLogger(logger),
 	)
 	r.NoError(err)
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 
 	proof, proofMetadata, err := proving.Generate(
-		context.Background(),
+		t.Context(),
 		ch,
 		cfg,
 		logger,
@@ -145,9 +144,9 @@ func Test_Verify_Detects_invalid_proof(t *testing.T) {
 		initialization.WithInitOpts(opts),
 	)
 	r.NoError(err)
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 	proof, proofMetadata, err := proving.Generate(
-		context.Background(),
+		t.Context(),
 		ch,
 		cfg,
 		logger,
@@ -208,7 +207,7 @@ func TestVerifyPow(t *testing.T) {
 		initialization.WithInitOpts(opts),
 	)
 	r.NoError(err)
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 
 	m := &shared.VRFNonceMetadata{
 		NodeId:          nodeId,
@@ -232,12 +231,12 @@ func BenchmarkVerifying(b *testing.B) {
 		initialization.WithInitOpts(opts),
 	)
 	require.NoError(b, err)
-	require.NoError(b, init.Initialize(context.Background()))
+	require.NoError(b, init.Initialize(b.Context()))
 
 	ch := make(shared.Challenge, 32)
 	rand.Read(ch)
 	p, m, err := proving.Generate(
-		context.Background(),
+		b.Context(),
 		ch, cfg,
 		zaptest.NewLogger(b),
 		proving.WithDataSource(cfg, nodeId, commitmentAtxId, opts.DataDir),

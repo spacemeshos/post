@@ -1,12 +1,13 @@
 package postrs
 
 // #cgo LDFLAGS: -lpost
+//
 // #include <stdlib.h>
 // #include "post.h"
 //
 // // forward declarations for callback C functions
 // void logCallback(ExternCRecord* record);
-// typedef void (*callback)(const struct ExternCRecord*);
+// typedef void (*callback)(const struct ExternCRecord*); // .
 import "C"
 
 import (

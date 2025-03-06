@@ -2,7 +2,6 @@ package initialization
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -85,7 +84,7 @@ func TestSearchForNonce(t *testing.T) {
 		WithLogger(logger),
 	)
 	require.NoError(t, err)
-	err = init.Initialize(context.Background())
+	err = init.Initialize(t.Context())
 	require.NoError(t, err)
 
 	metadata, err := LoadMetadata(opts.DataDir)
@@ -100,7 +99,7 @@ func TestSearchForNonce(t *testing.T) {
 	require.NoError(t, err)
 
 	nonce, value, err := SearchForNonce(
-		context.Background(),
+		t.Context(),
 		cfg,
 		opts,
 		SearchWithLogger(logger),
@@ -120,7 +119,7 @@ func TestSearchForNonce(t *testing.T) {
 	opts.ToFileIdx = &opts.FromFileIdx
 
 	_, _, err = SearchForNonce(
-		context.Background(),
+		t.Context(),
 		cfg,
 		opts,
 		SearchWithLogger(logger),
@@ -143,11 +142,11 @@ func TestSearchForNonceNotFound(t *testing.T) {
 		WithLogger(logger),
 	)
 	require.NoError(t, err)
-	err = init.Initialize(context.Background())
+	err = init.Initialize(t.Context())
 	require.NoError(t, err)
 
 	_, _, err = SearchForNonce(
-		context.Background(),
+		t.Context(),
 		cfg,
 		opts,
 		SearchWithLogger(logger),

@@ -2,7 +2,6 @@ package postrs
 
 import (
 	"encoding/hex"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -70,7 +69,7 @@ func TestScryptPositions(t *testing.T) {
 			if prevOutput == nil {
 				prevOutput = res.Output
 			} else {
-				require.Equal(t, prevOutput, res.Output, fmt.Sprintf("not equal: provider: %+v", p))
+				require.Equalf(t, prevOutput, res.Output, "not equal: provider: %+v", p)
 			}
 
 			if nonce == nil {
