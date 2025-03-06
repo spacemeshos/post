@@ -56,7 +56,7 @@ func TestInitialize(t *testing.T) {
 	require.NoError(t, err)
 
 	{
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		var eg errgroup.Group
@@ -105,7 +105,7 @@ func TestInitialize_NotStuck_If_No_Nonce_found(t *testing.T) {
 	require.NoError(t, err)
 
 	{
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 		require.NoError(t, init.Initialize(ctx))
 	}
@@ -132,7 +132,7 @@ func TestInitialize_BeforeNonceValue(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	require.NoError(t, init.Initialize(ctx))
 	cancel()
@@ -189,7 +189,7 @@ func TestInitialize_PowOutOfRange(t *testing.T) {
 	)
 	r.NoError(err)
 
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m := &shared.VRFNonceMetadata{
@@ -218,7 +218,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	)
 	r.NoError(err)
 
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	meta := &shared.VRFNonceMetadata{
@@ -241,7 +241,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	)
 	r.NoError(err)
 
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err := LoadMetadata(opts.DataDir)
@@ -264,7 +264,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	)
 	r.NoError(err)
 
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err = LoadMetadata(opts.DataDir)
@@ -288,7 +288,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	)
 	r.NoError(err)
 
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err = LoadMetadata(opts.DataDir)
@@ -322,7 +322,7 @@ func TestInitialize_ContinueWithLastPos(t *testing.T) {
 	)
 	r.NoError(err)
 
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, init.NumLabelsWritten())
 
 	m, err = LoadMetadata(opts.DataDir)
@@ -365,7 +365,7 @@ func TestReset_WhileInitializing(t *testing.T) {
 			r.ErrorIs(init.Reset(), ErrCannotResetWhileInitializing)
 			return nil
 		})
-		eg.Go(func() error { return init.Initialize(context.Background()) })
+		eg.Go(func() error { return init.Initialize(t.Context()) })
 		eg.Wait()
 
 		r.NoError(init.Reset())
@@ -387,7 +387,7 @@ func TestInitialize_Repeated(t *testing.T) {
 	r.NoError(err)
 
 	{
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		var eg errgroup.Group
@@ -408,7 +408,7 @@ func TestInitialize_Repeated(t *testing.T) {
 	r.NoError(err)
 
 	{
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		var eg errgroup.Group
@@ -436,7 +436,7 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	r.NoError(err)
 
 	{
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		var eg errgroup.Group
@@ -458,7 +458,7 @@ func TestInitialize_NumUnits_Increase(t *testing.T) {
 	r.NoError(err)
 
 	{
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		var eg errgroup.Group
@@ -485,7 +485,7 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	r.NoError(err)
 
 	{
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		var eg errgroup.Group
@@ -507,7 +507,7 @@ func TestInitialize_NumUnits_Decrease(t *testing.T) {
 	r.NoError(err)
 
 	{
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		var eg errgroup.Group
@@ -535,7 +535,7 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 	r.NoError(err)
 
 	{
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		var eg errgroup.Group
@@ -558,7 +558,7 @@ func TestInitialize_RedundantFiles(t *testing.T) {
 	r.NoError(err)
 
 	{
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		var eg errgroup.Group
@@ -602,7 +602,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 			WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 		)
 		require.NoError(t, err)
-		require.NoError(t, init.Initialize(context.Background()))
+		require.NoError(t, init.Initialize(t.Context()))
 
 		oneFileData, err = initData(opts.DataDir)
 		require.NoError(t, err)
@@ -636,7 +636,7 @@ func TestInitialize_MultipleFiles(t *testing.T) {
 				WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 			)
 			require.NoError(t, err)
-			require.NoError(t, init.Initialize(context.Background()))
+			require.NoError(t, init.Initialize(t.Context()))
 
 			multipleFilesData, err := initData(opts.DataDir)
 			require.NoError(t, err)
@@ -676,13 +676,13 @@ func TestNumLabelsWritten(t *testing.T) {
 	r.Equal(uint64(0), numLabelsWritten)
 
 	// Initialize.
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	r.NoError(err)
 	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
 
 	// Initialize repeated.
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	r.NoError(err)
 	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
@@ -699,7 +699,7 @@ func TestNumLabelsWritten(t *testing.T) {
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	r.NoError(err)
 	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 	numLabelsWritten, err = init.diskState.NumLabelsWritten()
 	r.NoError(err)
 	r.Equal(uint64(opts.NumUnits)*cfg.LabelsPerUnit, numLabelsWritten)
@@ -723,7 +723,7 @@ func TestValidateMetadata(t *testing.T) {
 	r.NoError(err)
 	r.NoError(init.verifyMetadata(m))
 
-	r.NoError(init.Initialize(context.Background()))
+	r.NoError(init.Initialize(t.Context()))
 	m, err = init.loadMetadata()
 	r.NoError(err)
 	r.NoError(init.verifyMetadata(m))
@@ -802,7 +802,7 @@ func TestStop(t *testing.T) {
 
 	// Start initialization and stop it after it has written some labels
 	{
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		var eg errgroup.Group
@@ -819,7 +819,7 @@ func TestStop(t *testing.T) {
 
 	// Continue the initialization to completion.
 	{
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		var eg errgroup.Group
@@ -878,7 +878,7 @@ func TestWrongLabelsDetected(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = init.Initialize(context.Background())
+	err = init.Initialize(t.Context())
 
 	var errWrongLabels ErrReferenceLabelMismatch
 	require.ErrorAs(t, err, &errWrongLabels)
@@ -908,7 +908,7 @@ func TestMissingProviderErrorsOnInitialize(t *testing.T) {
 	)
 	require.NoError(t, err) // no error on missing provider
 
-	err = init.Initialize(context.Background())
+	err = init.Initialize(t.Context())
 	require.ErrorContains(t, err, "no provider specified")
 }
 
@@ -926,7 +926,7 @@ func TestMissingProviderNoErrorWithFinishedInitialization(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = init.Initialize(context.Background())
+	err = init.Initialize(t.Context())
 	require.NoError(t, err)
 
 	opts.ProviderID = nil
@@ -939,7 +939,7 @@ func TestMissingProviderNoErrorWithFinishedInitialization(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = init.Initialize(context.Background())
+	err = init.Initialize(t.Context())
 	require.NoError(t, err) // no error on missing provider because init is finished already
 }
 
@@ -986,7 +986,7 @@ func TestInitializeSubset(t *testing.T) {
 		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	require.NoError(t, err)
-	err = init.Initialize(context.Background())
+	err = init.Initialize(t.Context())
 	require.NoError(t, err)
 
 	optsSubset := opts
@@ -1003,7 +1003,7 @@ func TestInitializeSubset(t *testing.T) {
 		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	require.NoError(t, err)
-	require.NoError(t, initSubset.Initialize(context.Background()))
+	require.NoError(t, initSubset.Initialize(t.Context()))
 
 	// Verify that the subset is a subset of the full set
 	fullData, err := initData(opts.DataDir)
@@ -1067,7 +1067,7 @@ func TestInitializeSubset_NoNonce(t *testing.T) {
 		}),
 	)
 	require.NoError(t, err)
-	require.NoError(t, init.Initialize(context.Background()))
+	require.NoError(t, init.Initialize(t.Context()))
 
 	// no nonce is found when initializing a subset
 	require.Nil(t, init.Nonce())
@@ -1097,7 +1097,7 @@ func TestInitializeSubset_NoNonce(t *testing.T) {
 		}),
 	)
 	require.NoError(t, err)
-	require.NoError(t, init.Initialize(context.Background()))
+	require.NoError(t, init.Initialize(t.Context()))
 
 	require.NotNil(t, init.Nonce())
 	require.NotNil(t, init.NonceValue())
@@ -1126,7 +1126,7 @@ func TestInitializeLastFileIsSmaller(t *testing.T) {
 		WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	require.NoError(t, err)
-	err = init.Initialize(context.Background())
+	err = init.Initialize(t.Context())
 	require.NoError(t, err)
 
 	// Verify that the first file contains 2 units

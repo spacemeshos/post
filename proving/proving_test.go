@@ -1,7 +1,6 @@
 package proving
 
 import (
-	"context"
 	"crypto/rand"
 	"fmt"
 	"testing"
@@ -51,14 +50,14 @@ func Test_Generate(t *testing.T) {
 				initialization.WithLogger(log),
 			)
 			r.NoError(err)
-			r.NoError(init.Initialize(context.Background()))
+			r.NoError(init.Initialize(t.Context()))
 
 			n, err := rand.Read(ch)
 			r.NoError(err)
 			r.Equal(len(ch), n)
 
 			proof, proofMetaData, err := Generate(
-				context.Background(),
+				t.Context(),
 				ch,
 				cfg,
 				log,
@@ -112,7 +111,7 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 		initialization.WithLogger(zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))),
 	)
 	require.NoError(t, err)
-	require.NoError(t, init.Initialize(context.Background()))
+	require.NoError(t, init.Initialize(t.Context()))
 
 	t.Run("invalid nodeId", func(t *testing.T) {
 		newNodeId := make([]byte, 32)
@@ -120,7 +119,7 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 		newNodeId[0] = newNodeId[0] + 1
 
 		_, _, err := Generate(
-			context.Background(),
+			t.Context(),
 			ch,
 			cfg,
 			zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
@@ -138,7 +137,7 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 		newAtxId[0] = newAtxId[0] + 1
 
 		_, _, err := Generate(
-			context.Background(),
+			t.Context(),
 			ch,
 			cfg,
 			zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
@@ -155,7 +154,7 @@ func Test_Generate_DetectInvalidParameters(t *testing.T) {
 		newCfg.LabelsPerUnit++
 
 		_, _, err := Generate(
-			context.Background(),
+			t.Context(),
 			ch,
 			newCfg,
 			zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel)),
