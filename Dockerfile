@@ -22,8 +22,8 @@ COPY . .
 RUN --mount=type=cache,id=build,target=/root/.cache/go-build make build
 
 FROM ubuntu:24.04 AS postcli
-ENV DEBIAN_FRONTEND noninteractive
-ENV SHELL /bin/bash
+ENV DEBIAN_FRONTEND=noninteractive
+ENV SHELL=/bin/bash
 USER root
 RUN set -ex \
     && apt-get update --fix-missing \
@@ -35,9 +35,9 @@ RUN set -ex \
     && rm -rf /var/lib/apt/lists/* \
     && locale-gen en_US.UTF-8 \
     && update-locale LANG=en_US.UTF-8
-ENV LANG en_US.UTF-8
-ENV LANGUAGE en_US.UTF-8
-ENV LC_ALL en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
 
 # Finally we copy the statically compiled Go binary.
 COPY --from=builder /src/build/postcli /bin/
