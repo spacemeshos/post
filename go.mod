@@ -7,9 +7,9 @@ require (
 	github.com/natefinch/atomic v1.0.1
 	github.com/stretchr/testify v1.10.0
 	github.com/zeebo/blake3 v0.2.4
-	go.uber.org/mock v0.5.2
+	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/sync v0.14.0
+	golang.org/x/sync v0.16.0
 )
 
 require (
