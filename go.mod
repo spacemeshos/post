@@ -5,7 +5,7 @@ go 1.24.1
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/natefinch/atomic v1.0.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	github.com/zeebo/blake3 v0.2.4
 	go.uber.org/mock v0.5.2
 	go.uber.org/zap v1.27.0
